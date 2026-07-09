@@ -22,8 +22,6 @@ const REDIRECT_URI = 'http://localhost:3000/api/auth/google/callback';
 
 export async function GET() {
   try {
-    , { status: 400 });
-    }
     const config = getGoogleConfig();
     if (!config) return NextResponse.json({error: 'No Google config'}, {status: 400});
     if (!config) {
