@@ -67,8 +67,6 @@ export async function fetchCalendarEvents() {
 
     const isExpired = Date.now() >= (token.created_at + (token.expires_in * 1000) - 60000);
     if (isExpired) {
-      ;
-      }
       const config = getGoogleConfig();
       if (!config) return { success: false, error: 'CRM credentials missing' };
 
