@@ -1,0 +1,344 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "multiSchema"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
+  schemas    = ["public", "auth"]
+}
+
+model Project {
+  id             String          @id @default(uuid())
+  name           String
+  description    String          @default("")
+  status         String          @default("active")
+  color          String          @default("#7c5cfc")
+  icon           String          @default("Folder")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  goals          Goal[]
+  knowledgeItems KnowledgeItem[]
+  tasks          Task[]
+
+  @@map("projects")
+
+  @@schema("public")
+}
+
+model Goal {
+  id             String          @id @default(uuid())
+  title          String
+  description    String          @default("")
+  status         String          @default("not_started")
+  targetDate     DateTime?       @map("target_date")
+  progress       Int             @default(0)
+  projectId      String?         @map("project_id")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  area           String          @default("personal")
+  project        Project?        @relation(fields: [projectId], references: [id])
+  knowledgeItems KnowledgeItem[]
+  tasks          Task[]
+
+  @@map("goals")
+
+  @@schema("public")
+}
+
+model Task {
+  id                  String    @id @default(uuid())
+  title               String
+  description         String    @default("")
+  status              String    @default("todo")
+  priority            String    @default("normal")
+  dueDate             DateTime? @map("due_date")
+  completedAt         DateTime? @map("completed_at")
+  projectId           String?   @map("project_id")
+  goalId              String?   @map("goal_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  area                String    @default("personal")
+  isRevenueGenerating Boolean   @default(false) @map("is_revenue_generating")
+  notes               String    @default("")
+  projectTags         Json      @default("[]") @map("project_tags")
+  goal                Goal?     @relation(fields: [goalId], references: [id])
+  project             Project?  @relation(fields: [projectId], references: [id])
+
+  @@map("tasks")
+
+  @@schema("public")
+}
+
+model ContentItem {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @default("")
+  status      String   @default("idee")
+  publishDate String?  @map("publish_date")
+  category    String   @default("Creator")
+  subtasks    Json     @default("[]")
+  projectTags Json     @default("[]") @map("project_tags")
+  priority    String   @default("normal")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("content_items")
+
+  @@schema("public")
+}
+
+model PersonalLog {
+  date              String   @id // YYYY-MM-DD
+  sleepHours        Float    @default(0) @map("sleep_hours")
+  bedTime           String?  @map("bed_time")
+  wakeTime          String?  @map("wake_time")
+  sleepQuality      Int      @default(3) @map("sleep_quality")
+  mood              Int      @default(3)
+  nutritionCalories Int      @default(0) @map("nutrition_calories")
+  nutritionWater    Float    @default(0) @map("nutrition_water")
+  workoutCompleted  Boolean  @default(false) @map("workout_completed")
+  workoutNotes      String?  @map("workout_notes")
+  meals             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("personal_logs")
+
+  @@schema("public")
+}
+
+model Setting {
+  key       String   @id
+  value     String?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("settings")
+
+  @@schema("public")
+}
+
+model CrmTaskOverride {
+  leadId    String   @id @map("lead_id")
+  title     String?
+  status    String   @default("todo")
+  deadline  String?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("crm_task_overrides")
+
+  @@schema("public")
+}
+
+model KnowledgeItem {
+  id        String                 @id @default(uuid())
+  title     String
+  content   String                 @default("")
+  type      String                 @default("note")
+  tags      Json                   @default("[]")
+  projectId String?                @map("project_id")
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+  embedding Unsupported("vector")?
+  goalId    String?                @map("goal_id")
+  goal      Goal?                  @relation(fields: [goalId], references: [id])
+  project   Project?               @relation(fields: [projectId], references: [id])
+
+  @@map("knowledge_items")
+
+  @@schema("public")
+}
+
+model KPI {
+  id        String   @id @default(uuid())
+  name      String
+  value     Float    @default(0)
+  target    Float    @default(0)
+  unit      String   @default("")
+  category  String   @default("general")
+  trackedAt DateTime @default(now()) @map("tracked_at")
+
+  @@map("kpis")
+
+  @@schema("public")
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  type        String
+  title       String
+  description String   @default("")
+  projectName String?  @map("project_name")
+  timestamp   DateTime @default(now())
+
+  @@map("activities")
+
+  @@schema("public")
+}
+
+model Tracker {
+  id          String        @id @default(uuid())
+  name        String
+  type        String
+  description String        @default("")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  items       TrackerItem[]
+
+  @@map("trackers")
+
+  @@schema("public")
+}
+
+model TrackerItem {
+  id               String       @id @default(uuid())
+  trackerId        String       @map("tracker_id")
+  title            String
+  icon             String?
+  order            Int
+  expectedDuration Int?
+  startWindow      String?
+  tracker          Tracker      @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+  logs             TrackerLog[]
+
+  @@map("tracker_items")
+
+  @@schema("public")
+}
+
+model TrackerLog {
+  id          String      @id @default(uuid())
+  itemId      String      @map("item_id")
+  date        DateTime
+  status      String
+  startedAt   DateTime?   @map("started_at")
+  completedAt DateTime?   @map("completed_at")
+  notes       String?
+  item        TrackerItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, date])
+  @@map("tracker_logs")
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_events {
+  id            BigInt    @id @default(autoincrement())
+  type          String
+  lead_id       BigInt
+  trigger_at    BigInt
+  status        String?   @default("pending")
+  payload       Json?
+  created_at_ms BigInt?   @default(0)
+  crm_leads     crm_leads @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lead_id], map: "idx_crm_events_lead_id")
+
+  @@schema("public")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crm_leads {
+  id                 BigInt       @id @default(autoincrement())
+  name               String
+  phone              String?      @default("")
+  notes              String?      @default("")
+  size               String?      @default("Tarifkunde")
+  entscheider        Int?         @default(0)
+  termin             Int?         @default(0)
+  rechnung           Int?         @default(0)
+  snooze_until_ms    BigInt?      @default(0)
+  last_contact_ms    BigInt?      @default(0)
+  status             String?      @default("Lead")
+  task_text          String?      @default("")
+  maps_city          String?      @default("")
+  lat                Float?       @db.Real
+  lng                Float?       @db.Real
+  website_url        String?      @default("")
+  google_maps_url    String?      @default("")
+  google_place_id    String?      @default("")
+  umsatz             Int?         @default(0)
+  starred            Int?         @default(0)
+  interest_strom     Int?         @default(0)
+  interest_gas       Int?         @default(0)
+  closed_strom       Int?         @default(0)
+  closed_gas         Int?         @default(0)
+  zaehlernummern     String?      @default("")
+  abschlussdatum     String?      @default("")
+  provi_umsatz       Int?         @default(0)
+  last_edited_ms     BigInt?      @default(0)
+  created_at_ms      BigInt?      @default(0)
+  locations          Json?        @default("[]")
+  call_history       Json?        @default("[]")
+  email              String?      @default("")
+  impressum_phone    String?      @default("")
+  legal_company_name String?      @default("")
+  director_name      String?      @default("")
+  phone_source       String?      @default("")
+  estimated_kwh      Int?         @default(0)
+  crm_events         crm_events[]
+
+  @@index([starred], map: "idx_crm_leads_starred")
+  @@index([status], map: "idx_crm_leads_status")
+
+  @@schema("public")
+}
+
+// ============================================
+// G Project (Accountability Tracker) Models
+// ============================================
+
+model tracker_action_rules {
+  id                 String  @id @default(uuid())
+  name               String
+  category           String
+  impact_type        String
+  base_value         Int
+  icon_name          String
+  requires_input     Boolean @default(false)
+  input_step         Int?
+  time_modifier      String?
+  daily_max          Int?
+  weekly_max         Int?
+  free_uses_per_week Int?
+  miss_penalty       Int?
+
+  @@map("tracker_action_rules")
+
+  @@schema("public")
+}
+
+model tracker_user_stats {
+  user_id                String  @id
+  name                   String?
+  my_points              Int     @default(5)
+  my_debt                Int     @default(0)
+  my_weekly_debt         Int     @default(0)
+  my_total_debt          Int     @default(0)
+  unpaid_weekly_debt     Int     @default(0)
+  last_settlement_date   String?
+  last_weekly_reset_date String?
+  last_gm_date           String?
+  last_late_pay_date     String?
+
+  @@map("tracker_user_stats")
+
+  @@schema("public")
+}
+
+model tracker_action_entries {
+  id             String  @id @default(uuid())
+  user_id        String
+  rule_id        String
+  timestamp      BigInt
+  points_applied Int
+  debt_applied   Int
+  is_cancelled   Boolean @default(false)
+
+  @@map("tracker_action_entries")
+
+  @@schema("public")
+}
