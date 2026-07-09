@@ -7,6 +7,19 @@ import os from 'os';
 
 const crmCredentialsPath = path.join(os.homedir(), 'dev', 'calling-station', 'credentials.json');
 
+
+
+function getGoogleConfig() {
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    return { client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET };
+  }
+  if (fs.existsSync(crmCredentialsPath)) {
+    return JSON.parse(fs.readFileSync(crmCredentialsPath, 'utf8')).installed;
+  }
+  return null;
+}
+
+
 async function getStoredToken() {
   const setting = await prisma.setting.findUnique({ where: { key: 'google_calendar_token' } });
   if (!setting || !setting.value) return null;
@@ -54,11 +67,10 @@ export async function fetchCalendarEvents() {
 
     const isExpired = Date.now() >= (token.created_at + (token.expires_in * 1000) - 60000);
     if (isExpired) {
-      if (!fs.existsSync(crmCredentialsPath)) {
-        return { success: false, error: 'CRM credentials missing' };
+      ;
       }
-      const creds = JSON.parse(fs.readFileSync(crmCredentialsPath, 'utf8'));
-      const config = creds.installed;
+      const config = getGoogleConfig();
+      if (!config) return { success: false, error: 'CRM credentials missing' };
 
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',

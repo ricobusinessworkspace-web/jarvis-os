@@ -5,7 +5,19 @@ import path from 'path';
 import os from 'os';
 
 const crmCredentialsPath = path.join(os.homedir(), 'dev', 'calling-station', 'credentials.json');
-const REDIRECT_URI = 'http://localhost:3000/api/auth/google/callback';
+const REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL ? (process.env.NEXT_PUBLIC_APP_URL + '/api/auth/google/callback') : 'http://localhost:3000/api/auth/google/callback';
+export const dynamic = 'force-dynamic';
+
+function getGoogleConfig() {
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    return { client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET };
+  }
+  if (fs.existsSync(crmCredentialsPath)) {
+    return JSON.parse(fs.readFileSync(crmCredentialsPath, 'utf8')).installed;
+  }
+  return null;
+}
+
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,8 +28,8 @@ export async function GET(req: NextRequest) {
       return new NextResponse('<html><body style="background:#000;color:#fff;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center"><div><h1 style="color:#ff9f0a;font-size:36px;margin:0">Abgebrochen</h1><p style="color:#8e8e93;margin-top:12px">Der OAuth-Flow wurde abgebrochen oder kein Code empfangen.</p></div></body></html>', { headers: { 'Content-Type': 'text/html' }});
     }
 
-    const creds = JSON.parse(fs.readFileSync(crmCredentialsPath, 'utf8'));
-    const config = creds.installed;
+    const config = getGoogleConfig();
+    if (!config) throw new Error('No Google config');
 
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
