@@ -217,26 +217,4 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* ============================================
-   Electron Desktop Integration
-   ============================================ */
 
-.electron-drag {
-  -webkit-app-region: drag;
-}
-
-.electron-no-drag {
-  -webkit-app-region: no-drag;
-}
-
-html.is-electron body {
-  background: transparent !important;
-}
-
-html.is-electron .glass {
-  background: rgba(20, 20, 22, 0.55);
-}
-
-html.is-electron .bg-background {
-  background: transparent !important;
-}

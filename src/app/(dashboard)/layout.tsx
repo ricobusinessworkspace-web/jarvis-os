@@ -9,16 +9,6 @@ import { StoreHydrator } from '@/components/layout/StoreHydrator';
 function DashboardShell({ children }: { children: ReactNode }) {
   const { isCollapsed } = useSidebar();
 
-  // ── Electron integration ──────────────────────────────
-  useEffect(() => {
-        
-    // Mark <html> so CSS can target the Electron shell
-    document.documentElement.classList.add('is-electron');
-
-    return () => {
-      document.documentElement.classList.remove('is-electron');
-    };
-  }, []);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
