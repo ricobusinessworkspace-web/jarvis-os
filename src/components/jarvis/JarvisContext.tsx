@@ -68,13 +68,36 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
 
       const decoder = new TextDecoder();
       let fullContent = '';
+      let pendingSentence = '';
+
+      // We maintain a promise chain for sequential TTS playback
+      let ttsPromise: Promise<void> = Promise.resolve();
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          // Speak the last remaining part if any
+          if (isVoiceEnabled && pendingSentence.trim().length > 0) {
+            const textToSpeak = pendingSentence.trim();
+            ttsPromise = ttsPromise.then(() => speakText(textToSpeak)).catch(console.error);
+          }
+          break;
+        }
 
         const chunk = decoder.decode(value, { stream: true });
         fullContent += chunk;
+        pendingSentence += chunk;
+
+        // Check for sentence boundaries
+        const match = pendingSentence.match(/([^.!?]+[.!?]+)(.*)/);
+        if (match) {
+          const sentenceToSpeak = match[1].trim();
+          pendingSentence = match[2] || '';
+          
+          if (isVoiceEnabled && sentenceToSpeak.length > 0) {
+            ttsPromise = ttsPromise.then(() => speakText(sentenceToSpeak)).catch(console.error);
+          }
+        }
 
         setMessages(prev => prev.map(msg => 
           msg.id === assistantMessageId 
@@ -89,11 +112,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
           ? { ...msg, isStreaming: false } 
           : msg
       ));
-
-      // Speak if enabled
-      if (isVoiceEnabled) {
-        speakText(fullContent).catch(console.error);
-      }
 
     } catch (error) {
       console.error('Failed to send message:', error);

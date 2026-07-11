@@ -68,22 +68,48 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+// Global singleton AudioContext to prevent autoplay issues
+let globalAudioContext: AudioContext | null = null;
+
+export function initAudio(): void {
+  if (typeof window === 'undefined') return;
+  if (!globalAudioContext) {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      globalAudioContext = new AudioContextClass();
+    }
+  }
+  // If it's suspended, resume it
+  if (globalAudioContext && globalAudioContext.state === 'suspended') {
+    globalAudioContext.resume().catch(console.error);
+  }
+}
+
 export async function playAudio(audioData: ArrayBuffer): Promise<void> {
   if (typeof window === 'undefined') return;
   
-  const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-  if (!AudioContext) {
+  if (!globalAudioContext) {
+    initAudio();
+  }
+  
+  if (!globalAudioContext) {
     console.error('Web Audio API is not supported in this browser.');
     return;
   }
 
-  const audioContext = new AudioContext();
-  
   try {
-    const audioBuffer = await audioContext.decodeAudioData(audioData);
-    const source = audioContext.createBufferSource();
+    // Resume context if suspended (needed for Safari/Chrome autoplay policies)
+    if (globalAudioContext.state === 'suspended') {
+      await globalAudioContext.resume();
+    }
+
+    // Clone the ArrayBuffer because decodeAudioData detached the buffer
+    const bufferClone = audioData.slice(0);
+    const audioBuffer = await globalAudioContext.decodeAudioData(bufferClone);
+    
+    const source = globalAudioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
+    source.connect(globalAudioContext.destination);
     
     return new Promise((resolve) => {
       source.onended = () => {

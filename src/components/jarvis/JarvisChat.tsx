@@ -5,6 +5,7 @@ import MessageBubble from './MessageBubble';
 import VoiceButton from './VoiceButton';
 import { ArrowUp, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { initAudio } from '@/lib/voice';
 
 export default function JarvisChat() {
   const { messages, isLoading, isVoiceEnabled, toggleVoice, sendMessage } = useJarvis();
@@ -20,6 +21,7 @@ export default function JarvisChat() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    initAudio(); // Unlock audio context on user interaction
     if (!input.trim() || isLoading) return;
     sendMessage(input);
     setInput('');
