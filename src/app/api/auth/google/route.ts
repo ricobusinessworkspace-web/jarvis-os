@@ -17,11 +17,11 @@ function getGoogleConfig() {
 }
 
 
-// Using Next.js local dev server for loopback
-const REDIRECT_URI = 'http://localhost:3000/api/auth/google/callback';
-
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const host = req.headers.get('host') || 'localhost:3000';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const REDIRECT_URI = `${protocol}://${host}/api/auth/google/callback`;
     const config = getGoogleConfig();
     if (!config) return NextResponse.json({error: 'No Google config'}, {status: 400});
     if (!config) {

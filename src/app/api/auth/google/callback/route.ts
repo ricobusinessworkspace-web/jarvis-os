@@ -5,7 +5,6 @@ import path from 'path';
 import os from 'os';
 
 const crmCredentialsPath = path.join(os.homedir(), 'dev', 'calling-station', 'credentials.json');
-const REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL ? (process.env.NEXT_PUBLIC_APP_URL + '/api/auth/google/callback') : 'http://localhost:3000/api/auth/google/callback';
 export const dynamic = 'force-dynamic';
 
 function getGoogleConfig() {
@@ -21,6 +20,10 @@ function getGoogleConfig() {
 
 export async function GET(req: NextRequest) {
   try {
+    const host = req.headers.get('host') || 'localhost:3000';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const REDIRECT_URI = `${protocol}://${host}/api/auth/google/callback`;
+
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
     

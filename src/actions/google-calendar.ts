@@ -48,7 +48,7 @@ export async function getCalendarStatus() {
 }
 
 export async function getCalendarAuthUrl() {
-  return { success: true, url: 'http://localhost:3000/api/auth/google' };
+  return { success: true, url: '/api/auth/google' };
 }
 
 export async function disconnectCalendar() {
