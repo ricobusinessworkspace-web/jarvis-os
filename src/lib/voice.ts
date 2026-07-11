@@ -79,9 +79,22 @@ export function initAudio(): void {
       globalAudioContext = new AudioContextClass();
     }
   }
-  // If it's suspended, resume it
-  if (globalAudioContext && globalAudioContext.state === 'suspended') {
-    globalAudioContext.resume().catch(console.error);
+  
+  if (globalAudioContext) {
+    if (globalAudioContext.state === 'suspended') {
+      globalAudioContext.resume().catch(console.error);
+    }
+    
+    // Play a silent buffer to unlock audio on iOS
+    try {
+      const buffer = globalAudioContext.createBuffer(1, 1, 22050);
+      const source = globalAudioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(globalAudioContext.destination);
+      source.start();
+    } catch (e) {
+      console.error('Failed to play silent buffer', e);
+    }
   }
 }
 
@@ -111,7 +124,7 @@ export async function playAudio(audioData: ArrayBuffer): Promise<void> {
     source.buffer = audioBuffer;
     source.connect(globalAudioContext.destination);
     
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       source.onended = () => {
         resolve();
       };
@@ -119,10 +132,12 @@ export async function playAudio(audioData: ArrayBuffer): Promise<void> {
     });
   } catch (error) {
     console.error('Error playing audio:', error);
+    throw error;
   }
 }
 
 export async function speakText(text: string): Promise<void> {
+  if (!text) return;
   try {
     const response = await fetch('/api/jarvis/tts', {
       method: 'POST',
@@ -139,6 +154,14 @@ export async function speakText(text: string): Promise<void> {
     const arrayBuffer = await response.arrayBuffer();
     await playAudio(arrayBuffer);
   } catch (error) {
-    console.error('Error speaking text:', error);
+    console.error('Error speaking text via TTS API, falling back to native TTS:', error);
+    fallbackTTS(text);
   }
+}
+
+function fallbackTTS(text: string) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'de-DE';
+  window.speechSynthesis.speak(utterance);
 }

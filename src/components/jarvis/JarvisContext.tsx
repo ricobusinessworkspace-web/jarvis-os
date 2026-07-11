@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { startListening as startVoiceListening, stopListening as stopVoiceListening, speakText } from '@/lib/voice';
+import { getCrmMetrics } from '@/actions/dashboard';
 
 export interface Message {
   id: string;
@@ -51,6 +52,29 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ]);
 
     try {
+      let systemPrompt = "Du bist Jarvis, der persönliche KI-Assistent von Rico. Antworte stets präzise, professionell und auf Deutsch.";
+      try {
+        const crmRes = await getCrmMetrics();
+        if (crmRes.success && crmRes.data) {
+          const data = crmRes.data;
+          systemPrompt += `\n\nAKTUELLER SYSTEM-KONTEXT (LIVE DATEN):
+Du hast Zugriff auf Ricos CRM-Daten. Hier sind die aktuellen Metriken:
+- Heutige Anrufe: ${data.todayCalls}
+- Anrufe (letzte 7 Tage): ${data.weeklyCalls}
+- Sales Pipeline:
+  - Entscheider: ${data.pipeline.entscheider} Leads
+  - Kontakt: ${data.pipeline.kontakt} Leads
+  - Rechnung: ${data.pipeline.rechnung} Leads
+  - Bestandskunden: ${data.pipeline.kunden} Leads
+- Priorisierte Leads: ${data.prioLeads} Stück
+
+Nutze dieses Wissen proaktiv, wenn Rico nach seiner Pipeline, seinen Leads oder seiner Performance fragt.
+Erfinde keine Namen oder Zahlen. Beziehe dich strikt auf diesen Live-Kontext.`;
+        }
+      } catch (err) {
+        console.error('Failed to fetch CRM metrics for context', err);
+      }
+
       // Send the request
       const response = await fetch('/api/jarvis/chat', {
         method: 'POST',
@@ -58,6 +82,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         // Pass the previous messages for context
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
+          systemPrompt,
         }),
       });
 
