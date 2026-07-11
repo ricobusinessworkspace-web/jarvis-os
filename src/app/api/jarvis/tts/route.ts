@@ -69,7 +69,7 @@ async function handleElevenLabsTTS(text: string): Promise<Response> {
   // CRITICAL: .trim() to strip any trailing whitespace/newlines from env vars
   // This is a common issue with Vercel CLI-injected environment variables
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  const voiceId = (process.env.ELEVENLABS_VOICE_ID?.trim()) || 'pNInz6obpgDQGcFmaJcg'; // default: Adam
+  const voiceId = (process.env.ELEVENLABS_VOICE_ID?.trim()) || 'pNInz6obpgDQGcFmaJgB'; // default: Adam
 
   if (!apiKey) {
     throw new Error('ELEVENLABS_API_KEY is not configured');
