@@ -9,7 +9,7 @@
 //         node jarvis-cli.mjs "Wie sieht mein CRM aus?"
 //
 // Features:
-//   - Direct Gemini API calls (no proxy)
+//   - Groq API
 //   - Function Calling with direct DB access
 //   - ElevenLabs Voice (Thomas Schendel)
 //   - Rate-limit retry (patient, no timeout)
@@ -54,7 +54,7 @@ Du hast nun vollen Zugriff auf Ricos System über "Function Calling Tools". Nutz
 DEINE FÄHIGKEITEN & TOOLS:
 1. CRM & Tasks: Nutze getCrmOverview und getTasks, wenn Rico nach seiner Arbeit fragt.
 2. Accountability: Nutze getGProjectScore, um Ricos Accountability-Punkte abzufragen.
-3. Memory (WICHTIG!): Nutze updateMemory IMMER DANN, wenn Rico neue Interessen, Vorlieben oder private Fakten erwähnt (z.B. "Ich interessiere mich jetzt für KI Aktien"). Speichere diese proaktiv ab. Nutze readMemory, um sein Profil abzurufen.
+3. Memory (WICHTIG!): Nutze updateMemory IMMER DANN, wenn Rico neue Interessen, Vorlieben oder private Fakten erwähnt. Speichere diese proaktiv ab. Nutze readMemory, um sein Profil abzurufen.
 
 PERSÖNLICHKEIT:
 - Du sprichst Rico mit "Sir" an.
@@ -94,7 +94,7 @@ const toolDeclarations = [
     type: 'function',
     function: {
       name: 'updateMemory',
-      description: 'Updates Ricos interests profile and memory. Call this proactively whenever Rico mentions new interests or preferences.',
+      description: 'Updates Ricos interests profile and memory.',
       parameters: {
         type: 'object',
         properties: {
@@ -118,7 +118,7 @@ const toolDeclarations = [
   }
 ];
 
-// ── Tool Executor (direct DB access — no HTTP, no proxy) ──
+// ── Tool Executor (direct DB access) ──
 
 async function executeTool(name, args) {
   switch (name) {
@@ -226,10 +226,7 @@ async function speak(text) {
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
   const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || 'pNInz6obpgDQGcFmaJgB';
   
-  if (!apiKey) {
-    // No ElevenLabs → skip voice
-    return;
-  }
+  if (!apiKey) { return; }
 
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
@@ -246,41 +243,27 @@ async function speak(text) {
       }),
     });
 
-    if (!res.ok) {
-      console.error(`${c.dim}[Voice] ElevenLabs error: ${res.status}${c.reset}`);
-      return;
-    }
+    if (!res.ok) { return; }
 
     const buffer = Buffer.from(await res.arrayBuffer());
     const tmpFile = join(tmpdir(), `jarvis_tts_${Date.now()}.mp3`);
     writeFileSync(tmpFile, buffer);
 
-    // Play audio on macOS
-    try {
-      execSync(`afplay "${tmpFile}"`, { stdio: 'ignore' });
-    } catch { /* user might ctrl+c during playback */ }
-    
-    try { unlinkSync(tmpFile); } catch { /* cleanup */ }
-  } catch (err) {
-    console.error(`${c.dim}[Voice] Error: ${err.message}${c.reset}`);
-  }
+    try { execSync(`afplay "${tmpFile}"`, { stdio: 'ignore' }); } catch {}
+    try { unlinkSync(tmpFile); } catch {}
+  } catch (err) {}
 }
 
 // ── Agent Loop ──
 
 async function chat(userText, conversationHistory) {
-  // Add user message
   conversationHistory.push({ role: 'user', content: userText });
-
   const maxIterations = 5;
 
   for (let i = 0; i < maxIterations; i++) {
     process.stdout.write(`${c.dim}  🧠 Denke nach...${c.reset}\r`);
 
-    const finalMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...conversationHistory
-    ];
+    const finalMessages = [{ role: 'system', content: SYSTEM_PROMPT }, ...conversationHistory];
 
     let response;
     try {
@@ -295,23 +278,17 @@ async function chat(userText, conversationHistory) {
     }
 
     const message = response.choices?.[0]?.message;
-    if (!message) {
-      return 'Keine Antwort von Groq erhalten.';
-    }
+    if (!message) return 'Keine Antwort erhalten.';
 
-    // Check for function calls
     if (message.tool_calls && message.tool_calls.length > 0) {
-      // Add model response to history
       conversationHistory.push(message);
 
-      // Execute each tool
       for (const tc of message.tool_calls) {
         const name = tc.function.name;
         let args = {};
         try { args = JSON.parse(tc.function.arguments); } catch (e) {}
 
         process.stdout.write(`  ${c.yellow}🔧 ${name}${c.reset}                    \n`);
-
         const result = await executeTool(name, args);
         
         conversationHistory.push({
@@ -321,25 +298,15 @@ async function chat(userText, conversationHistory) {
           content: JSON.stringify(result)
         });
       }
-
-      // Continue loop → Groq will generate final text
       continue;
     }
 
-    // Extract text response
     const fullText = message.content || '';
-
-    // Add to history
-    conversationHistory.push({
-      role: 'assistant',
-      content: fullText
-    });
-
+    conversationHistory.push({ role: 'assistant', content: fullText });
     process.stdout.write('                                       \r');
     return fullText;
   }
-
-  return 'Maximale Tool-Iterationen erreicht.';
+  return 'Maximale Iterationen erreicht.';
 }
 
 // ── Main ──
@@ -353,15 +320,13 @@ async function main() {
   console.log(`  ${c.dim}  Groq ${GROQ_MODEL} • ElevenLabs Voice • Supabase DB${c.reset}`);
   console.log(`  ${c.dim}  Tippe "exit" zum Beenden${c.reset}\n`);
 
-  // Test DB connection
   try {
     await prisma.$queryRaw`SELECT 1`;
     console.log(`  ${c.green}✓${c.reset} Datenbank verbunden`);
   } catch (err) {
-    console.log(`  ${c.red}✗${c.reset} Datenbank-Fehler: ${err.message}`);
+    console.log(`  ${c.red}✗${c.reset} Datenbank-Fehler`);
   }
 
-  // Test Groq
   try {
     await groq.chat.completions.create({ model: GROQ_MODEL, messages: [{role: 'user', content: 'ping'}] });
     console.log(`  ${c.green}✓${c.reset} Groq verbunden`);
@@ -369,13 +334,11 @@ async function main() {
     console.log(`  ${c.red}✗${c.reset} Groq-Fehler: ${err.message}`);
   }
 
-  console.log(`  ${c.green}✓${c.reset} ElevenLabs ${process.env.ELEVENLABS_API_KEY ? 'konfiguriert' : 'nicht konfiguriert (nur Text)'}`);
-  console.log('');
+  console.log(`  ${c.green}✓${c.reset} ElevenLabs ${process.env.ELEVENLABS_API_KEY ? 'konfiguriert' : 'nicht konfiguriert'}\n`);
 
   const conversationHistory = [];
-
-  // Check for one-shot command line argument
   const oneShot = process.argv.slice(2).join(' ').trim();
+  
   if (oneShot) {
     try {
       const reply = await chat(oneShot, conversationHistory);
@@ -388,7 +351,6 @@ async function main() {
     process.exit(0);
   }
 
-  // Interactive REPL
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -396,7 +358,6 @@ async function main() {
   });
 
   rl.prompt();
-
   rl.on('line', async (line) => {
     const input = line.trim();
     if (!input) { rl.prompt(); return; }
@@ -413,7 +374,6 @@ async function main() {
     } catch (err) {
       console.error(`\n  ${c.red}Error:${c.reset} ${err.message}\n`);
     }
-
     rl.prompt();
   });
 

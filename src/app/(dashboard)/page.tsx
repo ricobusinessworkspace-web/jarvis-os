@@ -24,7 +24,6 @@ import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
 import {
   getDashboardData,
   getCrmMetrics,
-  updateTask,
   savePersonalLog,
   logTrackerItem,
   updateTrackerItem
@@ -196,12 +195,13 @@ export default function DashboardPage() {
 
   // --- Task Actions ---
   const saveTaskEdit = async (taskId: string) => {
-        const title = taskEditTitle.trim();
-    if (!title) return;
+    const title = taskEditTitle.trim();
+    if (!title || !api) return;
     try {
-      const res = await updateTask(taskId, { title, dueDate: taskEditDeadline || null, notes: taskEditNotes });
-      if (res.success) {
-        updateTaskInStore(taskId, { title, dueDate: taskEditDeadline || null, notes: taskEditNotes });
+      const payload = { title, dueDate: taskEditDeadline || null, description: taskEditNotes };
+      const res = await api.updateTask(taskId, payload);
+      if (res) {
+        updateTaskInStore(taskId, payload);
         setEditingTaskId(null);
       }
     } catch (e) {
@@ -210,11 +210,12 @@ export default function DashboardPage() {
   };
 
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
-        try {
+    if (!api) return;
+    try {
       const newStatus = currentStatus === 'done' ? 'todo' : 'done';
       const completedAt = newStatus === 'done' ? new Date().toISOString() : null;
-      const res = await updateTask(taskId, { status: newStatus, completedAt });
-      if (res.success) {
+      const res = await api.updateTask(taskId, { status: newStatus, completedAt });
+      if (res) {
         updateTaskInStore(taskId, { status: newStatus, completedAt });
       }
     } catch (e) {
@@ -223,10 +224,11 @@ export default function DashboardPage() {
   };
 
   const toggleTaskPriority = async (taskId: string, currentPriority: string) => {
-        try {
+    if (!api) return;
+    try {
       const newPriority = currentPriority === 'high' ? 'normal' : 'high';
-      const res = await updateTask(taskId, { priority: newPriority });
-      if (res.success) {
+      const res = await api.updateTask(taskId, { priority: newPriority });
+      if (res) {
         updateTaskInStore(taskId, { priority: newPriority });
       }
     } catch (e) {
