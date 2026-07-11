@@ -50,6 +50,17 @@ export async function GET(req: NextRequest) {
 
     data.created_at = Date.now();
     
+    // Preserve existing refresh token if Google didn't send a new one
+    const existingSetting = await prisma.setting.findUnique({ where: { key: 'google_calendar_token' } });
+    if (existingSetting?.value) {
+      try {
+        const existingToken = JSON.parse(existingSetting.value);
+        if (!data.refresh_token && existingToken.refresh_token) {
+          data.refresh_token = existingToken.refresh_token;
+        }
+      } catch (e) {}
+    }
+    
     // Store in Postgres via Prisma
     await prisma.setting.upsert({
       where: { key: 'google_calendar_token' },
