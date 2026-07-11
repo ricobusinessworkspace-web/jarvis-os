@@ -14,6 +14,9 @@ export function StoreHydrator({ children }: { children: React.ReactNode }) {
       const result = await getDashboardData();
       if (result.success && result.data) {
         initialize(result.data as any);
+      } else {
+        console.error('Failed to load dashboard data:', result.error);
+        alert(`Error loading data: ${result.error}`);
       }
       setLoading(false);
     }

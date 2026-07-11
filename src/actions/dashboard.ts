@@ -44,8 +44,10 @@ export async function getDashboardData() {
 
     let todayLog = personalLogs.find(l => l.date === todayStr);
     if (!todayLog) {
-      todayLog = await prisma.personalLog.create({
-        data: { date: todayStr }
+      todayLog = await prisma.personalLog.upsert({
+        where: { date: todayStr },
+        update: {},
+        create: { date: todayStr }
       });
       personalLogs.push(todayLog);
     }
