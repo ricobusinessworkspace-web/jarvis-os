@@ -66,8 +66,6 @@ export async function getDashboardData() {
 // ─── CRM ───
 export async function getCrmMetrics() {
   try {
-    // Need to aggregate data from crm_leads and crm_events
-    // We do raw queries or Prisma queries if possible
     const nowMs = Date.now();
     const weekAgoMs = nowMs - 7 * 24 * 60 * 60 * 1000;
     
@@ -75,12 +73,34 @@ export async function getCrmMetrics() {
     const totalLeadsRow = await prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM crm_leads`;
     const calledTodayRow = await prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM crm_events WHERE type='call' AND created_at_ms >= ${nowMs - 24 * 60 * 60 * 1000}`;
     const calledWeekRow = await prisma.$queryRaw<any[]>`SELECT COUNT(*) as count FROM crm_events WHERE type='call' AND created_at_ms >= ${weekAgoMs}`;
-    const pipelineRow = await prisma.$queryRaw<any[]>`SELECT SUM(umsatz) as sum FROM crm_leads WHERE status NOT IN ('TerminGeplatzt', 'TerminAbgesagt')`;
+    
+    // New Pipeline Query
+    const pipelineRow = await prisma.$queryRaw<any[]>`
+      SELECT 
+        COUNT(CASE WHEN entscheider = 1 THEN 1 END)::int as entscheider,
+        COUNT(CASE WHEN termin = 1 THEN 1 END)::int as kontakt,
+        COUNT(CASE WHEN rechnung = 1 THEN 1 END)::int as rechnung,
+        COUNT(CASE WHEN status = 'Kunde' THEN 1 END)::int as kunden
+      FROM crm_leads
+      WHERE status != 'Uninteressant'
+    `;
+
+    const prioLeadsRow = await prisma.$queryRaw<any[]>`
+      SELECT COUNT(CASE WHEN starred = 1 THEN 1 END)::int as count FROM crm_leads WHERE status != 'Uninteressant'
+    `;
     
     const countTotal = Number(totalLeadsRow[0]?.count || 0);
     const todayCalls = Number(calledTodayRow[0]?.count || 0);
     const weeklyCalls = Number(calledWeekRow[0]?.count || 0);
-    const monthlyRevenue = Number(pipelineRow[0]?.sum || 0);
+    
+    const pipeline = {
+      entscheider: Number(pipelineRow[0]?.entscheider || 0),
+      kontakt: Number(pipelineRow[0]?.kontakt || 0),
+      rechnung: Number(pipelineRow[0]?.rechnung || 0),
+      kunden: Number(pipelineRow[0]?.kunden || 0),
+    };
+    
+    const prioLeads = Number(prioLeadsRow[0]?.count || 0);
 
     return { 
       success: true, 
@@ -88,8 +108,9 @@ export async function getCrmMetrics() {
         totalLeads: countTotal,
         todayCalls,
         weeklyCalls,
-        monthlyRevenue,
-        priorityLeads: []
+        pipeline,
+        prioLeads,
+        priorityLeads: [] // Keeping for backward compatibility if needed, or remove later
       } 
     };
   } catch (error: any) {

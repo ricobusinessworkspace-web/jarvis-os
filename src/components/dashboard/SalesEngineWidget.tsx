@@ -72,42 +72,28 @@ export default function SalesEngineWidget() {
           </span>
           <span className="text-2xl font-bold">{metrics.weeklyCalls}</span>
         </div>
-        
-        <div className="col-span-2 flex flex-col p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-          <span className="text-xs text-green-600/80 dark:text-green-400/80 font-medium mb-1 flex items-center gap-1">
-            <TrendingUp className="h-3.5 w-3.5" /> Total Pipeline Revenue
-          </span>
-          <span className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {metrics.monthlyRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-          </span>
-        </div>
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Priority Leads</h4>
-        {metrics.priorityLeads.length > 0 ? (
-          <div className="flex flex-col gap-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-            {metrics.priorityLeads.map((lead, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="flex items-center justify-between p-2 rounded-md bg-background border text-sm"
-              >
-                <span className="font-medium flex items-center gap-2">
-                  <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" /> 
-                  {lead.name}
-                </span>
-                {lead.umsatz > 0 && (
-                  <span className="text-muted-foreground">€{lead.umsatz}</span>
-                )}
-              </motion.div>
-            ))}
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Sales Pipeline</h4>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="flex flex-col p-2 rounded-lg bg-accent/10 border border-accent/20 text-center">
+            <span className="text-[10px] text-muted-foreground uppercase mb-1">Entscheider</span>
+            <span className="text-lg font-bold text-accent">{metrics.pipeline?.entscheider || 0}</span>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground italic">No starred leads right now.</p>
-        )}
+          <div className="flex flex-col p-2 rounded-lg bg-accent/10 border border-accent/20 text-center">
+            <span className="text-[10px] text-muted-foreground uppercase mb-1">Kontakt</span>
+            <span className="text-lg font-bold text-accent">{metrics.pipeline?.kontakt || 0}</span>
+          </div>
+          <div className="flex flex-col p-2 rounded-lg bg-accent/10 border border-accent/20 text-center">
+            <span className="text-[10px] text-muted-foreground uppercase mb-1">Rechnung</span>
+            <span className="text-lg font-bold text-accent">{metrics.pipeline?.rechnung || 0}</span>
+          </div>
+          <div className="flex flex-col p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
+            <span className="text-[10px] text-muted-foreground uppercase mb-1 flex items-center justify-center gap-1"><Star className="h-3 w-3" /> Prio</span>
+            <span className="text-lg font-bold text-yellow-600 dark:text-yellow-500">{metrics.prioLeads || 0}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

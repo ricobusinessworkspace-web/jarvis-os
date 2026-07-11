@@ -87,7 +87,13 @@ export interface TrackerWithItems extends Tracker {
 export interface CrmMetrics {
   todayCalls: number;
   weeklyCalls: number;
-  monthlyRevenue: number;
+  pipeline: {
+    entscheider: number;
+    kontakt: number;
+    rechnung: number;
+    kunden: number;
+  };
+  prioLeads: number;
   priorityLeads: Array<{ name: string; umsatz: number }>;
 }
 
