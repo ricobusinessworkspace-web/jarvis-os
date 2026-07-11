@@ -69,7 +69,7 @@ async function handleElevenLabsTTS(text: string): Promise<Response> {
   // CRITICAL: .trim() to strip any trailing whitespace/newlines from env vars
   // This is a common issue with Vercel CLI-injected environment variables
   const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  const voiceId = (process.env.ELEVENLABS_VOICE_ID?.trim()) || 'pNInz6obpgDQGcFmaJgB'; // default: Adam
+  const voiceId = (process.env.ELEVENLABS_VOICE_ID?.trim()) || 'Fghah4fztZORbiKfIGAs'; // default: Thomas Schendel
 
   if (!apiKey) {
     throw new Error('ELEVENLABS_API_KEY is not configured');
@@ -78,25 +78,25 @@ async function handleElevenLabsTTS(text: string): Promise<Response> {
   // Debug logging (key length only, never log the key itself!)
   console.log(`[TTS] ElevenLabs request — key length: ${apiKey.length}, voice: ${voiceId}`);
 
-  const elevenlabsRes = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
-    {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        text,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-        },
-      }),
-    }
-  );
+  // Use eleven_flash_v2_5 for lowest latency
+  const elevenlabsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
+    method: 'POST',
+    headers: {
+      'Accept': 'audio/mpeg',
+      'Content-Type': 'application/json',
+      'xi-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      text: text,
+      model_id: 'eleven_flash_v2_5',
+      voice_settings: {
+        stability: 0.4,
+        similarity_boost: 0.82,
+        style: 0.15,
+        use_speaker_boost: false
+      }
+    }),
+  });
 
   if (!elevenlabsRes.ok) {
     const errorText = await elevenlabsRes.text();

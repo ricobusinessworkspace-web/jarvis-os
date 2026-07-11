@@ -1,8 +1,7 @@
 'use client';
-import { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { speakText, extractSentences } from '@/lib/voice';
-import { getCrmMetrics } from '@/actions/dashboard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,40 +29,6 @@ interface JarvisContextType {
 }
 
 const JarvisContext = createContext<JarvisContextType | undefined>(undefined);
-
-// ---------------------------------------------------------------------------
-// System Prompt Builder
-// ---------------------------------------------------------------------------
-
-const BASE_SYSTEM_PROMPT = "Du bist Jarvis, der persönliche KI-Assistent von Rico. Antworte stets präzise, professionell und auf Deutsch. WICHTIG: Halte deine Antworten extrem kurz und prägnant (maximal 1-2 kurze Sätze), um Zeichen zu sparen.";
-
-async function buildSystemPrompt(): Promise<string> {
-  let systemPrompt = BASE_SYSTEM_PROMPT;
-
-  try {
-    const crmRes = await getCrmMetrics();
-    if (crmRes.success && crmRes.data) {
-      const data = crmRes.data;
-      systemPrompt += `\n\nAKTUELLER SYSTEM-KONTEXT (LIVE DATEN):
-Du hast Zugriff auf Ricos CRM-Daten. Hier sind die aktuellen Metriken:
-- Heutige Anrufe: ${data.todayCalls}
-- Anrufe (letzte 7 Tage): ${data.weeklyCalls}
-- Sales Pipeline:
-  - Entscheider: ${data.pipeline.entscheider} Leads
-  - Kontakt: ${data.pipeline.kontakt} Leads
-  - Rechnung: ${data.pipeline.rechnung} Leads
-  - Bestandskunden: ${data.pipeline.kunden} Leads
-- Priorisierte Leads: ${data.prioLeads} Stück
-
-Nutze dieses Wissen proaktiv, wenn Rico nach seiner Pipeline, seinen Leads oder seiner Performance fragt.
-Erfinde keine Namen oder Zahlen. Beziehe dich strikt auf diesen Live-Kontext.`;
-    }
-  } catch (err) {
-    console.error('[Jarvis] Failed to fetch CRM metrics for context:', err);
-  }
-
-  return systemPrompt;
-}
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -106,9 +71,6 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ]);
 
     try {
-      // Build system prompt with live CRM data
-      const systemPrompt = await buildSystemPrompt();
-
       // Use the ref to get the latest messages (avoids stale closure)
       const currentMessages = messagesRef.current;
 
@@ -116,8 +78,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...currentMessages, userMessage].map(m => ({ role: m.role, content: m.content })),
-          systemPrompt,
+          messages: [...currentMessages, userMessage].map(m => ({ role: m.role, content: m.content }))
         }),
       });
 
@@ -195,6 +156,24 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, []); // No dependencies — we use refs for mutable values
+
+  // Auto Morning Briefing Logic
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Slight delay to ensure the UI is loaded before Jarvis starts talking
+    const timer = setTimeout(() => {
+      const today = new Date().toISOString().split('T')[0];
+      const lastBriefing = localStorage.getItem('jarvis_last_briefing_date');
+      
+      if (lastBriefing !== today) {
+        localStorage.setItem('jarvis_last_briefing_date', today);
+        sendMessage("Guten Morgen Jarvis, bitte gib mir mein tägliches Morning Briefing.");
+      }
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [sendMessage]);
 
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
