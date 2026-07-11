@@ -1,167 +1,201 @@
-// Extend window interface to include speech recognition types
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+// ============================================================================
+// Voice Engine — Audio Playback & TTS Client
+// ============================================================================
+// Handles audio context management, TTS API calls, and audio playback.
+// Speech Recognition (STT) is in src/hooks/useSpeechRecognition.ts
+// ============================================================================
+
+// ---------------------------------------------------------------------------
+// AudioContext Singleton
+// ---------------------------------------------------------------------------
+let audioCtx: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
+
+export function getAudioContext(): AudioContext {
+  if (typeof window === 'undefined') {
+    throw new Error('AudioContext is not available in SSR');
   }
+  if (!audioCtx) {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) throw new Error('Web Audio API is not supported');
+    audioCtx = new Ctor();
+  }
+  return audioCtx;
 }
 
-let recognition: any = null;
-
-export function startListening(onResult: (text: string) => void, onEnd: () => void): void {
-  if (typeof window === 'undefined') return;
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
-  if (!SpeechRecognition) {
-    console.error('Speech recognition is not supported in this browser.');
-    onEnd();
-    return;
-  }
-
-  if (recognition) {
-    recognition.stop();
-  }
-
-  recognition = new SpeechRecognition();
-  recognition.lang = 'de-DE';
-  recognition.continuous = false;
-  recognition.interimResults = false;
-
-  recognition.onresult = (event: any) => {
-    const transcript = event.results[0][0].transcript;
-    onResult(transcript);
-  };
-
-  recognition.onerror = (event: any) => {
-    console.error('Speech recognition error:', event.error);
-    onEnd();
-  };
-
-  recognition.onend = () => {
-    onEnd();
-    recognition = null;
-  };
-
-  try {
-    recognition.start();
-  } catch (e) {
-    console.error('Failed to start speech recognition:', e);
-    onEnd();
-  }
-}
-
-export function stopListening(): void {
-  if (recognition) {
-    recognition.stop();
-    recognition = null;
-  }
-}
-
-// Convert Base64 string to ArrayBuffer
-export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = window.atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
-// Global singleton AudioContext to prevent autoplay issues
-let globalAudioContext: AudioContext | null = null;
-
+/**
+ * Must be called from a user-gesture event handler to unlock audio on iOS/Safari.
+ */
 export function initAudio(): void {
   if (typeof window === 'undefined') return;
-  if (!globalAudioContext) {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContextClass) {
-      globalAudioContext = new AudioContextClass();
+  try {
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(console.error);
     }
-  }
-  
-  if (globalAudioContext) {
-    if (globalAudioContext.state === 'suspended') {
-      globalAudioContext.resume().catch(console.error);
-    }
-    
     // Play a silent buffer to unlock audio on iOS
-    try {
-      const buffer = globalAudioContext.createBuffer(1, 1, 22050);
-      const source = globalAudioContext.createBufferSource();
-      source.buffer = buffer;
-      source.connect(globalAudioContext.destination);
-      source.start();
-    } catch (e) {
-      console.error('Failed to play silent buffer', e);
-    }
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
+  } catch (e) {
+    console.error('[VoiceEngine] Failed to init audio:', e);
   }
 }
 
+// ---------------------------------------------------------------------------
+// Audio Playback
+// ---------------------------------------------------------------------------
+
+/**
+ * Play raw audio data (ArrayBuffer) through the Web Audio API.
+ * Returns a promise that resolves when playback finishes.
+ */
 export async function playAudio(audioData: ArrayBuffer): Promise<void> {
   if (typeof window === 'undefined') return;
-  
-  if (!globalAudioContext) {
-    initAudio();
-  }
-  
-  if (!globalAudioContext) {
-    console.error('Web Audio API is not supported in this browser.');
-    return;
+
+  const ctx = getAudioContext();
+
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
   }
 
-  try {
-    // Resume context if suspended (needed for Safari/Chrome autoplay policies)
-    if (globalAudioContext.state === 'suspended') {
-      await globalAudioContext.resume();
-    }
+  // Clone buffer since decodeAudioData detaches the original
+  const audioBuffer = await ctx.decodeAudioData(audioData.slice(0));
 
-    // Clone the ArrayBuffer because decodeAudioData detached the buffer
-    const bufferClone = audioData.slice(0);
-    const audioBuffer = await globalAudioContext.decodeAudioData(bufferClone);
-    
-    const source = globalAudioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(globalAudioContext.destination);
-    
-    return new Promise((resolve, reject) => {
-      source.onended = () => {
-        resolve();
-      };
-      source.start();
-    });
-  } catch (error) {
-    console.error('Error playing audio:', error);
-    throw error;
+  // Stop any currently playing audio
+  stopAudio();
+
+  const source = ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(ctx.destination);
+  currentSource = source;
+
+  return new Promise<void>((resolve) => {
+    source.onended = () => {
+      if (currentSource === source) currentSource = null;
+      resolve();
+    };
+    source.start();
+  });
+}
+
+/**
+ * Stop currently playing audio immediately.
+ */
+export function stopAudio(): void {
+  if (currentSource) {
+    try {
+      currentSource.stop();
+    } catch { /* already stopped */ }
+    currentSource = null;
   }
 }
 
-export async function speakText(text: string): Promise<void> {
-  if (!text) return;
+// ---------------------------------------------------------------------------
+// TTS Client — Calls the /api/jarvis/tts route
+// ---------------------------------------------------------------------------
+
+export type TTSProvider = 'elevenlabs' | 'gemini';
+
+export interface SpeakOptions {
+  provider?: TTSProvider;
+}
+
+/**
+ * Send text to the TTS API route and play the returned audio.
+ * Falls back to native browser TTS if the API call fails entirely.
+ */
+export async function speakText(text: string, options?: SpeakOptions): Promise<void> {
+  if (!text?.trim()) return;
+
   try {
-    const response = await fetch('/api/jarvis/tts', {
+    const params = options?.provider ? `?provider=${options.provider}` : '';
+    const response = await fetch(`/api/jarvis/tts${params}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.trim() }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to generate speech');
+      const errorBody = await response.text().catch(() => 'unknown');
+      console.error(`[VoiceEngine] TTS API error (${response.status}):`, errorBody);
+      throw new Error(`TTS API returned ${response.status}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength === 0) {
+      throw new Error('TTS API returned empty audio');
+    }
     await playAudio(arrayBuffer);
   } catch (error) {
-    console.error('Error speaking text via TTS API, falling back to native TTS:', error);
-    fallbackTTS(text);
+    console.warn('[VoiceEngine] TTS API failed, falling back to browser TTS:', error);
+    fallbackBrowserTTS(text);
   }
 }
 
-function fallbackTTS(text: string) {
+// ---------------------------------------------------------------------------
+// Browser TTS Fallback (SpeechSynthesis API)
+// ---------------------------------------------------------------------------
+
+export function fallbackBrowserTTS(text: string): void {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+  // Cancel any ongoing speech
+  window.speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'de-DE';
+  utterance.rate = 1.0;
+  utterance.pitch = 0.95;
   window.speechSynthesis.speak(utterance);
+}
+
+// ---------------------------------------------------------------------------
+// Sentence Boundary Detection
+// ---------------------------------------------------------------------------
+
+// Common German abbreviations that should NOT trigger a sentence break
+const ABBREVIATIONS = new Set([
+  'z.b.', 'bzw.', 'nr.', 'dr.', 'hr.', 'fr.', 'prof.', 'ca.', 'etc.',
+  'inkl.', 'exkl.', 'ggf.', 'evtl.', 'usw.', 'u.a.', 'o.ä.', 'd.h.',
+  'str.', 'tel.', 'max.', 'min.', 'abs.', 'zzgl.', 'mwst.'
+]);
+
+/**
+ * Splits accumulated text into complete sentences and a remainder.
+ * Handles German abbreviations correctly to avoid false splits.
+ *
+ * @returns [completeSentences, remainder]
+ */
+export function extractSentences(text: string): [string[], string] {
+  const sentences: string[] = [];
+  let current = '';
+
+  for (let i = 0; i < text.length; i++) {
+    current += text[i];
+
+    if (text[i] === '.' || text[i] === '!' || text[i] === '?') {
+      // Check if this period is part of an abbreviation
+      const lowerCurrent = current.toLowerCase().trimStart();
+      const isAbbreviation = Array.from(ABBREVIATIONS).some(abbr =>
+        lowerCurrent.endsWith(abbr)
+      );
+
+      if (!isAbbreviation) {
+        // Check if next char is whitespace or end of text (sentence boundary)
+        const nextChar = text[i + 1];
+        if (!nextChar || nextChar === ' ' || nextChar === '\n') {
+          const sentence = current.trim();
+          if (sentence.length > 0) {
+            sentences.push(sentence);
+          }
+          current = '';
+        }
+      }
+    }
+  }
+
+  return [sentences, current];
 }

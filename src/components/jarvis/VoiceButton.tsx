@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { initAudio, startListening, stopListening } from '@/lib/voice';
+import { initAudio } from '@/lib/voice';
 import { useJarvis } from './JarvisContext';
 
 export default function VoiceButton() {
