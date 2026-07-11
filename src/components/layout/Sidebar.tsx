@@ -100,32 +100,31 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Separator line */}
-        <div className="my-4 border-t border-border/50" />
-
-        {/* ── Direct CRM Launcher Button ────────────────────── */}
-        <button
-          onClick={handleLaunchCRM}
+        {/* ── Jarvis AI Link ────────────────────── */}
+        <Link
+          href="/jarvis"
           className={cn(
-            'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-secondary hover:bg-green-500/10 hover:text-green-400 transition-all duration-150'
+            'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+            pathname.startsWith('/jarvis')
+              ? 'bg-accent/20 text-accent font-semibold border border-accent/20'
+              : 'text-secondary hover:bg-accent/10 hover:text-accent border border-transparent'
           )}
         >
-          <PhoneCall
-            size={18}
-            className="shrink-0 text-muted group-hover:text-green-400 transition-colors duration-150"
-          />
+          <div className="flex items-center justify-center w-[18px] h-[18px]">
+            <span className="text-[16px] leading-none">🤖</span>
+          </div>
           {!isCollapsed && (
             <motion.span
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="whitespace-nowrap text-left"
+              className="whitespace-nowrap flex-1"
             >
-              Calling Station
+              Jarvis AI
             </motion.span>
           )}
-        </button>
+        </Link>
       </nav>
 
       {/* ── User + Collapse Toggle ────────── */}
