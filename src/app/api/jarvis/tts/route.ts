@@ -1,6 +1,4 @@
 import { NextRequest } from 'next/server';
-import { generateTTS } from '@/lib/gemini';
-import { base64ToArrayBuffer } from '@/lib/voice'; // Wait, server side doesn't have window.atob. I need to convert it differently.
 
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +13,40 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { audioData, mimeType } = await generateTTS(text);
-    
-    // Convert base64 to buffer for the response
-    const audioBuffer = Buffer.from(audioData, 'base64');
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJcg'; // default Adam
+    const apiKey = process.env.ELEVENLABS_API_KEY;
 
-    return new Response(audioBuffer, {
+    if (!apiKey) {
+      throw new Error('ELEVENLABS_API_KEY is not configured in environment variables');
+    }
+
+    const elevenlabsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
       headers: {
-        'Content-Type': mimeType,
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
+      })
+    });
+
+    if (!elevenlabsRes.ok) {
+      const errorText = await elevenlabsRes.text();
+      throw new Error(`ElevenLabs API Error: ${errorText}`);
+    }
+
+    const arrayBuffer = await elevenlabsRes.arrayBuffer();
+
+    return new Response(arrayBuffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });

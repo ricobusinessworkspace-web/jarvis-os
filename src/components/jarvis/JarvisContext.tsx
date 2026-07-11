@@ -52,7 +52,7 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ]);
 
     try {
-      let systemPrompt = "Du bist Jarvis, der persönliche KI-Assistent von Rico. Antworte stets präzise, professionell und auf Deutsch.";
+      let systemPrompt = "Du bist Jarvis, der persönliche KI-Assistent von Rico. Antworte stets präzise, professionell und auf Deutsch. WICHTIG: Halte deine Antworten extrem kurz und prägnant (maximal 1-2 kurze Sätze), um Zeichen zu sparen.";
       try {
         const crmRes = await getCrmMetrics();
         if (crmRes.success && crmRes.data) {
