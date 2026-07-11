@@ -236,11 +236,9 @@ export async function runAgent(options: AgentOptions): Promise<string> {
     maxIterations = 5,
   } = options;
 
-  // Convert chat messages to Gemini-format contents
-  const contents: any[] = messages.map((msg) => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  // Messages are already mostly in the correct format, but we keep a local array
+  // to append tool calls and results during the loop.
+  const conversationHistory: any[] = [...messages];
 
   let fullText = '';
 
@@ -249,13 +247,11 @@ export async function runAgent(options: AgentOptions): Promise<string> {
       throw new DOMException('Aborted', 'AbortError');
     }
 
-    // ── Step 1: Call Gemini (streaming) ──
+    // ── Step 1: Call LLM (streaming) ──
     const { text, functionCalls } = await callLLMStreaming(
-      contents,
+      conversationHistory,
       systemPrompt,
       signal,
-      // Only pipe text chunks on the final iteration (when there are no function calls)
-      // Function-call responses don't contain user-facing text
       callbacks.onTextChunk
     );
 
@@ -266,10 +262,15 @@ export async function runAgent(options: AgentOptions): Promise<string> {
         callbacks.onToolCall?.(call.name);
       }
 
-      // Add model's function-call response to conversation history
-      contents.push({
-        role: 'model',
-        parts: functionCalls.map((c: any) => ({ functionCall: c })),
+      // Add model's tool_calls to conversation history
+      conversationHistory.push({
+        role: 'assistant',
+        content: null,
+        tool_calls: functionCalls.map((c: any) => ({
+          id: c.id || `call_${c.name}`,
+          type: 'function',
+          function: { name: c.name, arguments: JSON.stringify(c.args || {}) }
+        })),
       });
 
       // Execute tools server-side
@@ -280,18 +281,19 @@ export async function runAgent(options: AgentOptions): Promise<string> {
         callbacks.onToolResult?.(r.name, r.result);
       }
 
-      // Add tool results to conversation history (Gemini format)
-      contents.push({
-        role: 'user',
-        parts: results.map((r) => ({
-          functionResponse: {
-            name: r.name,
-            response: { result: r.result },
-          },
-        })),
-      });
+      // Add tool results to conversation history (OpenAI tool message format)
+      for (const r of results) {
+        // Find the matching call ID
+        const matchedCall = functionCalls.find((c: any) => c.name === r.name);
+        conversationHistory.push({
+          role: 'tool',
+          tool_call_id: matchedCall?.id || `call_${r.name}`,
+          name: r.name,
+          content: JSON.stringify(r.result),
+        });
+      }
 
-      // Loop continues → next iteration calls Gemini with tool results
+      // Loop continues → next iteration calls LLM with tool results
       continue;
     }
 

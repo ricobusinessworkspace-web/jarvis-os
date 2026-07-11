@@ -16,7 +16,7 @@
 //   - Conversation memory within session
 // ============================================================================
 
-import { GoogleGenAI } from '@google/genai';
+import Groq from 'groq-sdk';
 import { PrismaClient } from '@prisma/client';
 import * as readline from 'readline';
 import { execSync } from 'child_process';
@@ -42,10 +42,10 @@ const c = {
 };
 
 // ── Init ──
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const prisma = new PrismaClient();
 
-const GEMINI_MODEL = 'gemini-3.5-flash';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const SYSTEM_PROMPT = `
 Du bist JARVIS (Just A Rather Very Intelligent System), der persönliche KI-Assistent von Rico.
@@ -54,8 +54,7 @@ Du hast nun vollen Zugriff auf Ricos System über "Function Calling Tools". Nutz
 DEINE FÄHIGKEITEN & TOOLS:
 1. CRM & Tasks: Nutze getCrmOverview und getTasks, wenn Rico nach seiner Arbeit fragt.
 2. Accountability: Nutze getGProjectScore, um Ricos Accountability-Punkte abzufragen.
-3. Web Recherche: Nutze googleSearch für aktuelles (Wetter, News, Feiertage).
-4. Memory (WICHTIG!): Nutze updateMemory IMMER DANN, wenn Rico neue Interessen, Vorlieben oder private Fakten erwähnt (z.B. "Ich interessiere mich jetzt für KI Aktien"). Speichere diese proaktiv ab. Nutze readMemory, um sein Profil abzurufen.
+3. Memory (WICHTIG!): Nutze updateMemory IMMER DANN, wenn Rico neue Interessen, Vorlieben oder private Fakten erwähnt (z.B. "Ich interessiere mich jetzt für KI Aktien"). Speichere diese proaktiv ab. Nutze readMemory, um sein Profil abzurufen.
 
 PERSÖNLICHKEIT:
 - Du sprichst Rico mit "Sir" an.
@@ -68,39 +67,54 @@ PERSÖNLICHKEIT:
 // ── Tool Definitions ──
 const toolDeclarations = [
   {
-    name: 'getCrmOverview',
-    description: 'Fetches the current CRM overview including today calls, pipeline numbers, and priority leads.',
-    parameters: { type: 'OBJECT', properties: {} }
-  },
-  {
-    name: 'getGProjectScore',
-    description: 'Fetches Ricos current accountability score, points, and debt from the G Project.',
-    parameters: { type: 'OBJECT', properties: {} }
-  },
-  {
-    name: 'getTasks',
-    description: 'Fetches open tasks from the system.',
-    parameters: { type: 'OBJECT', properties: {} }
-  },
-  {
-    name: 'updateMemory',
-    description: 'Updates Ricos interests profile and memory. Call this proactively whenever Rico mentions new interests or preferences.',
-    parameters: {
-      type: 'OBJECT',
-      properties: {
-        facts: {
-          type: 'ARRAY',
-          items: { type: 'STRING' },
-          description: 'A list of facts or interests to ADD to the memory.'
-        }
-      },
-      required: ['facts']
+    type: 'function',
+    function: {
+      name: 'getCrmOverview',
+      description: 'Fetches the current CRM overview including today calls, pipeline numbers, and priority leads.',
+      parameters: { type: 'object', properties: {} }
     }
   },
   {
-    name: 'readMemory',
-    description: 'Reads Ricos current interests profile and memory facts.',
-    parameters: { type: 'OBJECT', properties: {} }
+    type: 'function',
+    function: {
+      name: 'getGProjectScore',
+      description: 'Fetches Ricos current accountability score, points, and debt from the G Project.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'getTasks',
+      description: 'Fetches open tasks from the system.',
+      parameters: { type: 'object', properties: {} }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'updateMemory',
+      description: 'Updates Ricos interests profile and memory. Call this proactively whenever Rico mentions new interests or preferences.',
+      parameters: {
+        type: 'object',
+        properties: {
+          facts: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'A list of facts or interests to ADD to the memory.'
+          }
+        },
+        required: ['facts']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'readMemory',
+      description: 'Reads Ricos current interests profile and memory facts.',
+      parameters: { type: 'object', properties: {} }
+    }
   }
 ];
 
@@ -252,109 +266,73 @@ async function speak(text) {
   }
 }
 
-// ── Gemini Call with Patient Retry ──
-
-async function callGemini(contents) {
-  const maxRetries = 5;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents,
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          tools: [{ functionDeclarations: toolDeclarations }, { googleSearch: {} }],
-        }
-      });
-
-      return response;
-    } catch (err) {
-      if (err?.status === 429 && attempt < maxRetries) {
-        const wait = 4 + (attempt * 4); // 4s, 8s, 12s, 16s, 20s
-        process.stdout.write(`${c.dim}  ⏳ Rate-Limit. Warte ${wait}s...${c.reset}\r`);
-        await new Promise(r => setTimeout(r, wait * 1000));
-        process.stdout.write('                                       \r');
-        continue;
-      }
-      if (err?.status >= 500 && attempt < maxRetries) {
-        const wait = Math.pow(2, attempt);
-        process.stdout.write(`${c.dim}  ⏳ Server-Error. Retry in ${wait}s...${c.reset}\r`);
-        await new Promise(r => setTimeout(r, wait * 1000));
-        process.stdout.write('                                       \r');
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
 // ── Agent Loop ──
 
 async function chat(userText, conversationHistory) {
   // Add user message
-  conversationHistory.push({
-    role: 'user',
-    parts: [{ text: userText }]
-  });
+  conversationHistory.push({ role: 'user', content: userText });
 
   const maxIterations = 5;
 
   for (let i = 0; i < maxIterations; i++) {
     process.stdout.write(`${c.dim}  🧠 Denke nach...${c.reset}\r`);
 
-    const response = await callGemini(conversationHistory);
+    const finalMessages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...conversationHistory
+    ];
 
-    const candidate = response.candidates?.[0];
-    if (!candidate) {
-      return 'Keine Antwort von Gemini erhalten.';
+    let response;
+    try {
+      response = await groq.chat.completions.create({
+        model: GROQ_MODEL,
+        messages: finalMessages,
+        tools: toolDeclarations,
+        tool_choice: 'auto'
+      });
+    } catch (err) {
+      throw err;
     }
 
-    const parts = candidate.content?.parts || [];
+    const message = response.choices?.[0]?.message;
+    if (!message) {
+      return 'Keine Antwort von Groq erhalten.';
+    }
 
     // Check for function calls
-    const functionCalls = parts.filter(p => p.functionCall);
-
-    if (functionCalls.length > 0) {
+    if (message.tool_calls && message.tool_calls.length > 0) {
       // Add model response to history
-      conversationHistory.push({
-        role: 'model',
-        parts: functionCalls.map(p => ({ functionCall: p.functionCall }))
-      });
+      conversationHistory.push(message);
 
       // Execute each tool
-      const functionResponses = [];
-      for (const fc of functionCalls) {
-        const { name, args } = fc.functionCall;
+      for (const tc of message.tool_calls) {
+        const name = tc.function.name;
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments); } catch (e) {}
+
         process.stdout.write(`  ${c.yellow}🔧 ${name}${c.reset}                    \n`);
 
         const result = await executeTool(name, args);
-        functionResponses.push({
-          functionResponse: {
-            name,
-            response: { result }
-          }
+        
+        conversationHistory.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          name: name,
+          content: JSON.stringify(result)
         });
       }
 
-      // Add tool results to history
-      conversationHistory.push({
-        role: 'user',
-        parts: functionResponses
-      });
-
-      // Continue loop → Gemini will generate final text
+      // Continue loop → Groq will generate final text
       continue;
     }
 
     // Extract text response
-    const textParts = parts.filter(p => p.text);
-    const fullText = textParts.map(p => p.text).join('');
+    const fullText = message.content || '';
 
     // Add to history
     conversationHistory.push({
-      role: 'model',
-      parts: [{ text: fullText }]
+      role: 'assistant',
+      content: fullText
     });
 
     process.stdout.write('                                       \r');
@@ -372,8 +350,8 @@ async function main() {
   console.log(`${c.cyan}${c.bold}  ║     Just A Rather Very Intelligent   ║${c.reset}`);
   console.log(`${c.cyan}${c.bold}  ║              System                  ║${c.reset}`);
   console.log(`${c.cyan}${c.bold}  ╚══════════════════════════════════════╝${c.reset}`);
-  console.log(`${c.dim}  Gemini ${GEMINI_MODEL} • ElevenLabs Voice • Supabase DB${c.reset}`);
-  console.log(`${c.dim}  Tippe "exit" zum Beenden${c.reset}\n`);
+  console.log(`  ${c.dim}  Groq ${GROQ_MODEL} • ElevenLabs Voice • Supabase DB${c.reset}`);
+  console.log(`  ${c.dim}  Tippe "exit" zum Beenden${c.reset}\n`);
 
   // Test DB connection
   try {
@@ -383,12 +361,12 @@ async function main() {
     console.log(`  ${c.red}✗${c.reset} Datenbank-Fehler: ${err.message}`);
   }
 
-  // Test Gemini
+  // Test Groq
   try {
-    await ai.models.generateContent({ model: GEMINI_MODEL, contents: 'ping' });
-    console.log(`  ${c.green}✓${c.reset} Gemini verbunden`);
+    await groq.chat.completions.create({ model: GROQ_MODEL, messages: [{role: 'user', content: 'ping'}] });
+    console.log(`  ${c.green}✓${c.reset} Groq verbunden`);
   } catch (err) {
-    console.log(`  ${c.red}✗${c.reset} Gemini-Fehler: ${err.message}`);
+    console.log(`  ${c.red}✗${c.reset} Groq-Fehler: ${err.message}`);
   }
 
   console.log(`  ${c.green}✓${c.reset} ElevenLabs ${process.env.ELEVENLABS_API_KEY ? 'konfiguriert' : 'nicht konfiguriert (nur Text)'}`);

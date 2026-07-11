@@ -100,31 +100,6 @@ export default function Sidebar() {
           );
         })}
 
-        {/* ── Jarvis AI Link ────────────────────── */}
-        <Link
-          href="/jarvis"
-          className={cn(
-            'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
-            pathname.startsWith('/jarvis')
-              ? 'bg-accent/20 text-accent font-semibold border border-accent/20'
-              : 'text-secondary hover:bg-accent/10 hover:text-accent border border-transparent'
-          )}
-        >
-          <div className="flex items-center justify-center w-[18px] h-[18px]">
-            <span className="text-[16px] leading-none">🤖</span>
-          </div>
-          {!isCollapsed && (
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="whitespace-nowrap flex-1"
-            >
-              Jarvis AI
-            </motion.span>
-          )}
-        </Link>
       </nav>
 
       {/* ── User + Collapse Toggle ────────── */}

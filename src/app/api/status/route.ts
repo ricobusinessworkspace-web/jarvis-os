@@ -17,11 +17,7 @@ interface HealthResponse {
   timestamp: string;
   subsystems: {
     database: SubsystemStatus;
-    gemini: SubsystemStatus;
-    openai: SubsystemStatus;
-    elevenlabs: SubsystemStatus;
     n8n: SubsystemStatus;
-    obsidian: SubsystemStatus;
   };
 }
 
@@ -31,11 +27,7 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     subsystems: {
       database: { status: 'unavailable' },
-      gemini: { status: 'not_configured' },
-      openai: { status: 'not_configured' },
-      elevenlabs: { status: 'not_configured' },
       n8n: { status: 'unavailable' },
-      obsidian: { status: 'not_configured' },
     },
   };
 
@@ -51,18 +43,6 @@ export async function GET() {
     health.status = 'degraded';
   }
 
-  // ── API key checks ─────────────────────────────────────────────────────────
-  if (process.env.GEMINI_API_KEY) {
-    health.subsystems.gemini = { status: 'ok', detail: 'API key configured' };
-  }
-
-  if (process.env.OPENAI_API_KEY) {
-    health.subsystems.openai = { status: 'ok', detail: 'API key configured' };
-  }
-
-  if (process.env.ELEVENLABS_API_KEY) {
-    health.subsystems.elevenlabs = { status: 'ok', detail: 'API key configured' };
-  }
 
   // ── n8n reachability check ──────────────────────────────────────────────────
   const n8nBaseUrl = process.env.N8N_BASE_URL || 'http://localhost:5678';
@@ -87,16 +67,6 @@ export async function GET() {
     };
   }
 
-  // ── Obsidian vault check ────────────────────────────────────────────────────
-  const vaultPath = process.env.OBSIDIAN_VAULT_PATH;
-  if (vaultPath) {
-    health.subsystems.obsidian = { status: 'ok', detail: `Vault: ${vaultPath}` };
-  }
-
-  // If no AI provider is configured, mark as degraded
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
-    health.status = 'degraded';
-  }
 
   return NextResponse.json(health);
 }
