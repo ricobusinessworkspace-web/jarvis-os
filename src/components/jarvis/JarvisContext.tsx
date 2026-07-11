@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { speakText, extractSentences } from '@/lib/voice';
+import { runAgent, type AgentMessage } from '@/lib/jarvis-agent';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,18 +42,29 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Use refs for values accessed inside the streaming loop to avoid stale closures
+  // Use refs for values accessed inside the agent callbacks to avoid stale closures
   const isVoiceEnabledRef = useRef(isVoiceEnabled);
   isVoiceEnabledRef.current = isVoiceEnabled;
 
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  // Abort controller for cancelling in-flight requests
+  const abortRef = useRef<AbortController | null>(null);
+
   // Speech recognition instance
   const recognitionRef = useRef<any>(null);
 
+  // ----------------------------------------------------------------
+  // Send Message → Client-Side Agent Loop → Streaming TTS
+  // ----------------------------------------------------------------
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
+
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const userMessage: Message = {
       id: uuidv4(),
@@ -71,81 +83,91 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     ]);
 
     try {
-      // Use the ref to get the latest messages (avoids stale closure)
+      // Build conversation history for the agent
       const currentMessages = messagesRef.current;
+      const agentMessages: AgentMessage[] = [...currentMessages, userMessage].map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-      const response = await fetch('/api/jarvis/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...currentMessages, userMessage].map(m => ({ role: m.role, content: m.content }))
-        }),
-      });
-
-      if (!response.ok) throw new Error('Chat API failed');
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No readable stream');
-
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      let pendingText = '';
-
-      // Sequential TTS playback queue
+      // Sentence-by-sentence TTS state
+      let sentenceBuffer = '';
       let ttsPromise: Promise<void> = Promise.resolve();
+      let loadingCleared = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          // Speak any remaining text
-          if (isVoiceEnabledRef.current && pendingText.trim().length > 0) {
-            const textToSpeak = pendingText.trim();
-            setIsSpeaking(true);
-            ttsPromise = ttsPromise
-              .then(() => speakText(textToSpeak))
-              .catch(console.error);
-          }
-          break;
-        }
+      await runAgent({
+        messages: agentMessages,
+        callbacks: {
+          // ── Streaming text chunks ──
+          onTextChunk: (chunk: string, accumulated: string) => {
+            // Clear "thinking" state on first text chunk
+            if (!loadingCleared) {
+              setIsLoading(false);
+              loadingCleared = true;
+            }
 
-        const chunk = decoder.decode(value, { stream: true });
-        fullContent += chunk;
-        pendingText += chunk;
+            // Update displayed message
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: accumulated }
+                : msg
+            ));
 
-        // Use the improved sentence boundary detection
-        const [completeSentences, remainder] = extractSentences(pendingText);
-        pendingText = remainder;
+            // Sentence-by-sentence TTS
+            sentenceBuffer += chunk;
+            const [completeSentences, remainder] = extractSentences(sentenceBuffer);
+            sentenceBuffer = remainder;
 
-        // Queue each complete sentence for TTS
-        if (isVoiceEnabledRef.current && completeSentences.length > 0) {
-          setIsSpeaking(true);
-          for (const sentence of completeSentences) {
-            const textToSpeak = sentence;
-            ttsPromise = ttsPromise
-              .then(() => speakText(textToSpeak))
-              .catch(console.error);
-          }
-        }
+            if (isVoiceEnabledRef.current && completeSentences.length > 0) {
+              setIsSpeaking(true);
+              for (const sentence of completeSentences) {
+                const textToSpeak = sentence;
+                ttsPromise = ttsPromise
+                  .then(() => speakText(textToSpeak))
+                  .catch(console.error);
+              }
+            }
+          },
 
-        // Update the displayed message content
-        setMessages(prev => prev.map(msg =>
-          msg.id === assistantMessageId
-            ? { ...msg, content: fullContent }
-            : msg
-        ));
-      }
+          // ── Tool calls (optional: could show UI feedback) ──
+          onToolCall: (toolName: string) => {
+            console.log(`[Jarvis] 🔧 Tool aufgerufen: ${toolName}`);
+          },
 
-      // Wait for all TTS to finish, then clear speaking state
-      ttsPromise.then(() => setIsSpeaking(false)).catch(() => setIsSpeaking(false));
+          // ── Agent finished ──
+          onComplete: (fullText: string) => {
+            // Speak any remaining buffered text
+            if (isVoiceEnabledRef.current && sentenceBuffer.trim().length > 0) {
+              const textToSpeak = sentenceBuffer.trim();
+              setIsSpeaking(true);
+              ttsPromise = ttsPromise
+                .then(() => speakText(textToSpeak))
+                .catch(console.error);
+            }
 
-      // Mark message as done streaming
-      setMessages(prev => prev.map(msg =>
-        msg.id === assistantMessageId
-          ? { ...msg, isStreaming: false }
-          : msg
-      ));
+            // Wait for all TTS to finish
+            ttsPromise
+              .then(() => setIsSpeaking(false))
+              .catch(() => setIsSpeaking(false));
 
-    } catch (error) {
+            // Finalize message
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: fullText, isStreaming: false }
+                : msg
+            ));
+          },
+
+          // ── Error ──
+          onError: (error: Error) => {
+            console.error('[Jarvis] Agent error:', error);
+          },
+        },
+        signal: controller.signal,
+      });
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+
       console.error('[Jarvis] Failed to send message:', error);
       setMessages(prev => prev.map(msg =>
         msg.id === assistantMessageId
@@ -157,7 +179,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, []); // No dependencies — we use refs for mutable values
 
-  // Auto Morning Briefing Logic
+  // ----------------------------------------------------------------
+  // Auto Morning Briefing
+  // ----------------------------------------------------------------
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -175,6 +199,9 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [sendMessage]);
 
+  // ----------------------------------------------------------------
+  // Speech Recognition
+  // ----------------------------------------------------------------
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
 

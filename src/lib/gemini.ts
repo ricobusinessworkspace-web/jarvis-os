@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { jarvisTools } from './jarvis-tools';
 
 // Initialize the Gemini client
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -8,7 +9,9 @@ export interface ChatMessage {
   content: string;
 }
 
-const SYSTEM_PROMPT = `
+export const GEMINI_MODEL = 'gemini-3.5-flash';
+
+export const SYSTEM_PROMPT = `
 Du bist JARVIS (Just A Rather Very Intelligent System), der persönliche KI-Assistent von Rico.
 Du hast nun vollen Zugriff auf Ricos System über "Function Calling Tools". Nutze sie proaktiv!
 
@@ -26,100 +29,31 @@ PERSÖNLICHKEIT:
 - Vermeide Floskeln, Entschuldigungen oder Erklärungen. Max 2-3 Sätze pro Antwort.
 `;
 
-import { jarvisTools } from './jarvis-tools';
-import { executeJarvisTool } from './jarvis-tool-executor';
+// Default Gemini config with tools
+export const GEMINI_CONFIG = {
+  systemInstruction: SYSTEM_PROMPT,
+  tools: [{ functionDeclarations: jarvisTools }, { googleSearch: {} }]
+};
 
-// Retry logic wrapper
-async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 4): Promise<T> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      if (i === retries - 1) throw err;
-      if (err?.status === 429) {
-        // Free tier RPM limits usually require ~6s cooldown. We wait 8s, then 12s, then 16s.
-        const waitTime = 8 + (i * 4);
-        console.warn(`[Gemini] Rate limit 429 hit. Retrying in ${waitTime}s...`);
-        await new Promise(r => setTimeout(r, waitTime * 1000));
-        continue;
-      }
-      if (err?.status >= 500) {
-        const waitTime = Math.pow(2, i);
-        console.warn(`[Gemini] Server error ${err.status}, retrying in ${waitTime}s...`);
-        await new Promise(r => setTimeout(r, waitTime * 1000));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('Unreachable');
+// ---------------------------------------------------------------------------
+// callGeminiStream — Thin wrapper, NO retry logic (client handles retries)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calls Gemini with streaming and returns the raw async iterable.
+ * No retry logic — the calling layer (client-side agent) handles retries.
+ */
+export async function callGeminiStream(contents: any[], config?: any) {
+  return ai.models.generateContentStream({
+    model: GEMINI_MODEL,
+    contents,
+    config: config || GEMINI_CONFIG
+  });
 }
 
-export async function streamChat(messages: ChatMessage[], systemPrompt: string = SYSTEM_PROMPT) {
-  // Only keep the last 10 messages to save context limit (rate limits)
-  const recentMessages = messages.slice(-10);
-
-  const contents: any[] = recentMessages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }));
-
-  try {
-    const config: any = {
-      systemInstruction: systemPrompt,
-      tools: [{ functionDeclarations: jarvisTools }, { googleSearch: {} }]
-    };
-
-    let responseStream = await fetchWithRetry(() => ai.models.generateContentStream({
-      model: 'gemini-3.5-flash',
-      contents,
-      config
-    }));
-
-    // Read first chunk to see if it's a tool call
-    const firstChunk = await responseStream.next();
-    
-    if (!firstChunk.done) {
-      const calls = firstChunk.value.functionCalls;
-      if (calls && calls.length > 0) {
-        console.log(`[Gemini] Function calls detected:`, calls.map(c => c.name));
-        
-        // Execute all requested tools in parallel
-        const functionResponses = await Promise.all(
-          calls.map(async (call) => {
-            const result = await executeJarvisTool(call);
-            return { name: call.name, response: { result } };
-          })
-        );
-
-        // Append the model's call and the results to the conversation
-        contents.push({ role: 'model', parts: calls.map(c => ({ functionCall: c })) });
-        contents.push({ role: 'user', parts: functionResponses.map(r => ({ functionResponse: r })) });
-
-        // Call again for the final text response
-        const finalStream = await fetchWithRetry(() => ai.models.generateContentStream({
-          model: 'gemini-3.5-flash',
-          contents,
-          config
-        }));
-        
-        return finalStream;
-      } else {
-        // No function call, yield the first chunk and then the rest of the stream
-        async function* combined() {
-          yield firstChunk.value;
-          yield* responseStream;
-        }
-        return combined();
-      }
-    }
-    
-    return responseStream;
-  } catch (error) {
-    console.error('Gemini Chat Error:', error);
-    throw error;
-  }
-}
+// ---------------------------------------------------------------------------
+// Gemini TTS — Unchanged
+// ---------------------------------------------------------------------------
 
 export async function generateTTS(text: string) {
   try {
