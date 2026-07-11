@@ -403,7 +403,7 @@ export default function DashboardPage() {
   };
 
   // --- Components ---
-  const WeeklyRoutineTable = ({ tracker }: { tracker: any }) => {
+  const renderWeeklyRoutineTable = (tracker: any) => {
     if (!tracker) return null;
     const isMorning = tracker.name.toLowerCase().includes('morgen');
     const Icon = isMorning ? Sun : Moon;
@@ -709,8 +709,8 @@ export default function DashboardPage() {
         <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Habit & Health Tracking</h2>
         
         <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-6 shadow-sm space-y-6">
-          <WeeklyRoutineTable tracker={morningTracker} />
-          <WeeklyRoutineTable tracker={eveningTracker} />
+          {renderWeeklyRoutineTable(morningTracker)}
+          {renderWeeklyRoutineTable(eveningTracker)}
           
           {/* Weekly Sleep Table */}
           <div className="bg-background/40 border border-border/20 rounded-2xl p-4 overflow-x-auto">
