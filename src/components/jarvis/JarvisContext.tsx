@@ -179,25 +179,8 @@ export function JarvisProvider({ children }: { children: ReactNode }) {
     }
   }, []); // No dependencies — we use refs for mutable values
 
-  // ----------------------------------------------------------------
-  // Auto Morning Briefing
-  // ----------------------------------------------------------------
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Slight delay to ensure the UI is loaded before Jarvis starts talking
-    const timer = setTimeout(() => {
-      const today = new Date().toISOString().split('T')[0];
-      const lastBriefing = localStorage.getItem('jarvis_last_briefing_date');
-      
-      if (lastBriefing !== today) {
-        localStorage.setItem('jarvis_last_briefing_date', today);
-        sendMessage("Guten Morgen Jarvis, bitte gib mir mein tägliches Morning Briefing.");
-      }
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, [sendMessage]);
+  // Morning Briefing — disabled during testing phase
+  // TODO: Re-enable when Jarvis is stable
 
   // ----------------------------------------------------------------
   // Speech Recognition
