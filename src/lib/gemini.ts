@@ -37,15 +37,23 @@ import { jarvisTools } from './jarvis-tools';
 import { executeJarvisTool } from './jarvis-tool-executor';
 
 // Retry logic wrapper
-async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+async function fetchWithRetry<T>(fn: () => Promise<T>, retries = 4): Promise<T> {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (err: any) {
       if (i === retries - 1) throw err;
-      if (err?.status === 429 || err?.status >= 500) {
-        console.warn(`[Gemini] Error ${err.status}, retrying in ${Math.pow(2, i)}s...`);
-        await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+      if (err?.status === 429) {
+        // Free tier RPM limits usually require ~6s cooldown. We wait 8s, then 12s, then 16s.
+        const waitTime = 8 + (i * 4);
+        console.warn(`[Gemini] Rate limit 429 hit. Retrying in ${waitTime}s...`);
+        await new Promise(r => setTimeout(r, waitTime * 1000));
+        continue;
+      }
+      if (err?.status >= 500) {
+        const waitTime = Math.pow(2, i);
+        console.warn(`[Gemini] Server error ${err.status}, retrying in ${waitTime}s...`);
+        await new Promise(r => setTimeout(r, waitTime * 1000));
         continue;
       }
       throw err;
