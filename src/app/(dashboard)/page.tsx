@@ -236,10 +236,11 @@ export default function DashboardPage() {
 
   const todayTasks = useMemo(() => {
     return tasks.filter(t => {
-      if (!t.dueDate) return false;
-      if (t.dueDate === todayStr) return true;
+      const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;
+      if (!taskDate) return false;
+      if (taskDate === todayStr) return true;
       // Include overdue tasks if they are not completed
-      return t.dueDate < todayStr && t.status !== 'done';
+      return taskDate < todayStr && t.status !== 'done';
     }).sort((a, b) => {
       // High priority tasks first
       const prioA = a.priority === 'high' ? 1 : 0;
@@ -247,7 +248,9 @@ export default function DashboardPage() {
       if (prioA !== prioB) return prioB - prioA;
       
       // Then overdue tasks first (by due date ascending)
-      return a.dueDate!.localeCompare(b.dueDate!);
+      const dateA = a.dueDate ? (typeof a.dueDate === 'string' ? a.dueDate.split('T')[0] : new Date(a.dueDate).toISOString().split('T')[0]) : '';
+      const dateB = b.dueDate ? (typeof b.dueDate === 'string' ? b.dueDate.split('T')[0] : new Date(b.dueDate).toISOString().split('T')[0]) : '';
+      return dateA.localeCompare(dateB);
     });
   }, [tasks, todayStr]);
 
@@ -327,10 +330,16 @@ export default function DashboardPage() {
       let eDone = 0;
       
       morningTracker?.items.forEach(item => {
-        if (item.logs.some(l => l.date.toISOString().split('T')[0] === dateStr && l.status === 'completed')) mDone++;
+        if (item.logs.some((l: any) => {
+          const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+          return lDate === dateStr && l.status === 'completed';
+        })) mDone++;
       });
       eveningTracker?.items.forEach(item => {
-        if (item.logs.some(l => l.date.toISOString().split('T')[0] === dateStr && l.status === 'completed')) eDone++;
+        if (item.logs.some((l: any) => {
+          const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+          return lDate === dateStr && l.status === 'completed';
+        })) eDone++;
       });
 
       return {
@@ -347,9 +356,11 @@ export default function DashboardPage() {
     today.setHours(0,0,0,0);
     
     let currentDate = new Date(today);
+    const localTodayStr = getLocalDateString(today);
+    const localTodayLog = getLogForDate(localTodayStr);
     
-    if (todayLog.wakeTime) {
-      const [h, m] = todayLog.wakeTime.split(':').map(Number);
+    if (localTodayLog && localTodayLog.wakeTime) {
+      const [h, m] = localTodayLog.wakeTime.split(':').map(Number);
       if (h < 5 || (h === 5 && m === 0)) {
         streak++;
       } else {
@@ -453,7 +464,10 @@ export default function DashboardPage() {
                   )}
                 </td>
                 {currentWeekStrs.map(dateStr => {
-                  const isDone = item.logs.some((l: any) => l.date.toISOString().split('T')[0] === dateStr && l.status === 'completed');
+                  const isDone = item.logs.some((l: any) => {
+                    const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+                    return lDate === dateStr && l.status === 'completed';
+                  });
                   return (
                     <td key={dateStr} className="py-1.5 px-2 border-b border-border/10 text-center">
                       <button onClick={() => handleToggleRoutineLog(tracker.id, item.id, dateStr, isDone)} className="flex items-center justify-center w-full">
@@ -522,9 +536,15 @@ export default function DashboardPage() {
                 <CheckCircle className="h-4 w-4 text-accent" /> Aufgaben
               </h3>
               <div className="flex items-center gap-2">
-                {todayTasks.filter(t => t.dueDate! < todayStr && t.status !== 'done').length > 0 && (
+                {todayTasks.filter(t => {
+                  const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;
+                  return taskDate && taskDate < todayStr && t.status !== 'done';
+                }).length > 0 && (
                   <span className="text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full">
-                    {todayTasks.filter(t => t.dueDate! < todayStr && t.status !== 'done').length} überfällig
+                    {todayTasks.filter(t => {
+                      const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;
+                      return taskDate && taskDate < todayStr && t.status !== 'done';
+                    }).length} überfällig
                   </span>
                 )}
                 <span className="text-[11px] font-semibold text-muted bg-overlay/50 px-2.5 py-0.5 rounded-full">
