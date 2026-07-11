@@ -40,7 +40,7 @@ export async function streamChat(messages: ChatMessage[], systemPrompt: string =
 
   try {
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: contents,
       config: {
         systemInstruction: systemPrompt,
@@ -57,7 +57,7 @@ export async function streamChat(messages: ChatMessage[], systemPrompt: string =
 export async function generateTTS(text: string) {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-tts',
+      model: 'gemini-3.1-flash-tts-preview',
       contents: text,
       config: {
         responseModalities: ["AUDIO"],
