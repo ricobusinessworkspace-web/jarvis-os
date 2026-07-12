@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Star, Pencil, Check, X } from 'lucide-react';
 import { updateTask } from '@/actions/dashboard';
@@ -51,7 +51,12 @@ const getDateBadge = (dateStr: string) => {
 };
 
 export function TaskClient({ initialTasks }: Props) {
-  // Using optimistic UI or just relying on revalidatePath
+  const [tasks, setTasks] = useState(initialTasks);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskEditTitle, setTaskEditTitle] = useState('');
   const [taskEditDeadline, setTaskEditDeadline] = useState('');
@@ -62,23 +67,35 @@ export function TaskClient({ initialTasks }: Props) {
   const saveTaskEdit = async (taskId: string) => {
     const title = taskEditTitle.trim();
     if (!title) return;
-    await updateTask(taskId, { title, dueDate: taskEditDeadline || null, description: taskEditNotes });
+    
+    // Optimistic Update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title, dueDate: taskEditDeadline || null, notes: taskEditNotes } : t));
     setEditingTaskId(null);
+    
+    await updateTask(taskId, { title, dueDate: taskEditDeadline || null, description: taskEditNotes });
   };
 
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'done' ? 'todo' : 'done';
     const completedAt = newStatus === 'done' ? new Date().toISOString() : null;
+    
+    // Optimistic Update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, completedAt } : t));
+    
     await updateTask(taskId, { status: newStatus, completedAt });
   };
 
   const toggleTaskPriority = async (taskId: string, currentPriority: string) => {
     const newPriority = currentPriority === 'high' ? 'normal' : 'high';
+    
+    // Optimistic Update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, priority: newPriority } : t));
+    
     await updateTask(taskId, { priority: newPriority });
   };
 
   const todayTasks = useMemo(() => {
-    return initialTasks.filter(t => {
+    return tasks.filter(t => {
       const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;
       if (!taskDate) return false;
       if (taskDate === todayStr) return true;
@@ -92,7 +109,7 @@ export function TaskClient({ initialTasks }: Props) {
       const dateB = b.dueDate ? (typeof b.dueDate === 'string' ? b.dueDate.split('T')[0] : new Date(b.dueDate).toISOString().split('T')[0]) : '';
       return dateA.localeCompare(dateB);
     });
-  }, [initialTasks, todayStr]);
+  }, [tasks, todayStr]);
 
   const overdueCount = todayTasks.filter(t => {
     const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;

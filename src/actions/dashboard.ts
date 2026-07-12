@@ -123,7 +123,7 @@ export async function getCrmMetrics() {
 export async function updateTask(id: string, data: any) {
   try {
     const updated = await prisma.task.update({ where: { id }, data });
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -133,7 +133,7 @@ export async function updateTask(id: string, data: any) {
 export async function createTask(data: any) {
   try {
     const created = await prisma.task.create({ data });
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true, data: created };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -143,7 +143,7 @@ export async function createTask(data: any) {
 export async function deleteTask(id: string) {
   try {
     await prisma.task.delete({ where: { id } });
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -240,7 +240,7 @@ export async function logTrackerItem(itemId: string, status: string, dateStr: st
       update: { status, completedAt: status === 'completed' ? new Date() : null },
       create: { itemId, date, status, completedAt: status === 'completed' ? new Date() : null }
     });
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true, data: log };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -250,7 +250,7 @@ export async function logTrackerItem(itemId: string, status: string, dateStr: st
 export async function updateTrackerItem(id: string, data: any) {
   try {
     const updated = await prisma.trackerItem.update({ where: { id }, data });
-    revalidatePath('/');
+    revalidatePath('/', 'layout');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };

@@ -96,10 +96,10 @@ export class VoiceService {
     return new Promise((resolve) => {
       const recordPath = join(tmpdir(), `jarvis_rec_${Date.now()}.wav`);
       
-      // rec -q -c 1 -r 16000 output.wav silence 1 0.1 3% 1 1.5 3%
+      // rec -q -c 1 -r 16000 output.wav silence 1 0.1 1% 1 1.5 1%
       this.recordProcess = spawn('rec', [
         '-q', '-c', '1', '-r', '16000', recordPath,
-        'silence', '1', '0.1', '3%', '1', '1.5', '3%'
+        'silence', '1', '0.1', '1%', '1', '1.5', '1%'
       ]);
 
       this.recordProcess.on('close', async () => {

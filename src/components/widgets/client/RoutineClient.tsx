@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Sun, Moon, CheckCircle, Pencil, Check, X } from 'lucide-react';
 import { logTrackerItem, updateTrackerItem } from '@/actions/dashboard';
 
@@ -31,6 +31,12 @@ function getCurrentWeekDates(offsetWeeks = 0) {
 const WEEK_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
 export function RoutineClient({ initialTrackers }: Props) {
+  const [trackers, setTrackers] = useState(initialTrackers);
+  
+  useEffect(() => {
+    setTrackers(initialTrackers);
+  }, [initialTrackers]);
+
   const [editingRoutineItem, setEditingRoutineItem] = useState<{ trackerId: string; itemId: string } | null>(null);
   const [routineEditTitle, setRoutineEditTitle] = useState('');
   
@@ -39,14 +45,51 @@ export function RoutineClient({ initialTrackers }: Props) {
 
   const handleToggleRoutineLog = async (trackerId: string, itemId: string, dateStr: string, isDone: boolean) => {
     const newStatus = isDone ? 'not_done' : 'completed';
+    
+    // Optimistic Update
+    setTrackers(prev => prev.map(t => {
+      if (t.id === trackerId) {
+        return {
+          ...t,
+          items: t.items.map((item: any) => {
+            if (item.id === itemId) {
+              const logs = [...item.logs];
+              const logIndex = logs.findIndex(l => {
+                const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+                return lDate === dateStr;
+              });
+              
+              if (logIndex >= 0) {
+                logs[logIndex] = { ...logs[logIndex], status: newStatus };
+              } else {
+                logs.push({ date: dateStr, status: newStatus });
+              }
+              return { ...item, logs };
+            }
+            return item;
+          })
+        };
+      }
+      return t;
+    }));
+
     await logTrackerItem(itemId, newStatus, dateStr);
   };
 
   const saveRoutineItemEdit = async (trackerId: string, itemId: string) => {
     const title = routineEditTitle.trim();
     if (!title) return;
-    await updateTrackerItem(itemId, { title });
+    
+    // Optimistic Update
+    setTrackers(prev => prev.map(t => {
+      if (t.id === trackerId) {
+        return { ...t, items: t.items.map((item: any) => item.id === itemId ? { ...item, title } : item) };
+      }
+      return t;
+    }));
     setEditingRoutineItem(null);
+
+    await updateTrackerItem(itemId, { title });
   };
 
   const renderWeeklyRoutineTable = (tracker: any) => {
@@ -130,8 +173,8 @@ export function RoutineClient({ initialTrackers }: Props) {
     );
   };
 
-  const morningTracker = initialTrackers.find(t => t.name.toLowerCase().includes('morgen'));
-  const eveningTracker = initialTrackers.find(t => t.name.toLowerCase().includes('abend'));
+  const morningTracker = trackers.find((t: any) => t.name.toLowerCase().includes('morgen'));
+  const eveningTracker = trackers.find((t: any) => t.name.toLowerCase().includes('abend'));
 
   return (
     <>
