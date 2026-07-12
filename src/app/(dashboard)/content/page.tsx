@@ -122,10 +122,11 @@ export default function ContentAndTasksPage() {
     const tags = newContentProject.trim() ? [newContentProject.trim()] : [];
     
     try {
+      const isoDeadline = newContentDeadline ? new Date(newContentDeadline).toISOString() : null;
       const res = await createContentItem({
         title: newContentTitle,
         status: 'idee',
-        publishDate: newContentDeadline || null,
+        publishDate: isoDeadline,
         projectTags: JSON.stringify(tags),
       });
       if (res.success && res.data) {
@@ -163,13 +164,14 @@ export default function ContentAndTasksPage() {
     const tags = editProject.trim() ? [editProject.trim()] : [];
     
     try {
+      const isoDeadline = editDeadline ? new Date(editDeadline).toISOString() : null;
       const res = await updateContentItem(item.id, { 
         title: editTitle, 
-        publishDate: editDeadline || null,
+        publishDate: isoDeadline,
         projectTags: JSON.stringify(tags) 
       });
       if (res.success) {
-        updateContentItemInStore(item.id, { title: editTitle, publishDate: editDeadline || null, projectTags: tags });
+        updateContentItemInStore(item.id, { title: editTitle, publishDate: isoDeadline, projectTags: tags });
         setEditingCard(null);
       }
     } catch (err) {
@@ -228,9 +230,10 @@ export default function ContentAndTasksPage() {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
     try {
+      const isoDeadline = newTaskDeadline ? new Date(newTaskDeadline).toISOString() : null;
       const res = await createTask({
         title: newTaskTitle,
-        dueDate: newTaskDeadline || null,
+        dueDate: isoDeadline,
         status: 'todo' as const,
         priority: 'normal' as const
       });
@@ -267,9 +270,10 @@ export default function ContentAndTasksPage() {
   const handleSaveTaskEdit = async (task: Task) => {
     if (!editTaskTitle.trim()) return;
     try {
-      const res = await updateTask(task.id, { title: editTaskTitle, dueDate: editTaskDeadline || null, notes: editTaskNotes });
+      const isoDeadline = editTaskDeadline ? new Date(editTaskDeadline).toISOString() : null;
+      const res = await updateTask(task.id, { title: editTaskTitle, dueDate: isoDeadline, notes: editTaskNotes });
       if (res.success) {
-        updateTaskInStore(task.id, { title: editTaskTitle, dueDate: editTaskDeadline || null, notes: editTaskNotes });
+        updateTaskInStore(task.id, { title: editTaskTitle, dueDate: isoDeadline, notes: editTaskNotes });
         setEditingTask(null);
       }
     } catch (err) {
@@ -473,7 +477,7 @@ export default function ContentAndTasksPage() {
                               <div className="flex items-center justify-between pt-1 border-t border-border/20">
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => handleToggleContentPriority(item)} className="p-1 transition-colors" title="Priorität"><Star className={`h-3.5 w-3.5 ${item.priority === 'high' ? 'fill-amber-400 text-amber-400' : 'text-muted/30 hover:text-amber-400/60'}`} /></button>
-                                  <button onClick={() => { setEditingCard(item.id); setEditTitle(item.title); setEditProject(getProjectTags(item)[0] || ''); setEditDeadline(item.publishDate || ''); }} className="text-muted hover:text-foreground p-1 transition-colors" title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></button>
+                                  <button onClick={() => { setEditingCard(item.id); setEditTitle(item.title); setEditProject(getProjectTags(item)[0] || ''); setEditDeadline(item.publishDate ? (typeof item.publishDate === 'string' ? item.publishDate.split('T')[0] : new Date(item.publishDate).toISOString().split('T')[0]) : ''); }} className="text-muted hover:text-foreground p-1 transition-colors" title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></button>
                                   <button onClick={() => handleDeleteContent(item.id)} className="text-muted hover:text-red-400 p-1 transition-colors" title="Löschen"><Trash2 className="h-3.5 w-3.5" /></button>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -562,7 +566,7 @@ export default function ContentAndTasksPage() {
                             </div>
                             
                             <div className="flex flex-col gap-1">
-                              <button onClick={() => { setEditingTask(task.id); setEditTaskTitle(task.title); setEditTaskDeadline(task.dueDate || ''); setEditTaskNotes(task.notes || ''); }} className="text-muted hover:text-foreground p-1 transition-colors" title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => { setEditingTask(task.id); setEditTaskTitle(task.title); setEditTaskDeadline(task.dueDate ? (typeof task.dueDate === 'string' ? task.dueDate.split('T')[0] : new Date(task.dueDate).toISOString().split('T')[0]) : ''); setEditTaskNotes(task.notes || ''); }} className="text-muted hover:text-foreground p-1 transition-colors" title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></button>
                               <button onClick={() => handleDeleteTask(task.id)} className="text-muted hover:text-red-400 p-1 transition-colors" title="Löschen"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>

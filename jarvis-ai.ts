@@ -30,7 +30,8 @@ const c = {
   magenta: '\x1b[35m',
 };
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Fallback auf 8b Modell, da 70b harte Daily Limits (100k Tokens) hat
+const GROQ_MODEL = 'llama-3.1-8b-instant';
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const SYSTEM_PROMPT = `
@@ -116,6 +117,12 @@ class JarvisAgent extends EventEmitter {
     if (!text.trim()) { this.setState('idle'); return; }
     
     this.history.push({ role: 'user', content: text });
+    
+    // History Truncation: Behalte nur die letzten 6 Nachrichten (3 Interaktionen), um massiv Tokens zu sparen!
+    if (this.history.length > 6) {
+      this.history = this.history.slice(this.history.length - 6);
+    }
+    
     this.setState('thinking');
 
     const maxIterations = 3;
@@ -131,8 +138,13 @@ class JarvisAgent extends EventEmitter {
           tools: toolDeclarations as any,
           tool_choice: 'auto'
         });
-      } catch (err) {
-        console.error(`\n  ${c.red}API Error:${c.reset}`, err);
+      } catch (err: any) {
+        if (err.status === 429) {
+          console.log(`\n  ${c.red}JARVIS:${c.reset} Entschuldigung Sir, mein Groq-Token-Limit für heute ist aufgebraucht. Ich brauche eine Pause.`);
+          VoiceService.speak("Entschuldigung Sir, mein Token Limit ist aufgebraucht.");
+        } else {
+          console.error(`\n  ${c.red}API Error:${c.reset}`, err.message || err);
+        }
         this.setState('idle');
         return;
       }
