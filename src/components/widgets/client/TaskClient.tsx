@@ -68,11 +68,14 @@ export function TaskClient({ initialTasks }: Props) {
     const title = taskEditTitle.trim();
     if (!title) return;
     
+    // Prisma requires an ISO-8601 string or Date object for DateTime fields.
+    const isoDeadline = taskEditDeadline ? new Date(taskEditDeadline).toISOString() : null;
+    
     // Optimistic Update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title, dueDate: taskEditDeadline || null, notes: taskEditNotes } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, title, dueDate: isoDeadline, notes: taskEditNotes } : t));
     setEditingTaskId(null);
     
-    await updateTask(taskId, { title, dueDate: taskEditDeadline || null, description: taskEditNotes });
+    await updateTask(taskId, { title, dueDate: isoDeadline, description: taskEditNotes });
   };
 
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
@@ -215,7 +218,7 @@ export function TaskClient({ initialTasks }: Props) {
                         onClick={() => {
                           setEditingTaskId(task.id);
                           setTaskEditTitle(task.title);
-                          setTaskEditDeadline(task.dueDate || '');
+                          setTaskEditDeadline(task.dueDate ? (typeof task.dueDate === 'string' ? task.dueDate.split('T')[0] : new Date(task.dueDate).toISOString().split('T')[0]) : '');
                           setTaskEditNotes(task.notes || '');
                         }} 
                         className="text-muted hover:text-foreground p-1 transition-colors"

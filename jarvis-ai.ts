@@ -64,6 +64,10 @@ const toolDeclarations = [
   { type: 'function', function: { name: 'getGProjectScore', description: 'Holt Accountability Score', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'getTasks', description: 'Holt offene Todos', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'getTodayRoutines', description: 'Holt heutige Routinen', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'markRoutineCompleted', description: 'Hakt eine Routine ab', parameters: { type: 'object', properties: { itemId: { type: 'string', description: 'Die ID der Routine' } }, required: ['itemId'] } } },
+  { type: 'function', function: { name: 'getHealthAndSleepData', description: 'Holt Schlaf- und 5AM-Streak Daten', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'createTask', description: 'Erstellt eine neue Aufgabe', parameters: { type: 'object', properties: { title: { type: 'string' }, priority: { type: 'string', enum: ['high', 'medium', 'low'] } }, required: ['title'] } } },
+  { type: 'function', function: { name: 'completeTask', description: 'Markiert eine Aufgabe als erledigt', parameters: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } } },
   { type: 'function', function: { name: 'readMemory', description: 'Liest Ricos Profil', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { 
       name: 'updateMemory', 
@@ -78,6 +82,10 @@ async function executeTool(name: string, args: any) {
     case 'getGProjectScore': return await RoutineService.getGProjectScore();
     case 'getTodayRoutines': return await RoutineService.getTodayRoutines();
     case 'getTasks': return await TaskService.getTasks();
+    case 'markRoutineCompleted': return await RoutineService.markRoutineCompleted(args.itemId);
+    case 'getHealthAndSleepData': return await RoutineService.getHealthAndSleepData();
+    case 'createTask': return await TaskService.createTask({ title: args.title, priority: args.priority || 'medium', status: 'todo' });
+    case 'completeTask': return await TaskService.updateTask(args.id, { status: 'done' });
     case 'readMemory': return await MemoryService.readMemory();
     case 'updateMemory': return await MemoryService.updateMemory(args?.facts || []);
     default: return { error: `Tool "${name}" nicht implementiert.` };

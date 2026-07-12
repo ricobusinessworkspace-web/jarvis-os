@@ -131,8 +131,8 @@ body {
 }
 
 ::selection {
-  background: var(--accent-muted);
-  color: var(--fg-primary);
+  background: var(--color-accent-muted);
+  color: var(--color-foreground);
 }
 
 /* ============================================

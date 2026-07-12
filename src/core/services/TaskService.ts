@@ -11,7 +11,8 @@ export class TaskService {
       });
       
       return { 
-        tasks: tasks.map(t => ({ 
+        tasks: tasks.map(t => ({
+          id: t.id,
           title: t.title, 
           priority: t.priority, 
           project: t.project?.name || '', 
