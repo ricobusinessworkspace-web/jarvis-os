@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
+import ProfileModal from '@/components/ProfileModal';
+import { useState } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -25,6 +27,7 @@ const COLLAPSED_WIDTH = 72;
 export default function Sidebar() {
   const { isCollapsed, toggleSidebar } = useSidebar();
   const pathname = usePathname();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLaunchCRM = async () => {
     try {
@@ -114,7 +117,10 @@ export default function Sidebar() {
         {/* ── User + Collapse Toggle ────────── */}
         <div className="shrink-0 border-t border-border px-3 py-3 space-y-2">
           {/* User section */}
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2 select-none">
+          <div 
+            className="flex items-center gap-3 rounded-lg px-3 py-2 select-none cursor-pointer hover:bg-overlay transition-colors"
+            onClick={() => setProfileOpen(true)}
+          >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elevated text-xs font-semibold text-foreground ring-1 ring-border shadow-sm">
               R
             </div>
@@ -149,6 +155,8 @@ export default function Sidebar() {
           onClick={toggleSidebar}
         />
       )}
+
+      <ProfileModal open={profileOpen} onOpenChange={setProfileOpen} />
     </>
   );
 }
