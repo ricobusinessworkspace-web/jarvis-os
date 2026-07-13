@@ -40,8 +40,10 @@ export function RoutineClient({ initialTrackers }: Props) {
   const [editingRoutineItem, setEditingRoutineItem] = useState<{ trackerId: string; itemId: string } | null>(null);
   const [routineEditTitle, setRoutineEditTitle] = useState('');
   
+  const [weekOffset, setWeekOffset] = useState(0);
+  
   const todayStr = getLocalDateString();
-  const currentWeekStrs = useMemo(() => getCurrentWeekDates(0), []);
+  const currentWeekStrs = useMemo(() => getCurrentWeekDates(weekOffset), [weekOffset]);
 
   const handleToggleRoutineLog = async (trackerId: string, itemId: string, dateStr: string, isDone: boolean) => {
     const newStatus = isDone ? 'not_done' : 'completed';
@@ -99,9 +101,18 @@ export function RoutineClient({ initialTrackers }: Props) {
     
     return (
       <div className="bg-elevated/30 border border-border/30 rounded-2xl p-4 shadow-sm space-y-3 overflow-x-auto">
-        <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5 pb-1">
-          <Icon className={`h-4 w-4 ${isMorning ? 'text-amber-400' : 'text-indigo-400'}`} /> {tracker.name}
-        </h3>
+        <div className="flex items-center justify-between pb-1">
+          <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
+            <Icon className={`h-4 w-4 ${isMorning ? 'text-amber-400' : 'text-indigo-400'}`} /> {tracker.name}
+          </h3>
+          <div className="flex items-center gap-2 bg-overlay/30 p-1 rounded-lg">
+            <button onClick={() => setWeekOffset(prev => prev - 1)} className="px-2 py-1 rounded-md hover:bg-overlay/50 text-muted hover:text-foreground transition-colors flex items-center">◀</button>
+            <span className="text-[10px] font-bold text-foreground w-20 text-center">
+              {weekOffset === 0 ? 'Diese Woche' : weekOffset === -1 ? 'Letzte Woche' : `${Math.abs(weekOffset)} W. zurück`}
+            </span>
+            <button onClick={() => setWeekOffset(prev => prev + 1)} disabled={weekOffset >= 0} className={`px-2 py-1 rounded-md transition-colors flex items-center ${weekOffset >= 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-overlay/50 text-muted hover:text-foreground'}`}>▶</button>
+          </div>
+        </div>
         <table className="w-full text-left border-collapse min-w-[500px]">
           <thead>
             <tr>
