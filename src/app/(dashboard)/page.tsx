@@ -7,7 +7,7 @@ import FiveAmStreakWidget from '@/components/widgets/FiveAmStreakWidget';
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-10 pb-16 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-10 pb-16 px-4 md:px-8 pt-4 md:pt-0 max-w-7xl mx-auto w-full">
       
       {/* ───────────────────────────────────────────────────────── */}
       {/* SECTION 1: DAILY FOCUS */}
@@ -42,7 +42,7 @@ export default function DashboardPage() {
       <section className="space-y-4">
         <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Habit & Health Tracking</h2>
         
-        <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-6 shadow-sm space-y-6">
+        <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-4 md:p-6 shadow-sm space-y-6">
           <RoutineWidget />
           <SleepWidget />
         </div>

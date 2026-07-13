@@ -15,6 +15,8 @@ import { RoutineService } from './src/core/services/RoutineService';
 import { TaskService } from './src/core/services/TaskService';
 import { MemoryService } from './src/core/services/MemoryService';
 import { VoiceService } from './src/core/services/VoiceService';
+import { ContentService } from './src/core/services/ContentService';
+import { BriefingService } from './src/core/services/BriefingService';
 import { prisma } from './src/core/db';
 
 dotenv.config();
@@ -48,8 +50,9 @@ WICHTIG ZUR KOMMUNIKATION (OUTPUT SANITIZATION):
 - ERWÄHNE NIEMALS Funktionsnamen, JSON-Strukturen, API-Responses oder interne Commands.
 
 DEINE REGELN FÜR DIE ANTWORTEN (SEHR WICHTIG):
-- Antworte IMMER in MAXIMAL EINEM KURZEN SATZ! Sei extrem prägnant.
-- Keine Füllwörter. Komm sofort zur Sache.
+- LIES DATEN UND ZAHLEN NATÜRLICH VOR! (Sag niemals "2026-07-12", sondern "Heute", "Morgen". Sag "Halb sieben" statt "18:30:00").
+- REGEL FÜR NORMALE ANTWORTEN: Antworte in MAXIMAL EINEM KURZEN SATZ! Komm sofort zur Sache. Keine Füllwörter.
+- REGEL FÜR DAS MORNING BRIEFING: Wenn du das Briefing vorliest, darfst du 2 BIS 3 SÄTZE verwenden. Fasse die Dinge logisch zusammen, anstatt sie krampfhaft in einen Satz zu quetschen.
 - Trockener, sarkastischer Humor (britischer Stil á la Jarvis aus Iron Man).
 - Sprich Rico mit "Sir" an.
 - Antworte auf Deutsch.
@@ -64,6 +67,8 @@ const toolDeclarations = [
   { type: 'function', function: { name: 'getCrmOverview', description: 'Holt die CRM Metriken', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'getGProjectScore', description: 'Holt Accountability Score', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'getTasks', description: 'Holt offene Todos', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'getContentPipeline', description: 'Holt die Content Pipeline (Videos, Newsletter etc.)', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'getMorningBriefing', description: 'Holt das komplette Morning Briefing (Wetter, Schlaf, Tasks, Routinen, CRM)', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'getTodayRoutines', description: 'Holt heutige Routinen', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'markRoutineCompleted', description: 'Hakt eine Routine ab', parameters: { type: 'object', properties: { itemId: { type: 'string', description: 'Die ID der Routine' } }, required: ['itemId'] } } },
   { type: 'function', function: { name: 'getHealthAndSleepData', description: 'Holt Schlaf- und 5AM-Streak Daten', parameters: { type: 'object', properties: {} } } },
@@ -83,6 +88,8 @@ async function executeTool(name: string, args: any) {
     case 'getGProjectScore': return await RoutineService.getGProjectScore();
     case 'getTodayRoutines': return await RoutineService.getTodayRoutines();
     case 'getTasks': return await TaskService.getTasks();
+    case 'getContentPipeline': return await ContentService.getContentPipeline();
+    case 'getMorningBriefing': return await BriefingService.getMorningBriefing();
     case 'markRoutineCompleted': return await RoutineService.markRoutineCompleted(args.itemId);
     case 'getHealthAndSleepData': return await RoutineService.getHealthAndSleepData();
     case 'createTask': return await TaskService.createTask({ title: args.title, priority: args.priority || 'medium', status: 'todo' });

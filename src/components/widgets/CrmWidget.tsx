@@ -36,7 +36,7 @@ export default async function CrmWidget() {
             <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.weeklyCalls}</span>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <div className="flex flex-col p-2 rounded-xl bg-accent/10 border border-accent/20 text-center">
             <span className="text-[9px] text-muted font-bold uppercase tracking-wider mb-1">Entscheider</span>
             <span className="text-lg font-black text-accent">{crmMetrics.pipeline?.entscheider || 0}</span>

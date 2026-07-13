@@ -3,9 +3,10 @@ import { createTask } from '@/actions/dashboard';
 
 import { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, Bell } from 'lucide-react';
+import { Search, Bell, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
+import { useSidebar } from './SidebarContext';
 
 function pageNameFromPath(pathname: string): string {
   if (pathname === '/') return 'Dashboard';
@@ -17,6 +18,7 @@ function pageNameFromPath(pathname: string): string {
 export default function TopBar() {
   const pathname = usePathname();
   const pageName = pageNameFromPath(pathname);
+  const { toggleSidebar } = useSidebar();
 
   const [now, setNow] = useState<Date | null>(null);
   const [isElectron, setIsElectron] = useState(false);
@@ -52,13 +54,19 @@ export default function TopBar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 px-6 glass border-b border-border electron-drag select-none"
+      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 px-4 md:px-6 glass border-b border-border electron-drag select-none"
     >
       {/* ── Left: Breadcrumb ──────────────── */}
       <div className={cn('flex items-center gap-2 text-xs font-semibold uppercase tracking-wider', isElectron && 'pl-16')}>
-        <span className="text-muted">Jarvis OS</span>
-        <span className="text-muted">/</span>
-        <span className="font-black text-foreground">{pageName}</span>
+        <button 
+          onClick={toggleSidebar} 
+          className="md:hidden mr-1 p-1.5 rounded-md hover:bg-overlay text-muted hover:text-foreground transition-colors electron-no-drag"
+        >
+          <Menu size={18} />
+        </button>
+        <span className="text-muted hidden sm:inline">Jarvis OS</span>
+        <span className="text-muted hidden sm:inline">/</span>
+        <span className="font-black text-foreground truncate max-w-[120px] sm:max-w-none">{pageName}</span>
       </div>
 
       {/* ── Center / Right: Clock, Search & Notifications ── */}

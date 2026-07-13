@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 
 interface SidebarContextValue {
   isCollapsed: boolean;
@@ -10,7 +10,14 @@ interface SidebarContextValue {
 const SidebarContext = createContext<SidebarContextValue | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Default to true for SSR/mobile safety
+
+  useEffect(() => {
+    // On mount, if it's a desktop screen, expand it
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      setIsCollapsed(false);
+    }
+  }, []);
 
   const toggleSidebar = useCallback(() => {
     setIsCollapsed((prev) => !prev);

@@ -5,6 +5,7 @@ import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import { StoreHydrator } from '@/components/layout/StoreHydrator';
+import { cn } from '@/lib/utils';
 
 function DashboardShell({ children }: { children: ReactNode }) {
   const { isCollapsed } = useSidebar();
@@ -15,11 +16,10 @@ function DashboardShell({ children }: { children: ReactNode }) {
       <Sidebar />
 
       <main
-        className="flex flex-1 flex-col transition-[margin-left] duration-250"
-        style={{
-          marginLeft: isCollapsed ? 72 : 260,
-          transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
+        className={cn(
+          "flex flex-1 flex-col transition-[margin-left] duration-250 w-full md:w-auto",
+          isCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"
+        )}
       >
         <TopBar />
 
