@@ -5,6 +5,7 @@ import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import { StoreHydrator } from '@/components/layout/StoreHydrator';
+import PullToRefresh from '@/components/PullToRefresh';
 import { cn } from '@/lib/utils';
 
 function DashboardShell({ children }: { children: ReactNode }) {
@@ -24,7 +25,9 @@ function DashboardShell({ children }: { children: ReactNode }) {
         <TopBar />
 
         <div className="flex-1 overflow-y-auto p-4 select-none">
-          {children}
+          <PullToRefresh>
+            {children}
+          </PullToRefresh>
         </div>
       </main>
     </div>
