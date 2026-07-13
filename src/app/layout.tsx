@@ -11,6 +11,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Jarvis OS",
   description: "Personal Operating System — Command Center for Projects, Knowledge & Productivity",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Jarvis OS",
+  },
 };
 
 export default function RootLayout({
