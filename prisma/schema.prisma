@@ -342,3 +342,16 @@ model tracker_action_entries {
 
   @@schema("public")
 }
+
+model Transaction {
+  id          String   @id @default(uuid())
+  amount      Float
+  type        String   // "income" or "expense"
+  category    String   // z.B. "Miete", "Provision", "Lebensmittel"
+  description String   @default("")
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("transactions")
+  @@schema("public")
+}

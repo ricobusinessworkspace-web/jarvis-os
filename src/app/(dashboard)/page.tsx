@@ -11,59 +11,63 @@ export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-10 pb-16 px-4 md:px-8 pt-4 md:pt-0 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-8 pb-16 px-4 md:px-8 pt-4 md:pt-0 max-w-7xl mx-auto w-full">
       
       {/* ───────────────────────────────────────────────────────── */}
-      {/* SECTION 1: DAILY FOCUS */}
+      {/* TOP ROW: Wealth & Agenda */}
       {/* ───────────────────────────────────────────────────────── */}
       <section className="space-y-4">
-        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Daily Focus</h2>
+        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Command Center</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Today's Agenda */}
-          <div className="h-full">
+          {/* Net Worth & Ledger (2/3 width) */}
+          <div className="lg:col-span-2 h-[380px]">
+            <NetWorthWidget />
+          </div>
+
+          {/* Today's Agenda (1/3 width) */}
+          <div className="lg:col-span-1 h-[380px]">
             <CalendarWidget />
           </div>
 
-          {/* Today's Tasks & Content */}
-          <div className="flex flex-col gap-6 h-full">
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────── */}
+      {/* BOTTOM ROW: Execution & Habits */}
+      {/* ───────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Execution & Habits</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          {/* Tasks */}
+          <div className="flex flex-col h-[500px]">
             <TaskWidget />
+          </div>
+
+          {/* Content Pipeline */}
+          <div className="flex flex-col h-[500px]">
             <ContentWidget />
           </div>
 
-          {/* KPIs: 5 AM Streak & Sales Engine */}
-          <div className="flex flex-col gap-6">
+          {/* Habits & Health */}
+          <div className="flex flex-col gap-4">
             <FiveAmStreakWidget />
-            <CrmWidget />
+            <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-4 md:p-6 shadow-sm space-y-6 flex-1">
+              <RoutineWidget />
+              <SleepWidget />
+            </div>
           </div>
 
         </div>
       </section>
 
-      {/* ───────────────────────────────────────────────────────── */}
-      {/* SECTION 2: WEALTH & FINANCE */}
-      {/* ───────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Wealth & Finance</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1 h-[280px]">
-            <NetWorthWidget />
-          </div>
-        </div>
-      </section>
-
-      {/* ───────────────────────────────────────────────────────── */}
-      {/* SECTION 3: HABIT & HEALTH TRACKING */}
-      {/* ───────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Habit & Health Tracking</h2>
-        
-        <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-4 md:p-6 shadow-sm space-y-6">
-          <RoutineWidget />
-          <SleepWidget />
-        </div>
-      </section>
+      {/* 
+        CRM WIDGET HIDDEN AS REQUESTED 
+        <CrmWidget /> 
+      */}
 
     </div>
   );

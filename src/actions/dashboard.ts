@@ -277,3 +277,35 @@ export async function logNetWorth(value: number, target: number) {
     return { success: false, error: error.message };
   }
 }
+
+export async function logTransaction(data: { amount: number, type: string, category: string, description?: string }) {
+  try {
+    const tx = await prisma.transaction.create({ data });
+    
+    // Auto-update Net Worth
+    const lastKpi = await prisma.kPI.findFirst({
+      where: { name: 'Net Worth' },
+      orderBy: { trackedAt: 'desc' }
+    });
+    
+    const target = lastKpi ? lastKpi.target : 100000;
+    const currentVal = lastKpi ? lastKpi.value : 0;
+    const diff = data.type === 'income' ? data.amount : -data.amount;
+    const newVal = currentVal + diff;
+    
+    await prisma.kPI.create({
+      data: {
+        name: 'Net Worth',
+        value: newVal,
+        target: target,
+        category: 'finance',
+        unit: '€'
+      }
+    });
+
+    revalidatePath('/', 'layout');
+    return { success: true, data: tx };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
