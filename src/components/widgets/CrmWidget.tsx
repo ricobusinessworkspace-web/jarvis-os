@@ -1,5 +1,5 @@
 import { CrmService } from '@/core/services/CrmService';
-import { TrendingUp, Phone, PhoneCall, Star } from 'lucide-react';
+import { TrendingUp, Phone, PhoneCall, Star, Mail } from 'lucide-react';
 
 export default async function CrmWidget() {
   const crmMetrics: any = await CrmService.getOverview();
@@ -27,13 +27,25 @@ export default async function CrmWidget() {
       </div>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
-            <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><Phone className="h-3 w-3" /> Heute</span>
-            <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.todayCalls}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
+              <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><Phone className="h-3 w-3" /> Heute Calls</span>
+              <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.todayCalls}</span>
+            </div>
+            <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
+              <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><Mail className="h-3 w-3" /> Heute Mails</span>
+              <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.todayEmails}</span>
+            </div>
           </div>
-          <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
-            <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><PhoneCall className="h-3 w-3" /> Woche</span>
-            <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.weeklyCalls}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
+              <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><PhoneCall className="h-3 w-3" /> Woche Calls</span>
+              <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.weeklyCalls}</span>
+            </div>
+            <div className="flex flex-col p-3 rounded-xl bg-background/60 border border-border/40">
+              <span className="text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><Mail className="h-3 w-3" /> Woche Mails</span>
+              <span className="text-xl font-black text-foreground mt-0.5">{crmMetrics.weeklyEmails}</span>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">

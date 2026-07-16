@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Circle, Star, Pencil, Check, X } from 'lucide-react';
+import { CheckCircle, Circle, Star, Pencil, Check, X, Target } from 'lucide-react';
 import { updateTask } from '@/actions/dashboard';
 
 interface Props {
@@ -97,13 +97,29 @@ export function TaskClient({ initialTasks }: Props) {
     await updateTask(taskId, { priority: newPriority });
   };
 
+  const toggleChecklist = async (taskId: string, notes: string, lineIndex: number, isChecked: boolean) => {
+    const lines = notes.split('\n');
+    lines[lineIndex] = lines[lineIndex].replace(isChecked ? '[x]' : '[ ]', isChecked ? '[ ]' : '[x]').replace(isChecked ? '[X]' : '[ ]', isChecked ? '[ ]' : '[x]');
+    const newNotes = lines.join('\n');
+    
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, notes: newNotes } : t));
+    await updateTask(taskId, { description: newNotes });
+  };
+
   const todayTasks = useMemo(() => {
     return tasks.filter(t => {
       const taskDate = t.dueDate ? (typeof t.dueDate === 'string' ? t.dueDate.split('T')[0] : new Date(t.dueDate).toISOString().split('T')[0]) : null;
+      const completedDate = t.completedAt ? (typeof t.completedAt === 'string' ? t.completedAt.split('T')[0] : new Date(t.completedAt).toISOString().split('T')[0]) : null;
+      
+      if (completedDate === todayStr) return true; // Show anything completed today!
       if (!taskDate) return false;
       if (taskDate === todayStr) return true;
       return taskDate < todayStr && t.status !== 'done';
     }).sort((a, b) => {
+      if (a.status === 'done' && b.status !== 'done') return 1;
+      if (a.status !== 'done' && b.status === 'done') return -1;
+      
       const prioA = a.priority === 'high' ? 1 : 0;
       const prioB = b.priority === 'high' ? 1 : 0;
       if (prioA !== prioB) return prioB - prioA;
@@ -160,7 +176,7 @@ export function TaskClient({ initialTasks }: Props) {
                         value={taskEditNotes}
                         onChange={(e) => setTaskEditNotes(e.target.value)}
                         className="w-full bg-elevated border border-border rounded-lg px-3 py-2 text-[11px] text-foreground focus:border-accent outline-none min-h-[60px] resize-y"
-                        placeholder="Notizen zur Aufgabe..."
+                        placeholder="Notizen oder Checkliste (mit [ ] und [x])..."
                       />
                       <input 
                         type="date" 
@@ -194,16 +210,51 @@ export function TaskClient({ initialTasks }: Props) {
                         <p className={`text-xs font-semibold leading-snug ${isDone ? 'line-through text-muted' : 'text-foreground'}`}>
                           {task.title}
                         </p>
+                        
                         {task.notes && (
-                          <p className={`text-[11px] leading-relaxed mt-1 whitespace-pre-wrap ${isDone ? 'text-muted/60 line-through' : 'text-muted'}`}>
-                            {task.notes}
-                          </p>
+                          <div className="mt-1.5 space-y-0.5">
+                            {task.notes.split('\n').map((line: string, i: number) => {
+                              const isUnchecked = line.trim().startsWith('[ ]');
+                              const isChecked = line.trim().startsWith('[x]') || line.trim().startsWith('[X]');
+                              if (isUnchecked || isChecked) {
+                                const text = line.replace(/^\[[ xX]\]\s*/, '');
+                                return (
+                                  <div key={i} className="flex items-start gap-1.5">
+                                    <button 
+                                      onClick={() => toggleChecklist(task.id, task.notes, i, isChecked)} 
+                                      className="mt-[3px] shrink-0 hover:scale-110 transition-transform"
+                                    >
+                                      {isChecked ? (
+                                        <CheckCircle className="h-3 w-3 text-accent" />
+                                      ) : (
+                                        <Circle className="h-3 w-3 text-muted/60 hover:text-accent/50 transition-colors" />
+                                      )}
+                                    </button>
+                                    <span className={`text-[10px] leading-snug ${isChecked ? 'line-through text-muted/60' : 'text-muted'}`}>{text}</span>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <p key={i} className={`text-[11px] leading-relaxed whitespace-pre-wrap ${isDone ? 'text-muted/60 line-through' : 'text-muted'}`}>
+                                  {line}
+                                </p>
+                              );
+                            })}
+                          </div>
                         )}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
                           {task.dueDate && (() => {
                             const badge = getDateBadge(task.dueDate);
                             return badge ? <span className={badge.className}>{badge.text}</span> : null;
                           })()}
+                          
+                          {task.goal && (
+                            <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider flex items-center gap-1">
+                              <Target className="h-2 w-2" /> {task.goal.title}
+                            </span>
+                          )}
+                          
                           {(() => {
                             const pTags = getProjectTags(task);
                             return pTags.length > 0 && pTags.map(tag => (

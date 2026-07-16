@@ -30,19 +30,11 @@ export class VoiceService {
       return;
     }
 
-    const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-    const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || 'nPczCjzI2devNBz1zQrb';
-
-    if (!apiKey) {
-      if (onFinish) onFinish();
-      return;
-    }
-
     const sanitizeForTTS = (str: string) => {
       return str
-        .replace(/(\d{1,2}):(\d{2}):\d{2}/g, '$1 Uhr $2') // 18:30:00 -> 18 Uhr 30
-        .replace(/(\d{1,2}):(\d{2})/g, (match, h, m) => m === '00' ? `${h} Uhr` : `${h} Uhr ${m}`) // 18:30 -> 18 Uhr 30
-        .replace(/\d{4}-\d{2}-\d{2}/g, 'heute') // Fallback if YYYY-MM-DD slips through
+        .replace(/(\d{1,2}):(\d{2}):\d{2}/g, '$1 Uhr $2') 
+        .replace(/(\d{1,2}):(\d{2})/g, (match, h, m) => m === '00' ? `${h} Uhr` : `${h} Uhr ${m}`)
+        .replace(/\d{4}-\d{2}-\d{2}/g, 'heute')
         .replace(/%/g, ' Prozent')
         .replace(/&/g, ' und ')
         .replace(/°C/g, ' Grad Celsius')
@@ -52,30 +44,15 @@ export class VoiceService {
     const sanitizedText = sanitizeForTTS(text.trim());
 
     try {
-      const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          text: sanitizedText,
-          model_id: 'eleven_flash_v2_5',
-          voice_settings: { stability: 0.4, similarity_boost: 0.82, style: 0.15, use_speaker_boost: false }
-        }),
+      const { EdgeTTS } = await import('node-edge-tts');
+      const tts = new EdgeTTS({
+        voice: 'de-DE-ConradNeural', // Jarvis Stimme
+        lang: 'de-DE',
+        outputFormat: 'audio-24khz-96kbitrate-mono-mp3'
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error('\nElevenLabs API Error:', res.status, errText);
-        if (onFinish) onFinish();
-        return;
-      }
-
-      const buffer = Buffer.from(await res.arrayBuffer());
       const tmpFile = join(tmpdir(), `jarvis_tts_${Date.now()}.mp3`);
-      writeFileSync(tmpFile, buffer);
+      await tts.ttsPromise(sanitizedText, tmpFile);
 
       this.playProcess = spawn('afplay', [tmpFile]);
       
@@ -85,8 +62,14 @@ export class VoiceService {
         if (onFinish) onFinish();
       });
 
-    } catch (err) {
-      if (onFinish) onFinish();
+    } catch (err: any) {
+      console.error(`\nEdge TTS Fehler:`, err.message);
+      // Fallback zu lokalem macOS TTS
+      this.playProcess = spawn('say', ['-v', 'Anna', sanitizedText]);
+      this.playProcess.on('close', () => {
+        this.playProcess = null;
+        if (onFinish) onFinish();
+      });
     }
   }
 

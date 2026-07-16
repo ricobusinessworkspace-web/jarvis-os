@@ -183,8 +183,7 @@ export class RoutineService {
 
   static async logTrackerItem(itemId: string, status: string, dateStr: string) {
     try {
-      const date = new Date(dateStr);
-      date.setHours(0,0,0,0);
+      const date = new Date(`${dateStr}T00:00:00.000Z`);
       const log = await prisma.trackerLog.upsert({
         where: { itemId_date: { itemId, date } },
         update: { status, completedAt: status === 'completed' ? new Date() : null },

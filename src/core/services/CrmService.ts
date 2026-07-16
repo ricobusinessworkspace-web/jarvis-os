@@ -10,6 +10,8 @@ export class CrmService {
       const totalLeadsRow: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as count FROM crm_leads`;
       const calledTodayRow: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as count FROM crm_events WHERE type='call' AND created_at_ms >= ${dayAgoMs}`;
       const calledWeekRow: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as count FROM crm_events WHERE type='call' AND created_at_ms >= ${weekAgoMs}`;
+      const emailedTodayRow: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as count FROM crm_events WHERE type='email' AND created_at_ms >= ${dayAgoMs}`;
+      const emailedWeekRow: any[] = await prisma.$queryRaw`SELECT COUNT(*)::int as count FROM crm_events WHERE type='email' AND created_at_ms >= ${weekAgoMs}`;
       const pipelineRow: any[] = await prisma.$queryRaw`
         SELECT 
           COUNT(CASE WHEN entscheider = 1 THEN 1 END)::int as entscheider,
@@ -24,6 +26,8 @@ export class CrmService {
         totalLeads: Number(totalLeadsRow[0]?.count || 0),
         todayCalls: Number(calledTodayRow[0]?.count || 0),
         weeklyCalls: Number(calledWeekRow[0]?.count || 0),
+        todayEmails: Number(emailedTodayRow[0]?.count || 0),
+        weeklyEmails: Number(emailedWeekRow[0]?.count || 0),
         pipeline: {
           entscheider: Number(pipelineRow[0]?.entscheider || 0),
           kontakt: Number(pipelineRow[0]?.kontakt || 0),

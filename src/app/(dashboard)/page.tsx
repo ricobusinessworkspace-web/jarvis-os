@@ -4,6 +4,9 @@ import CrmWidget from '@/components/widgets/CrmWidget';
 import RoutineWidget from '@/components/widgets/RoutineWidget';
 import SleepWidget from '@/components/widgets/SleepWidget';
 import FiveAmStreakWidget from '@/components/widgets/FiveAmStreakWidget';
+import ContentWidget from '@/components/widgets/ContentWidget';
+
+export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
   return (
@@ -22,9 +25,10 @@ export default function DashboardPage() {
             <CalendarWidget />
           </div>
 
-          {/* Today's Tasks */}
-          <div className="h-full">
+          {/* Today's Tasks & Content */}
+          <div className="flex flex-col gap-6 h-full">
             <TaskWidget />
+            <ContentWidget />
           </div>
 
           {/* KPIs: 5 AM Streak & Sales Engine */}

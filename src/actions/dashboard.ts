@@ -155,6 +155,7 @@ export async function createContentItem(data: any) {
   try {
     const created = await prisma.contentItem.create({ data });
     revalidatePath('/content');
+    revalidatePath('/', 'layout');
     return { success: true, data: created };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -165,6 +166,7 @@ export async function updateContentItem(id: string, data: any) {
   try {
     const updated = await prisma.contentItem.update({ where: { id }, data });
     revalidatePath('/content');
+    revalidatePath('/', 'layout');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -175,6 +177,7 @@ export async function deleteContentItem(id: string) {
   try {
     await prisma.contentItem.delete({ where: { id } });
     revalidatePath('/content');
+    revalidatePath('/', 'layout');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -233,8 +236,7 @@ export async function savePersonalLog(data: any) {
 
 export async function logTrackerItem(itemId: string, status: string, dateStr: string) {
   try {
-    const date = new Date(dateStr);
-    date.setHours(0,0,0,0);
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
     const log = await prisma.trackerLog.upsert({
       where: { itemId_date: { itemId, date } },
       update: { status, completedAt: status === 'completed' ? new Date() : null },

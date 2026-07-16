@@ -1,55 +1,58 @@
-# 🤝 Project Handover: Jarvis OS (Local CLI Edition)
+# 🤝 Project Handover
 
 **To:** Next Lead Developer / Agent
 **From:** Previous Agent
-**Date:** 2026-07-11 / 2026-07-12
+**Date:** 2026-07-15
 
-Dieses Dokument dient als nahtlose Übergabe für den nachfolgenden Entwicklungs-Agenten. Es beschreibt den brandaktuellen Architekturwechsel, der in den letzten Sessions vollzogen wurde, und den exakten Entwicklungsstand.
-
----
-
-## ⚡ 1. Projekt-Überblick & Vision (Architektur-Shift)
-Jarvis OS sollte ursprünglich eine Vercel-gehostete Web-App mit UI sein. Aufgrund von strengen API Rate Limits (Google Gemini Free Tier) und nervigen Vercel-Deployments hat Rico (der User) jedoch beschlossen:
-**Jarvis läuft ab sofort primär als lokales Command-Line-Interface (CLI) auf seinem Mac.**
-
-Dadurch sparen wir uns komplizierte Web-UIs, Streaming-Proxies und Deployments und haben ein pfeilschnelles, lokales "Brain", das direkt mit der Datenbank spricht und sofort antwortet.
+Dieses Dokument dient als nahtlose Übergabe für den nachfolgenden Entwicklungs-Agenten. Es beschreibt den aktuellen Stand des Projekts sowie die Aufgaben, die in der letzten Session erfolgreich abgeschlossen wurden, und gibt Hinweise auf mögliche nächste Schritte.
 
 ---
 
-## 🏗️ 2. Neue Technische Architektur
+## ⚡ 1. Projekt-Überblick & Workspaces
 
-Die Architektur ist extrem entschlackt und auf Geschwindigkeit optimiert:
+Rico arbeitet aktiv an mehreren Systemen, wobei die beiden wichtigsten Repositories wie folgt aufgeteilt sind:
+- **`Jarvis OS`** (`/Users/rico/dev/Jarvis OS`): Die Next.js Web-App (Dashboard, Routines, Sleep Tracking, CRM Overview).
+- **`Lightning CRM`** (`/Users/rico/dev/Lightning CRM`): Die Electron/Node.js CRM-App, über die Leads verwaltet, abtelefoniert ("Call") und kontaktiert ("E-Mail") werden.
 
-- **Core Script:** `jarvis-cli.mjs` (Lokal ausgeführt per `node jarvis-cli.mjs` oder via Desktop Shortcut)
-- **LLM / Brain:** **Groq** mit dem Modell `llama-3.3-70b-versatile`. Extrem schnelles Function Calling und Inference via LPU.
-- **Voice / TTS:** **ElevenLabs**. Wir nutzen aktuell die Standard-Stimme "Brian" (`nPczCjzI2devNBz1zQrb`), da Ricos favorisierte deutsche Community-Stimme (Thomas Schendel) auf der ElevenLabs Free-Tier API nicht zugelassen ist. Die Audioausgabe erfolgt lokal via macOS `afplay`.
-- **Datenbank:** Supabase PostgreSQL, direkt angebunden über **Prisma** (`executeTool` in der CLI führt Prisma Queries nativ aus, ganz ohne HTTP Backend).
-- **Environment:** `.env` im Projekt-Root beinhaltet alle Secrets (Groq, ElevenLabs, Supabase DB URLs).
-
----
-
-## 🚀 3. Aktueller Stand (Was wurde gemacht?)
-1. **Next.js Web-UI gelöscht:** Alle Routen unter `src/app/(dashboard)/jarvis`, API Routen (`src/app/api/jarvis`) und Komponenten (`src/components/jarvis`) wurden vom User restlos gelöscht. Das Next.js Projekt dient nur noch als Hülle für andere Tools (G Project, CRM).
-2. **LLM Migration:** Das Google Gemini SDK wurde durch das `groq-sdk` ersetzt. Die Message- und Tool-Struktur wurde auf den OpenAI-Standard umgeschrieben.
-3. **Persönlichkeit geupdatet:** Jarvis hat nun einen trockenen, sarkastischen britischen Humor einprogrammiert bekommen.
-4. **Desktop Shortcut:** Auf Ricos Desktop liegt eine `Jarvis.command` Datei, mit der er die CLI per Doppelklick direkt starten kann.
-5. **Erfolgreich getestet:** Die CLI funktioniert hervorragend. Tools wie `getCrmOverview` werden von Groq erkannt, die Prisma-Query läuft durch und ElevenLabs spricht die Antwort aus.
+Zusätzlich gibt es **Antigravity-Workspaces**:
+Das IDE-Popup "missing folder Poerating205system" stammte daher, dass der iCloud-Workspace `/Users/rico/Library/Mobile Documents/com~apple~CloudDocs/Operating System` im System vermerkt war, der Ordner auf der Festplatte aber physisch nicht existierte. Dieser wurde wiederhergestellt.
 
 ---
 
-## 🚨 4. Bekannte Einschränkungen & Next Steps
+## 🚀 2. Aktueller Stand & Kürzlich abgeschlossene Tasks
 
-### ElevenLabs Free-Tier Restriktion
-Rico wollte ursprünglich die Voice ID `Fghah4fztZORbiKfIGAs` (Thomas Schendel, die deutsche Synchronstimme von Iron Mans Jarvis). Da dies eine "Library Voice" ist, wirft die ElevenLabs API einen `payment_required` 401 Fehler.
-**Lösung:** Wir haben als Fallback die Standardstimme "Brian" (`nPczCjzI2devNBz1zQrb`) eingestellt. Sollte Rico sein ElevenLabs auf "Creator" ($5) upgraden, kann die Voice-ID in der `.env` wieder auf Thomas Schendel geändert werden.
+In der letzten Session wurden gezielt UI/UX-Probleme und Feature-Requests in `Jarvis OS` behoben:
+
+1. **Pull-to-Refresh Funktion** (`Jarvis OS`):
+   - Eine `PullToRefresh`-Komponente wurde erstellt und im Dashboard-Layout (`src/app/(dashboard)/layout.tsx`) integriert.
+   - Unterstützt sowohl Touch-Swipes (Mobile PWA) als auch Trackpad-Scrolls (MacBook), um die App durch einen Wisch nach unten neu zu laden (Datenaktualisierung).
+
+2. **Habit & Sleep Tracking Navigation** (`Jarvis OS`):
+   - Im `RoutineClient` und `SleepClient` wurde die wochenbasierte Pagination (`weekOffset`) wiederhergestellt. Der User kann nun historische Routine- und Schlafdaten in der Wochenansicht navigieren.
+
+3. **Speichern von Deadlines behoben** (`Jarvis OS`):
+   - Ein Bug im `Content/Task`-Bereich wurde gefixt, bei dem das Setzen eines Deadline-Datums den Speichervorgang blockierte, da Datumsobjekte falsch in ISO-Strings konvertiert wurden.
+
+4. **CRM-Tracker Trennung (Anrufe vs. E-Mails)** (`Jarvis OS`):
+   - **Problem:** Die "Call & Track" und "E-Mail Copy & Track" Buttons im `Lightning CRM` Electron-CRM tracken nun separat `call` und `email` Events in die Datenbank.
+   - **Lösung in `Jarvis OS`:** Der `CrmService.ts` wurde so angepasst, dass nicht nur `type='call'` gezählt wird, sondern auch `type='email'`.
+   - **UI in `Jarvis OS`:** Das `CrmWidget.tsx` wurde visuell umgebaut, sodass nun die Metriken "Heute Calls" und "Woche Calls" direkt über "Heute Mails" und "Woche Mails" (mit passenden Lucide-React Icons) gestapelt angezeigt werden.
+
+5. **Antigravity Workspace Error Fix**:
+   - Die Fehlermeldung "missing folder Poerating205system" auf dem Screen des Users wurde beseitigt, indem der entsprechende fehlende Pfad per CLI (`mkdir -p ...`) auf Ricos Mac neu angelegt wurde.
+
+---
+
+## 🚨 3. Bekannte Einschränkungen & Next Steps
+
+### Synchronisation zwischen Apps
+- Rico nutzt die `Jarvis OS` Web-App oft gleichzeitig am Mac und am Handy. Die neue Pull-to-Refresh Methode lindert PWA-Caching-Sorgen, es sollte jedoch bei weiteren Data-Fetching Problemen geprüft werden, ob Next.js Caching-Strategien (`revalidate`) angepasst werden müssen.
+
+### Tracker in `Lightning CRM`
+- Der E-Mail Tracker in der Electron-App (`Lightning CRM`) nutzt automatisch die gescrapte E-Mail Adresse aus dem Impressum (`scraper.js`). Der User wünscht, dass dieser Workflow nahtlos läuft. Prüfe bei zukünftigen Reports, ob hier noch Logik im UI-Layer (`main_ui.js` / `pipeline_ui.js`) angepasst werden soll.
 
 ### Deine Aufgaben für die Zukunft (Next Steps)
-- **Features erweitern:** Da Jarvis jetzt stabil als CLI läuft, kannst du weitere Tools in `toolDeclarations` und `executeTool` in `jarvis-cli.mjs` einbauen (z.B. Google Calendar Integration oder Apple Notes auslesen).
-- **Refactoring (Optional):** Aktuell ist die gesamte CLI Logik (Tools, LLM-Aufrufe, ElevenLabs, Prisma) monolithisch in der `jarvis-cli.mjs` Datei (ca. 400 Zeilen). Bei Bedarf kannst du das in saubere Module (z.B. `src/lib/tools/...`) auslagern.
+- **Feedback abwarten:** Rico testet derzeit die separaten E-Mail- und Call-Tracker im Jarvis OS Dashboard sowie die Pull-to-Refresh Mechanik.
+- Falls Rico weitere Wünsche zu den Trackern im Kanban-Board von `Lightning CRM` hat, achte darauf, dass die entsprechenden Buttons in `public/ui/pipeline_ui.js` und das Logging in `public/ui/main_ui.js` liegen.
 
----
-
-## 🔮 5. Entwickler-Guidelines
-- **Fokus auf CLI:** Baue keine neuen Next.js Routen oder React-Komponenten für Jarvis. Alles für Jarvis passiert in der lokalen Node-Umgebung!
-- **Dependencies:** Wenn du neue Node-Module brauchst (z.B. für lokale Dateioperationen), installiere sie ganz normal, aber stelle sicher, dass sie in der `jarvis-cli.mjs` richtig importiert werden.
-- **Fehlerbehandlung:** Da es ein interaktives CLI ist, fange API-Fehler (Rate Limits, Offline) sauber mit `try/catch` ab, damit das Programm in der REPL-Schleife (`readline`) bleibt und nicht komplett crasht.
+Viel Erfolg für die nächste Session! 🚀
