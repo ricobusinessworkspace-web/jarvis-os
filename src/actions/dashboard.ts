@@ -282,31 +282,54 @@ export async function logNetWorth(value: number, target: number) {
   }
 }
 
-export async function logTransaction(data: { amount: number, type: string, category: string, description?: string }) {
+export async function updateFinanceBuckets(buckets: { liquid: number, depot: number, assets: number, debt: number }, target: number) {
   try {
-    const tx = await prisma.transaction.create({ data });
-    
-    // Auto-update Net Worth
-    const lastKpi = await prisma.kPI.findFirst({
-      where: { name: 'Net Worth' },
-      orderBy: { trackedAt: 'desc' }
+    await prisma.setting.upsert({
+      where: { key: 'finance_buckets' },
+      update: { value: JSON.stringify(buckets) },
+      create: { key: 'finance_buckets', value: JSON.stringify(buckets) }
     });
-    
-    const target = lastKpi ? lastKpi.target : 100000;
-    const currentVal = lastKpi ? lastKpi.value : 0;
-    const diff = data.type === 'income' ? data.amount : -data.amount;
-    const newVal = currentVal + diff;
-    
-    await prisma.kPI.create({
+
+    const netWorth = buckets.liquid + buckets.depot + buckets.assets - buckets.debt;
+
+    const created = await prisma.kPI.create({
       data: {
         name: 'Net Worth',
-        value: newVal,
-        target: target,
+        value: netWorth,
+        target,
         category: 'finance',
         unit: '€'
       }
     });
 
+    revalidatePath('/', 'layout');
+    return { success: true, data: created };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function addPipelineItem(data: { amount: number, type: string, category: string, description?: string }) {
+  try {
+    const tx = await prisma.transaction.create({ 
+      data: {
+        ...data,
+        status: 'pending'
+      }
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, data: tx };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function markPipelineItemCleared(id: string) {
+  try {
+    const tx = await prisma.transaction.update({
+      where: { id },
+      data: { status: 'cleared' }
+    });
     revalidatePath('/', 'layout');
     return { success: true, data: tx };
   } catch (error: any) {

@@ -17,18 +17,23 @@ export class FinanceService {
 
       const current = history.length > 0 ? history[history.length - 1] : null;
 
+      // Fetch Buckets
+      const bucketSetting = await prisma.setting.findUnique({ where: { key: 'finance_buckets' } });
+      const buckets = bucketSetting?.value ? JSON.parse(bucketSetting.value) : { liquid: 0, depot: 0, assets: 0, debt: 0 };
+
+      // Fetch Pipeline
       const txRecords = await prisma.transaction.findMany({
-        orderBy: { date: 'desc' },
-        take: 50 // Show recent 50
+        where: { status: 'pending' },
+        orderBy: { date: 'asc' } // Earliest first
       });
 
-      const transactions = txRecords.map(tx => ({
+      const pipeline = txRecords.map(tx => ({
         ...tx,
         date: tx.date.toISOString(),
         createdAt: tx.createdAt.toISOString()
       }));
 
-      return { history, current, transactions };
+      return { history, current, buckets, pipeline };
     } catch (err: any) {
       return { error: err.message };
     }

@@ -347,6 +347,7 @@ model Transaction {
   id          String   @id @default(uuid())
   amount      Float
   type        String   // "income" or "expense"
+  status      String   @default("pending") // "pending" or "cleared"
   category    String   // z.B. "Miete", "Provision", "Lebensmittel"
   description String   @default("")
   date        DateTime @default(now())
