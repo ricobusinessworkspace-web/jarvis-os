@@ -22,12 +22,12 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Net Worth & Ledger (2/3 width) */}
-          <div className="lg:col-span-2 h-[380px]">
+          <div className="lg:col-span-2 h-auto lg:h-[380px] min-h-[250px]">
             <NetWorthWidget />
           </div>
 
           {/* Today's Agenda (1/3 width) */}
-          <div className="lg:col-span-1 h-[380px]">
+          <div className="lg:col-span-1 h-auto lg:h-[380px] min-h-[250px]">
             <CalendarWidget />
           </div>
 
@@ -43,12 +43,12 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           
           {/* Tasks */}
-          <div className="flex flex-col h-[500px]">
+          <div className="flex flex-col h-auto lg:h-[500px] min-h-[300px]">
             <TaskWidget />
           </div>
 
           {/* Content Pipeline */}
-          <div className="flex flex-col h-[500px]">
+          <div className="flex flex-col h-auto lg:h-[500px] min-h-[300px]">
             <ContentWidget />
           </div>
 
