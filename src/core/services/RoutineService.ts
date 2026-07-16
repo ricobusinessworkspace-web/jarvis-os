@@ -165,8 +165,12 @@ export class RoutineService {
       if (bedTime && wakeTime) {
         const bed = new Date(`1970-01-01T${bedTime}:00`);
         const wake = new Date(`1970-01-01T${wakeTime}:00`);
-        if (wake < bed) wake.setDate(wake.getDate() + 1);
-        sleepHours = Number(((wake.getTime() - bed.getTime()) / (1000 * 60 * 60)).toFixed(1));
+        if (!isNaN(bed.getTime()) && !isNaN(wake.getTime())) {
+          if (wake < bed) wake.setDate(wake.getDate() + 1);
+          sleepHours = Number(((wake.getTime() - bed.getTime()) / (1000 * 60 * 60)).toFixed(1));
+        }
+      } else {
+        sleepHours = 0;
       }
   
       const updated = await prisma.personalLog.upsert({
