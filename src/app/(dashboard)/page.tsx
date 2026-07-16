@@ -5,6 +5,7 @@ import RoutineWidget from '@/components/widgets/RoutineWidget';
 import SleepWidget from '@/components/widgets/SleepWidget';
 import FiveAmStreakWidget from '@/components/widgets/FiveAmStreakWidget';
 import ContentWidget from '@/components/widgets/ContentWidget';
+import NetWorthWidget from '@/components/widgets/NetWorthWidget';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,19 @@ export default function DashboardPage() {
       </section>
 
       {/* ───────────────────────────────────────────────────────── */}
-      {/* SECTION 2: HABIT & HEALTH TRACKING */}
+      {/* SECTION 2: WEALTH & FINANCE */}
+      {/* ───────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Wealth & Finance</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1 h-[280px]">
+            <NetWorthWidget />
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────── */}
+      {/* SECTION 3: HABIT & HEALTH TRACKING */}
       {/* ───────────────────────────────────────────────────────── */}
       <section className="space-y-4">
         <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">Habit & Health Tracking</h2>

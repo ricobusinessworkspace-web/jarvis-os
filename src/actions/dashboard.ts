@@ -258,3 +258,22 @@ export async function updateTrackerItem(id: string, data: any) {
     return { success: false, error: error.message };
   }
 }
+
+// ─── FINANCE ───
+export async function logNetWorth(value: number, target: number) {
+  try {
+    const created = await prisma.kPI.create({
+      data: {
+        name: 'Net Worth',
+        value,
+        target,
+        category: 'finance',
+        unit: '€'
+      }
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, data: created };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
