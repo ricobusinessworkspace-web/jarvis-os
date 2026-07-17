@@ -18,7 +18,7 @@ export class MemoryService {
     try {
       if (!facts || facts.length === 0) return { success: true, message: 'No new facts.' };
 
-      let profile = await prisma.knowledgeItem.findFirst({
+      const profile = await prisma.knowledgeItem.findFirst({
         where: { type: 'profile', title: 'Jarvis Memory' }
       });
 

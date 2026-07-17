@@ -56,7 +56,7 @@ export async function executeJarvisTool(toolCall: any): Promise<any> {
         if (!facts || facts.length === 0) return { success: true, message: 'No new facts provided.' };
 
         // Fetch existing
-        let profile = await prisma.knowledgeItem.findFirst({
+        const profile = await prisma.knowledgeItem.findFirst({
           where: { type: 'profile', title: 'Jarvis Memory' }
         });
 

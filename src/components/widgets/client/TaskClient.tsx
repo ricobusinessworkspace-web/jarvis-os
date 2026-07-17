@@ -51,11 +51,13 @@ const getDateBadge = (dateStr: string) => {
 };
 
 export function TaskClient({ initialTasks }: Props) {
+  const [prevInitialTasks, setPrevInitialTasks] = useState(initialTasks);
   const [tasks, setTasks] = useState(initialTasks);
 
-  useEffect(() => {
+  if (initialTasks !== prevInitialTasks) {
+    setPrevInitialTasks(initialTasks);
     setTasks(initialTasks);
-  }, [initialTasks]);
+  }
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [taskEditTitle, setTaskEditTitle] = useState('');

@@ -16,7 +16,7 @@ export default async function FiveAmStreakWidget() {
   let streak = 0;
   today.setHours(0,0,0,0);
   
-  let currentDate = new Date(today);
+  const currentDate = new Date(today);
   
   const getLogForDate = (dateStr: string) => {
     return personalLogs.find((l: any) => l.date === dateStr);

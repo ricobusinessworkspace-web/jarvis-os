@@ -71,7 +71,7 @@ export class RoutineService {
       // Calculate 5 AM Streak
       let streak = 0;
       today.setHours(0,0,0,0);
-      let currentDate = new Date(today);
+      const currentDate = new Date(today);
       
       if (todayLog && todayLog.wakeTime) {
         const [h, m] = todayLog.wakeTime.split(':').map(Number);

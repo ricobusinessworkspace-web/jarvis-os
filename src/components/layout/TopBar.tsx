@@ -29,7 +29,7 @@ export default function TopBar() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     const timeout = setTimeout(() => setNow(new Date()), 0);
     const interval = setInterval(() => setNow(new Date()), 30000);
     return () => {
