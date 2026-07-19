@@ -24,7 +24,7 @@ model Project {
   knowledgeItems KnowledgeItem[]
   tasks          Task[]
 
-  @@map("projects")
+  @@map("jarvis_projects")
 
   @@schema("public")
 }
@@ -44,7 +44,7 @@ model Goal {
   knowledgeItems KnowledgeItem[]
   tasks          Task[]
 
-  @@map("goals")
+  @@map("jarvis_goals")
 
   @@schema("public")
 }
@@ -68,7 +68,7 @@ model Task {
   goal                Goal?     @relation(fields: [goalId], references: [id])
   project             Project?  @relation(fields: [projectId], references: [id])
 
-  @@map("tasks")
+  @@map("jarvis_tasks")
 
   @@schema("public")
 }
@@ -86,7 +86,7 @@ model ContentItem {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@map("content_items")
+  @@map("jarvis_content_items")
 
   @@schema("public")
 }
@@ -105,7 +105,7 @@ model PersonalLog {
   meals             String?
   createdAt         DateTime @default(now()) @map("created_at")
 
-  @@map("personal_logs")
+  @@map("jarvis_personal_logs")
 
   @@schema("public")
 }
@@ -115,7 +115,7 @@ model Setting {
   value     String?
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  @@map("settings")
+  @@map("jarvis_settings")
 
   @@schema("public")
 }
@@ -146,7 +146,7 @@ model KnowledgeItem {
   goal      Goal?                  @relation(fields: [goalId], references: [id])
   project   Project?               @relation(fields: [projectId], references: [id])
 
-  @@map("knowledge_items")
+  @@map("jarvis_knowledge_items")
 
   @@schema("public")
 }
@@ -160,7 +160,7 @@ model KPI {
   category  String   @default("general")
   trackedAt DateTime @default(now()) @map("tracked_at")
 
-  @@map("kpis")
+  @@map("jarvis_kpis")
 
   @@schema("public")
 }
@@ -173,7 +173,7 @@ model Activity {
   projectName String?  @map("project_name")
   timestamp   DateTime @default(now())
 
-  @@map("activities")
+  @@map("jarvis_activities")
 
   @@schema("public")
 }
@@ -187,7 +187,7 @@ model Tracker {
   updatedAt   DateTime      @updatedAt @map("updated_at")
   items       TrackerItem[]
 
-  @@map("trackers")
+  @@map("jarvis_trackers")
 
   @@schema("public")
 }
@@ -203,7 +203,7 @@ model TrackerItem {
   tracker          Tracker      @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   logs             TrackerLog[]
 
-  @@map("tracker_items")
+  @@map("jarvis_tracker_items")
 
   @@schema("public")
 }
@@ -219,7 +219,7 @@ model TrackerLog {
   item        TrackerItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@unique([itemId, date])
-  @@map("tracker_logs")
+  @@map("jarvis_tracker_logs")
 
   @@schema("public")
 }
@@ -353,6 +353,6 @@ model Transaction {
   date        DateTime @default(now())
   createdAt   DateTime @default(now()) @map("created_at")
 
-  @@map("transactions")
+  @@map("jarvis_transactions")
   @@schema("public")
 }

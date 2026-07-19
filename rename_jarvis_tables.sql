@@ -1,0 +1,13 @@
+ALTER TABLE IF EXISTS "projects" RENAME TO "jarvis_projects";
+ALTER TABLE IF EXISTS "goals" RENAME TO "jarvis_goals";
+ALTER TABLE IF EXISTS "tasks" RENAME TO "jarvis_tasks";
+ALTER TABLE IF EXISTS "content_items" RENAME TO "jarvis_content_items";
+ALTER TABLE IF EXISTS "personal_logs" RENAME TO "jarvis_personal_logs";
+ALTER TABLE IF EXISTS "settings" RENAME TO "jarvis_settings";
+ALTER TABLE IF EXISTS "knowledge_items" RENAME TO "jarvis_knowledge_items";
+ALTER TABLE IF EXISTS "kpis" RENAME TO "jarvis_kpis";
+ALTER TABLE IF EXISTS "activities" RENAME TO "jarvis_activities";
+ALTER TABLE IF EXISTS "trackers" RENAME TO "jarvis_trackers";
+ALTER TABLE IF EXISTS "tracker_items" RENAME TO "jarvis_tracker_items";
+ALTER TABLE IF EXISTS "tracker_logs" RENAME TO "jarvis_tracker_logs";
+ALTER TABLE IF EXISTS "transactions" RENAME TO "jarvis_transactions";
