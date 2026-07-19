@@ -96,11 +96,11 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
   const safeToSpend = buckets.liquid + pendingIncome - pendingExpense;
 
   return (
-    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl shadow-sm h-full flex flex-col md:flex-row overflow-hidden relative">
+    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl shadow-sm h-full flex flex-col xl:flex-col 2xl:flex-row overflow-hidden relative">
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* LEFT: Net Worth Chart */}
-      <div className="flex-1 p-6 flex flex-col relative z-10 border-b md:border-b-0 md:border-r border-border/20">
+      <div className="flex-1 p-6 flex flex-col relative z-10 border-b 2xl:border-b-0 2xl:border-r border-border/20">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
             <div className="bg-emerald-500/20 p-1.5 rounded-lg"><Wallet className="h-4 w-4 text-emerald-400" /></div>
@@ -147,7 +147,7 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
       </div>
 
       {/* RIGHT: Tabs (Balances / Pipeline) */}
-      <div className="w-full md:w-[360px] bg-background/30 flex flex-col z-10 relative">
+      <div className="w-full 2xl:w-[360px] bg-background/30 flex flex-col z-10 relative">
         <div className="flex border-b border-border/20">
           <button onClick={() => setActiveTab('balances')} className={`flex-1 p-4 text-[11px] font-bold tracking-widest uppercase transition-colors ${activeTab === 'balances' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-muted hover:text-foreground'}`}>Balances</button>
           <button onClick={() => setActiveTab('pipeline')} className={`flex-1 p-4 text-[11px] font-bold tracking-widest uppercase transition-colors ${activeTab === 'pipeline' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-muted hover:text-foreground'}`}>Pipeline</button>
