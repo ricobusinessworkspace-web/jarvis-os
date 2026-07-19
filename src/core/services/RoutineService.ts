@@ -108,7 +108,7 @@ export class RoutineService {
               logs: {
                 where: {
                   date: {
-                    gte: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000)
+                    gte: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000)
                   }
                 }
               }
@@ -129,7 +129,7 @@ export class RoutineService {
       const personalLogs = await prisma.personalLog.findMany({
         where: {
           date: {
-            gte: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            gte: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
           }
         }
       });
