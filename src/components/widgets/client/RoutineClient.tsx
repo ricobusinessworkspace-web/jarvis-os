@@ -113,12 +113,12 @@ export function RoutineClient({ initialTrackers }: Props) {
             <button onClick={() => setWeekOffset(prev => prev + 1)} disabled={weekOffset >= 0} className={`px-2 py-1 rounded-md transition-colors flex items-center ${weekOffset >= 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-overlay text-muted hover:text-foreground'}`}>▶</button>
           </div>
         </div>
-        <table className="w-full text-left border-collapse min-w-[500px]">
+        <table className="w-full text-left border-collapse min-w-[400px]">
           <thead>
             <tr>
-              <th className="py-2 px-3 border-b border-border/20 text-xs text-muted font-bold w-1/3">Habit</th>
+              <th className="py-1.5 px-2 border-b border-border/20 text-xs text-muted font-bold w-[28%]">Habit</th>
               {WEEK_DAYS.map((day, i) => (
-                <th key={day} className={`py-2 px-3 border-b border-border/20 text-xs font-bold text-center ${currentWeekStrs[i] === todayStr ? 'text-accent' : 'text-muted'}`}>
+                <th key={day} className={`py-1.5 px-1 border-b border-border/20 text-[11px] font-bold text-center ${currentWeekStrs[i] === todayStr ? 'text-accent' : 'text-muted'}`}>
                   {day}
                 </th>
               ))}
@@ -127,14 +127,14 @@ export function RoutineClient({ initialTrackers }: Props) {
           <tbody>
             {tracker.items.map((item: any) => (
               <tr key={item.id} className="hover:bg-overlay/20 transition-colors group">
-                <td className="py-3 px-3 border-b border-border/10 text-sm font-semibold text-foreground w-1/3">
+                <td className="py-2.5 px-2 border-b border-border/10 text-xs font-semibold text-foreground w-[28%]">
                   {editingRoutineItem?.itemId === item.id ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <input 
                         type="text" 
                         value={routineEditTitle} 
                         onChange={(e) => setRoutineEditTitle(e.target.value)} 
-                        className="bg-elevated border border-border rounded px-2 py-1 text-sm text-foreground focus:border-accent outline-none w-full"
+                        className="bg-elevated border border-border rounded px-2 py-0.5 text-xs text-foreground focus:border-accent outline-none w-full"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') saveRoutineItemEdit(tracker.id, item.id);
@@ -142,23 +142,23 @@ export function RoutineClient({ initialTrackers }: Props) {
                         }}
                       />
                       <button onClick={() => saveRoutineItemEdit(tracker.id, item.id)} className="text-accent hover:text-accent-hover shrink-0">
-                        <Check className="h-4 w-4" />
+                        <Check className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => setEditingRoutineItem(null)} className="text-muted hover:text-foreground shrink-0">
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <span>{item.title}</span>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="truncate pr-1">{item.title}</span>
                       <button 
                         onClick={() => {
                           setEditingRoutineItem({ trackerId: tracker.id, itemId: item.id });
                           setRoutineEditTitle(item.title);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opacity p-1"
+                        className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opacity p-0.5 shrink-0"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3 w-3" />
                       </button>
                     </div>
                   )}
@@ -169,9 +169,9 @@ export function RoutineClient({ initialTrackers }: Props) {
                     return lDate === dateStr && l.status === 'completed';
                   });
                   return (
-                    <td key={dateStr} className="py-3 px-3 border-b border-border/10 text-center">
+                    <td key={dateStr} className="py-2.5 px-1 border-b border-border/10 text-center">
                       <button onClick={() => handleToggleRoutineLog(tracker.id, item.id, dateStr, isDone)} className="flex items-center justify-center w-full group-hover:scale-110 transition-transform">
-                        {isDone ? <CheckCircle className="h-5 w-5 text-accent inline-block" /> : <div className="h-5 w-5 rounded-full border-2 border-muted/30 inline-block group-hover:border-accent transition-colors" />}
+                        {isDone ? <CheckCircle className="h-4 w-4 text-accent inline-block" /> : <div className="h-4 w-4 rounded-full border-2 border-muted/30 inline-block group-hover:border-accent transition-colors" />}
                       </button>
                     </td>
                   );
