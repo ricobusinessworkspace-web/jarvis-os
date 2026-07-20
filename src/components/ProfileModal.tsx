@@ -71,9 +71,15 @@ export default function ProfileModal({ open, onOpenChange }: { open: boolean; on
 
           {user ? (
             <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white text-xl font-bold">
+              <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-secondary/20">
+                <div 
+                  className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground text-2xl font-bold cursor-pointer group"
+                  title="Profilbild ändern (Demnächst)"
+                >
                   {user.email.charAt(0).toUpperCase()}
+                  <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-xs">
+                    📷
+                  </div>
                 </div>
                 <div>
                   <div className="text-xl font-bold">{user.email}</div>
@@ -85,6 +91,30 @@ export default function ProfileModal({ open, onOpenChange }: { open: boolean; on
                   </div>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted">Dein Anzeigename</label>
+                <input 
+                  id="profileNameInput"
+                  type="text" 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+                  placeholder="z.B. Max Mustermann" 
+                />
+                <p className="text-xs text-muted">Dieser Name wird im Activity Log angezeigt.</p>
+              </div>
+
+              <button 
+                className="w-full flex items-center justify-center rounded-lg bg-primary text-primary-foreground p-3 text-sm font-semibold hover:bg-primary/90 transition-colors"
+                onClick={() => {
+                  const input = document.getElementById('profileNameInput') as HTMLInputElement;
+                  if (input?.value) {
+                    localStorage.setItem('jarvis_user_name', input.value);
+                    alert('Profil gespeichert! (Splash-Screen aktualisiert sich beim nächsten Start)');
+                  }
+                }}
+              >
+                Profil speichern
+              </button>
 
               {isPrivileged && (
                 <div className="pt-4 border-t border-border">
