@@ -1,35 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 
 export default function EcosystemLoader() {
-  const [phase, setPhase] = useState<"text" | "logo" | "done">("text");
-  const [userName, setUserName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Read from localStorage (safely on client side)
-    const storedName = localStorage.getItem("jarvis_user_name");
-    if (storedName) {
-      setUserName(storedName);
-    }
-
-    // Sequence timing
-    const textTimer = setTimeout(() => {
-      setPhase("logo");
-    }, 1800); // text shows for 1.8s
-
-    const logoTimer = setTimeout(() => {
-      setPhase("done");
-    }, 3000); // total 3s
-
-    return () => {
-      clearTimeout(textTimer);
-      clearTimeout(logoTimer);
-    };
+    // Keep it extremely short to just mask hydration/layout jumps
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 150);
+    return () => clearTimeout(timer);
   }, []);
 
-  if (phase === "done") return null;
+  if (!loading) return null;
 
   return (
     <div
@@ -41,60 +25,24 @@ export default function EcosystemLoader() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        transition: "opacity 0.6s ease-out",
-        opacity: 1,
+        transition: "opacity 0.2s ease-out",
+        opacity: loading ? 1 : 0,
       }}
     >
       <style>{`
-        @keyframes textFadeInOut {
-          0% { opacity: 0; transform: scale(0.95); }
-          20% { opacity: 1; transform: scale(1); }
-          80% { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1.05); }
+        .global-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid rgba(255, 255, 255, 0.1);
+          border-radius: 50%;
+          border-top-color: #fff;
+          animation: global-spin 1s ease-in-out infinite;
         }
-        @keyframes logoFadeInPulse {
-          0% { opacity: 0; transform: scale(0.8); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes ecosystemPulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
+        @keyframes global-spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
-
-      {phase === "text" && (
-        <div
-          style={{
-            position: "absolute",
-            fontSize: "24px",
-            fontWeight: 600,
-            color: "#fff",
-            animation: "textFadeInOut 1.8s ease-in-out forwards",
-          }}
-        >
-          {userName ? `Welcome ${userName}` : "Welcome"}
-        </div>
-      )}
-
-      {phase === "logo" && (
-        <div
-          style={{
-            width: 100,
-            height: 100,
-            position: "relative",
-            animation: "logoFadeInPulse 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards, ecosystemPulse 2s cubic-bezier(0.4, 0, 0.6, 1) 0.6s infinite",
-          }}
-        >
-          <Image
-            src="/apple-touch-icon.png"
-            alt="Jarvis OS Loader"
-            fill
-            style={{ borderRadius: 22, objectFit: "cover" }}
-            priority
-          />
-        </div>
-      )}
+      <div className="global-spinner" />
     </div>
   );
 }
