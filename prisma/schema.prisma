@@ -344,8 +344,9 @@ model tracker_action_entries {
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
-  amount      Float
+  id                String   @id @default(uuid())
+  bankTransactionId String?  @unique @map("bank_transaction_id")
+  amount            Float
   type        String   // "income" or "expense"
   status      String   @default("pending") // "pending" or "cleared"
   category    String   // z.B. "Miete", "Provision", "Lebensmittel"
