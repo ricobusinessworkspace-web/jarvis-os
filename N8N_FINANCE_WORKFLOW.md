@@ -1,130 +1,76 @@
-# n8n Finance Workflow – Setup Guide
+# Bank Sync – Setup Guide
 
-Diese Anleitung beschreibt, wie du den n8n-Workflow aufsetzt, der täglich deine Bankumsätze automatisch an Jarvis OS pusht.
+Automatische Synchronisation deiner Bankumsätze (BW-Bank + DKB) via FinTS direkt in Jarvis OS.
 
 ---
 
 ## Voraussetzungen
 
-1. **GoCardless Account** — Erstelle einen kostenlosen Account auf [GoCardless Bank Account Data](https://bankaccountdata.gocardless.com/)
-2. **n8n** — Lokal oder gehostet erreichbar (Default: `http://localhost:5678`)
-3. **Jarvis OS** — Deployed auf Vercel mit aktiver `/api/webhooks/finance` Route
+- Node.js installiert
+- Jarvis OS Projekt mit `npm install` aufgesetzt
+- Online-Banking bei BW-Bank und/oder DKB aktiviert
+- FinTS/HBCI-Zugang bei deiner Bank freigeschaltet
 
 ---
 
-## 1. GoCardless Setup
+## 1. Env-Variablen eintragen
 
-### API Credentials
-1. Gehe zu [GoCardless Dashboard](https://bankaccountdata.gocardless.com/) → **User Secrets**
-2. Erstelle ein neues Secret → du erhältst `secret_id` + `secret_key`
+Öffne `/Users/rico/dev/Jarvis OS/.env` und füge am Ende hinzu:
 
-### Bank-Verbindung (Requisition)
-1. Im GoCardless Dashboard → **Requisitions** → **New Requisition**
-2. Wähle dein Land (DE) und deine Bank (z.B. N26, Sparkasse, etc.)
-3. Du wirst zur Bank weitergeleitet, um den Zugriff zu autorisieren
-4. Nach der Autorisierung erhältst du eine **Requisition ID** und die verknüpften **Account IDs**
+```env
+# ── Banking (FinTS) ──
+# BW-Bank (Privat)
+FINTS_BW_URL="https://banking-li4.s-fints-pt-li.de/fints30"
+FINTS_BW_BLZ="60050101"
+FINTS_BW_USER="dein-anmeldename"
+FINTS_BW_PIN="dein-online-banking-pin"
 
-> **Wichtig:** PSD2-Zugriffe laufen alle 90 Tage ab. Du musst den Consent dann erneuern.
-
----
-
-## 2. n8n Workflow erstellen
-
-### Node 1: Cron Trigger
-- **Trigger Interval:** Every Day
-- **Hour:** 3 (03:00 Uhr nachts)
-- **Timezone:** Europe/Berlin
-
-### Node 2: HTTP Request – Access Token
-- **Method:** POST
-- **URL:** `https://bankaccountdata.gocardless.com/api/v2/token/new/`
-- **Body (JSON):**
-  ```json
-  {
-    "secret_id": "{{$env.GOCARDLESS_SECRET_ID}}",
-    "secret_key": "{{$env.GOCARDLESS_SECRET_KEY}}"
-  }
-  ```
-- **Response:** Enthält `access` Token (gültig 24h)
-
-### Node 3: HTTP Request – Transactions abrufen
-- **Method:** GET
-- **URL:** `https://bankaccountdata.gocardless.com/api/v2/accounts/{{ACCOUNT_ID}}/transactions/`
-- **Headers:** `Authorization: Bearer {{$node["Access Token"].json.access}}`
-- **Query Parameters:**
-  - `date_from`: `{{$today.minus({days: 1}).toFormat('yyyy-MM-dd')}}`
-  - `date_to`: `{{$today.toFormat('yyyy-MM-dd')}}`
-
-### Node 4: HTTP Request – Kontostand abrufen
-- **Method:** GET
-- **URL:** `https://bankaccountdata.gocardless.com/api/v2/accounts/{{ACCOUNT_ID}}/balances/`
-- **Headers:** `Authorization: Bearer {{$node["Access Token"].json.access}}`
-
-### Node 5 (Optional): OpenAI – Kategorie-Mapping
-- **Model:** gpt-4o-mini
-- **System Prompt:**
-  ```
-  Du bist ein Finanz-Kategorisierer. Ordne jeden Buchungstext einer dieser Kategorien zu:
-  Gehalt, Miete, Lebensmittel, Software, Transport, Versicherung, Freizeit, Gesundheit, Sparen, Provision, Sonstiges.
-  Antworte nur mit dem Kategorienamen.
-  ```
-- **User Message:** `{{$json.remittanceInformationUnstructured}}`
-
-### Node 6: Function – Payload transformieren
-```javascript
-const transactions = $input.all().map(item => {
-  const tx = item.json;
-  const amount = Math.abs(parseFloat(tx.transactionAmount.amount));
-  const type = parseFloat(tx.transactionAmount.amount) >= 0 ? 'income' : 'expense';
-  
-  return {
-    bankTransactionId: tx.transactionId || tx.internalTransactionId,
-    amount: amount,
-    type: type,
-    category: tx.category || 'Sonstiges', // From OpenAI node or fallback
-    description: tx.remittanceInformationUnstructured || tx.creditorName || tx.debtorName || '',
-    date: tx.bookingDate + 'T00:00:00.000Z'
-  };
-});
-
-const balance = $node["Kontostand"].json.balances?.[0]?.balanceAmount?.amount;
-
-return [{
-  json: {
-    transactions,
-    current_balance: balance ? parseFloat(balance) : undefined
-  }
-}];
+# DKB (Geschäftlich)
+FINTS_DKB_URL="https://fints.dkb.de/fints"
+FINTS_DKB_BLZ="12030000"
+FINTS_DKB_USER="dein-anmeldename"
+FINTS_DKB_PIN="dein-online-banking-pin"
 ```
 
-### Node 7: HTTP Request – Push to Jarvis
-- **Method:** POST
-- **URL:** `https://jarvis-os-xxxxx.vercel.app/api/webhooks/finance`
-  *(Ersetze mit deiner Vercel URL)*
-- **Headers:**
-  - `Content-Type: application/json`
-  - `Authorization: Bearer {{$env.N8N_WEBHOOK_SECRET}}`
-- **Body:** `{{JSON.stringify($json)}}`
+> **Anmeldename BW-Bank:** Ist dein Online-Banking Anmeldename (nicht die Kontonummer).
+> **Anmeldename DKB:** Ist in der Regel dein Benutzername aus dem Online-Banking.
 
 ---
 
-## 3. n8n Environment Variables
+## 2. Erster Testlauf
 
-Setze in deinen n8n Settings → **Variables**:
-- `GOCARDLESS_SECRET_ID` → Dein GoCardless Secret ID
-- `GOCARDLESS_SECRET_KEY` → Dein GoCardless Secret Key
-- `N8N_WEBHOOK_SECRET` → Selbes Secret wie in Jarvis `.env`
+```bash
+cd "/Users/rico/dev/Jarvis OS"
+npm run sync:banks
+```
 
----
-
-## 4. Mehrere Konten
-
-Wenn du Giro + Business-Konto hast, dupliziere die Nodes 3+4 für jede Account ID und merge die Ergebnisse im Function Node.
+Beim **ersten Lauf** wird wahrscheinlich eine TAN abgefragt (pushTAN oder chipTAN). Bestätige diese in deiner Banking-App. Danach funktioniert der Sync für ca. 90 Tage ohne TAN.
 
 ---
 
-## 5. Testen
+## 3. n8n Automatisierung
 
-1. Starte den Workflow manuell in n8n (Play-Button)
-2. Prüfe die Jarvis Response im n8n Output Panel
-3. Öffne dein Jarvis Dashboard und verifiziere die neuen Transaktionen
+Importiere die Datei `Jarvis_Finance_Workflow.json` von deinem Desktop in n8n:
+
+1. Öffne n8n → Neuer Workflow → ⋯ → **Import from File**
+2. Wähle `Jarvis_Finance_Workflow.json`
+3. Workflow auf **Active** stellen
+
+Der Workflow hat nur 2 Nodes:
+- **Schedule Trigger:** Läuft täglich um 03:00 Uhr
+- **Execute Command:** Startet `npm run sync:banks`
+
+---
+
+## 4. Optionen
+
+```bash
+# Standard: Letzte 2 Tage
+npm run sync:banks
+
+# Letzte 7 Tage (z.B. nach Urlaub)
+npx tsx scripts/sync-banks.ts --days 7
+
+# Letzte 30 Tage (initialer Import)
+npx tsx scripts/sync-banks.ts --days 30
+```
