@@ -17,6 +17,12 @@ export class FinanceService {
 
       const current = history.length > 0 ? history[history.length - 1] : null;
 
+      // Fetch Target Setting
+      const targetSetting = await prisma.setting.findUnique({ where: { key: 'net_worth_target' } });
+      if (current && targetSetting?.value) {
+        current.target = parseFloat(targetSetting.value);
+      }
+
       // Fetch Buckets
       const bucketSetting = await prisma.setting.findUnique({ where: { key: 'finance_buckets' } });
       const buckets = bucketSetting?.value ? JSON.parse(bucketSetting.value) : { liquid: 0, depot: 0, assets: 0, debt: 0 };

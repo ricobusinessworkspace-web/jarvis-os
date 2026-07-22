@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { Wallet, TrendingUp, Plus, Check, ArrowDownRight, ArrowUpRight, X, Building, Landmark, PiggyBank, Receipt, Banknote } from 'lucide-react';
-import { updateFinanceBuckets, addPipelineItem, markPipelineItemCleared } from '@/actions/dashboard';
+import { Wallet, TrendingUp, Plus, Check, ArrowDownRight, ArrowUpRight, X, Building, Landmark, PiggyBank, Receipt, Banknote, Pencil, Trash2 } from 'lucide-react';
+import { updateFinanceBuckets, addPipelineItem, markPipelineItemCleared, updateFinanceTarget, updatePipelineItem, deletePipelineItem } from '@/actions/dashboard';
 
 interface NetWorthEntry { id: string; value: number; target: number; date: string; }
 interface Transaction { id: string; amount: number; type: string; category: string; description: string; date: string; status: string; }
@@ -37,6 +37,14 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
   const [txType, setTxType] = useState<'income' | 'expense'>('expense');
   const [txAmount, setTxAmount] = useState('');
   const [txCategory, setTxCategory] = useState('');
+  const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Pipeline Edit State
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+
+  // Target Goal Edit State
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [editTargetValue, setEditTargetValue] = useState('');
 
   const displayValue = current?.value || 0;
   const displayTarget = current?.target || 100000;
@@ -65,6 +73,15 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
     await updateFinanceBuckets(newBuckets, displayTarget);
   };
 
+  const handleUpdateTarget = async () => {
+    const val = parseFloat(editTargetValue);
+    if (!isNaN(val)) {
+      if (current) setCurrent({ ...current, target: val });
+      setIsEditingTarget(false);
+      await updateFinanceTarget(val);
+    }
+  };
+
   const handleAddPipeline = async () => {
     const amount = parseFloat(txAmount.replace(/[^0-9.-]+/g, ''));
     if (isNaN(amount) || !txCategory) return;
@@ -72,12 +89,29 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
 
     const newTx: Transaction = {
       id: 'temp-' + Date.now(),
-      amount, type: txType, category: txCategory, description: '', date: new Date().toISOString(), status: 'pending'
+      amount, type: txType, category: txCategory, description: '', date: new Date(txDate).toISOString(), status: 'pending'
     };
 
-    setPipeline(prev => [...prev, newTx]);
-    setTxAmount(''); setTxCategory('');
-    await addPipelineItem({ amount, type: txType, category: txCategory });
+    setPipeline(prev => [...prev, newTx].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+    setTxAmount(''); setTxCategory(''); setTxDate(new Date().toISOString().split('T')[0]);
+    await addPipelineItem({ amount, type: txType, category: txCategory, date: new Date(txDate) });
+  };
+
+  const handleSavePipelineEdit = async (id: string) => {
+    const amount = parseFloat(txAmount.replace(/[^0-9.-]+/g, ''));
+    if (isNaN(amount) || !txCategory) return;
+    
+    const updatedTx = { amount, type: txType, category: txCategory, date: new Date(txDate).toISOString() };
+    setPipeline(prev => prev.map(p => p.id === id ? { ...p, ...updatedTx } : p).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+    setEditingTxId(null);
+    setTxAmount(''); setTxCategory(''); setTxDate(new Date().toISOString().split('T')[0]);
+    await updatePipelineItem(id, { amount, type: txType, category: txCategory, date: new Date(txDate) });
+  };
+
+  const handleDeletePipelineItem = async (id: string) => {
+    setPipeline(prev => prev.filter(p => p.id !== id));
+    setEditingTxId(null);
+    await deletePipelineItem(id);
   };
 
   const handleClearPipelineItem = async (id: string, e: React.MouseEvent) => {
@@ -110,10 +144,34 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
 
         <div className="flex-1 flex flex-col">
           <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-foreground">{formatCurrency(displayValue)}</h1>
-          <div className="flex items-center gap-2 mt-2 mb-6">
-            <span className="text-xs font-semibold text-muted bg-overlay/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-emerald-400" /> Ziel: {formatCurrency(displayTarget)}
-            </span>
+          <div className="flex items-center gap-2 mt-2 mb-6 h-6">
+            {isEditingTarget ? (
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  value={editTargetValue} 
+                  onChange={e => setEditTargetValue(e.target.value)} 
+                  className="bg-background border border-border/50 rounded px-2 py-0.5 text-xs text-foreground outline-none w-24"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleUpdateTarget();
+                    if (e.key === 'Escape') setIsEditingTarget(false);
+                  }}
+                />
+                <button onClick={handleUpdateTarget} className="text-emerald-400 hover:text-emerald-300"><Check className="h-4 w-4" /></button>
+                <button onClick={() => setIsEditingTarget(false)} className="text-muted"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <span className="text-xs font-semibold text-muted bg-overlay/50 px-2 py-0.5 rounded-full flex items-center gap-1 group relative">
+                <TrendingUp className="h-3 w-3 text-emerald-400" /> Ziel: {formatCurrency(displayTarget)}
+                <button 
+                  onClick={() => { setIsEditingTarget(true); setEditTargetValue(displayTarget.toString()); }} 
+                  className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Pencil className="h-3 w-3 text-muted hover:text-foreground" />
+                </button>
+              </span>
+            )}
           </div>
 
           <div className="space-y-2 mb-6 max-w-sm">
@@ -161,7 +219,7 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                 {isUpdatingBuckets ? (
                   <div className="space-y-3 bg-overlay/30 p-3 rounded-2xl border border-border/30">
                     <div>
-                      <label className="text-[10px] font-bold uppercase text-muted">Giro / Cash (€)</label>
+                      <label className="text-[10px] font-bold uppercase text-muted">Cash (Giro/Business) (€)</label>
                       <input type="number" value={bLiquid} onChange={e => setBLiquid(e.target.value)} className="w-full bg-background border border-border/50 rounded-lg px-3 py-2 text-sm" />
                     </div>
                     <div>
@@ -183,7 +241,7 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                     <div className="flex justify-between items-center bg-overlay/30 p-3 rounded-2xl border border-border/30">
                       <div className="flex items-center gap-3">
                         <div className="bg-blue-500/10 p-2 rounded-lg"><Landmark className="h-4 w-4 text-blue-400" /></div>
-                        <p className="text-xs font-bold text-foreground">Liquidität</p>
+                        <p className="text-xs font-bold text-foreground">Cash (Giro/Business)</p>
                       </div>
                       <p className="text-sm font-black">{formatCurrency(buckets.liquid)}</p>
                     </div>
@@ -223,12 +281,28 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                 <div className="bg-gradient-to-br from-emerald-500/10 to-transparent p-4 rounded-2xl border border-emerald-500/20 mb-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500/70">Safe to Spend</p>
                   <p className="text-2xl font-black text-emerald-400">{formatCurrency(safeToSpend)}</p>
-                  <p className="text-[10px] text-muted mt-1">Girokonto minus anstehende Ausgaben + Einnahmen.</p>
+                  <p className="text-[10px] text-muted mt-2 border-t border-emerald-500/10 pt-2 flex flex-col gap-0.5">
+                    <span className="flex justify-between"><span>Cash (Giro/Business):</span> <span>{formatCurrency(buckets.liquid)}</span></span>
+                    <span className="flex justify-between text-emerald-400"><span>+ Einnahmen:</span> <span>{formatCurrency(pendingIncome)}</span></span>
+                    <span className="flex justify-between text-red-400"><span>- Ausgaben:</span> <span>{formatCurrency(pendingExpense)}</span></span>
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] font-bold tracking-widest uppercase text-muted">Ausstehend</h4>
-                  <button onClick={() => setIsAddingTx(true)} className="bg-overlay p-1.5 rounded-lg hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"><Plus className="h-3 w-3" /></button>
+                  <button 
+                    onClick={() => {
+                      setIsAddingTx(true);
+                      setEditingTxId(null);
+                      setTxType('expense');
+                      setTxAmount('');
+                      setTxCategory('');
+                      setTxDate(new Date().toISOString().split('T')[0]);
+                    }} 
+                    className="bg-overlay p-1.5 rounded-lg hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
                 </div>
 
                 <AnimatePresence>
@@ -238,11 +312,19 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                         <button onClick={() => setTxType('income')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${txType === 'income' ? 'bg-emerald-500/20 text-emerald-400' : 'text-muted'}`}>Einnahme</button>
                         <button onClick={() => setTxType('expense')} className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${txType === 'expense' ? 'bg-red-500/20 text-red-400' : 'text-muted'}`}>Ausgabe</button>
                       </div>
-                      <input type="number" placeholder="Betrag (€)" value={txAmount} onChange={e => setTxAmount(e.target.value)} className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-sm" />
-                      <input type="text" placeholder="Bezeichnung (z.B. Steuern)" value={txCategory} onChange={e => setTxCategory(e.target.value)} className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-sm" />
+                      <input type="number" placeholder="Betrag (€)" value={txAmount} onChange={e => setTxAmount(e.target.value)} className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500/50" />
+                      <input type="text" placeholder="Bezeichnung (z.B. Steuern)" value={txCategory} onChange={e => setTxCategory(e.target.value)} className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500/50" />
+                      <input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} className="w-full bg-background/50 border border-border/50 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500/50 text-muted-foreground" />
                       <div className="flex gap-2">
-                        <button onClick={handleAddPipeline} className="flex-1 bg-emerald-500/20 text-emerald-400 font-bold py-2 rounded-lg text-xs">Hinzufügen</button>
-                        <button onClick={() => setIsAddingTx(false)} className="p-2 text-muted"><X className="h-4 w-4" /></button>
+                        <button onClick={editingTxId ? () => handleSavePipelineEdit(editingTxId) : handleAddPipeline} className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors text-emerald-400 font-bold py-2 rounded-lg text-xs">
+                          {editingTxId ? 'Speichern' : 'Hinzufügen'}
+                        </button>
+                        {editingTxId && (
+                          <button onClick={() => handleDeletePipelineItem(editingTxId)} className="bg-red-500/20 hover:bg-red-500/30 text-red-400 p-2 rounded-lg transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button onClick={() => { setIsAddingTx(false); setEditingTxId(null); }} className="p-2 text-muted hover:text-foreground transition-colors"><X className="h-4 w-4" /></button>
                       </div>
                     </motion.div>
                   )}
@@ -254,8 +336,11 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                   )}
                   {pipeline.map(tx => {
                     const isIncome = tx.type === 'income';
+                    const dateObj = new Date(tx.date);
+                    const isOverdue = dateObj < new Date() && dateObj.toDateString() !== new Date().toDateString();
+                    
                     return (
-                      <motion.div layout key={tx.id} className="flex items-center justify-between p-2.5 rounded-xl bg-overlay/20 border border-border/30 group">
+                      <motion.div layout key={tx.id} className={`flex items-center justify-between p-2.5 rounded-xl border group ${isOverdue ? 'bg-red-500/5 border-red-500/20' : 'bg-overlay/20 border-border/30'}`}>
                         <div className="flex items-center gap-3">
                           <button 
                             onClick={(e) => handleClearPipelineItem(tx.id, e)}
@@ -265,8 +350,23 @@ export function NetWorthClient({ initialHistory, initialCurrent, initialBuckets,
                             <Check className="h-3 w-3" />
                           </button>
                           <div>
-                            <p className="text-xs font-bold text-foreground">{tx.category}</p>
-                            <p className="text-[9px] text-muted">{new Date(tx.date).toLocaleDateString('de-DE')}</p>
+                            <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                              {tx.category}
+                              <button 
+                                onClick={() => {
+                                  setEditingTxId(tx.id);
+                                  setTxType(tx.type as 'income'|'expense');
+                                  setTxAmount(tx.amount.toString());
+                                  setTxCategory(tx.category);
+                                  setTxDate(tx.date.split('T')[0]);
+                                  setIsAddingTx(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opacity"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </p>
+                            <p className={`text-[9px] ${isOverdue ? 'text-red-400 font-bold' : 'text-muted'}`}>{dateObj.toLocaleDateString('de-DE')}</p>
                           </div>
                         </div>
                         <span className={`text-xs font-black tracking-tight ${isIncome ? 'text-emerald-400' : 'text-red-400'}`}>

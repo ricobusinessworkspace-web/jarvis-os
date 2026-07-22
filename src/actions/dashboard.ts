@@ -282,6 +282,20 @@ export async function logNetWorth(value: number, target: number) {
   }
 }
 
+export async function updateFinanceTarget(target: number) {
+  try {
+    const updated = await prisma.setting.upsert({
+      where: { key: 'net_worth_target' },
+      update: { value: target.toString() },
+      create: { key: 'net_worth_target', value: target.toString() }
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, data: updated };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function updateFinanceBuckets(buckets: { liquid: number, depot: number, assets: number, debt: number }, target: number) {
   try {
     await prisma.setting.upsert({
@@ -309,7 +323,7 @@ export async function updateFinanceBuckets(buckets: { liquid: number, depot: num
   }
 }
 
-export async function addPipelineItem(data: { amount: number, type: string, category: string, description?: string }) {
+export async function addPipelineItem(data: { amount: number, type: string, category: string, description?: string, date?: Date }) {
   try {
     const tx = await prisma.transaction.create({ 
       data: {
@@ -319,6 +333,31 @@ export async function addPipelineItem(data: { amount: number, type: string, cate
     });
     revalidatePath('/', 'layout');
     return { success: true, data: tx };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updatePipelineItem(id: string, data: any) {
+  try {
+    const tx = await prisma.transaction.update({
+      where: { id },
+      data
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, data: tx };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deletePipelineItem(id: string) {
+  try {
+    await prisma.transaction.delete({
+      where: { id }
+    });
+    revalidatePath('/', 'layout');
+    return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
