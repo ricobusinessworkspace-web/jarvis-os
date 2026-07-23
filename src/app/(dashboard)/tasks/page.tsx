@@ -543,12 +543,23 @@ export default function TasksPage() {
                     <div className="p-1.5 rounded-md bg-red-500/10 text-red-500"><CalendarDays className="h-4 w-4" /></div>
                     Datum
                   </div>
-                  <input 
-                    type="date" 
-                    value={selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString().split('T')[0] : ''}
-                    onChange={(e) => handleUpdateSelectedTask({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                    className="bg-transparent text-sm text-secondary focus:outline-none"
-                  />
+                  <div className="flex items-center gap-1">
+                    <input 
+                      type="date" 
+                      value={selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => handleUpdateSelectedTask({ dueDate: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                      className="bg-transparent text-sm text-secondary focus:outline-none"
+                    />
+                    {selectedTask.dueDate && (
+                      <button 
+                        onClick={() => handleUpdateSelectedTask({ dueDate: null })}
+                        className="p-1 hover:bg-overlay rounded-md text-muted hover:text-red-400 transition-colors shrink-0"
+                        title="Datum entfernen"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-3 flex items-center justify-between">
