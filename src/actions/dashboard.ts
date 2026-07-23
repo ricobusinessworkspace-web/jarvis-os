@@ -375,3 +375,19 @@ export async function markPipelineItemCleared(id: string) {
     return { success: false, error: error.message };
   }
 }
+
+// ─── WEIGHT TRACKER ───
+export async function addWeightEntry(weight: number) {
+  try {
+    const entry = await prisma.weightEntry.create({
+      data: {
+        weight,
+        date: new Date()
+      }
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, data: entry };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

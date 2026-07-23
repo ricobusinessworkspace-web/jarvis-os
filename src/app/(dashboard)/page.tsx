@@ -6,6 +6,7 @@ import SleepWidget from '@/components/widgets/SleepWidget';
 import FiveAmStreakWidget from '@/components/widgets/FiveAmStreakWidget';
 import ContentWidget from '@/components/widgets/ContentWidget';
 import NetWorthWidget from '@/components/widgets/NetWorthWidget';
+import WeightWidget from '@/components/widgets/WeightWidget';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,9 +59,14 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Content Pipeline */}
-            <div className="h-[400px]">
-              <ContentWidget />
+            {/* Content Pipeline & Weight Tracker */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-[400px]">
+                <ContentWidget />
+              </div>
+              <div className="h-[400px]">
+                <WeightWidget />
+              </div>
             </div>
 
           </div>

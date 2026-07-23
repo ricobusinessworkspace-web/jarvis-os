@@ -357,3 +357,13 @@ model Transaction {
   @@map("jarvis_transactions")
   @@schema("public")
 }
+
+model WeightEntry {
+  id        String   @id @default(uuid())
+  weight    Float
+  date      DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("jarvis_weight_entries")
+  @@schema("public")
+}
