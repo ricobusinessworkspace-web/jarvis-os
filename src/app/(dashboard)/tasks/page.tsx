@@ -16,7 +16,8 @@ import {
   X,
   AlignLeft,
   CalendarDays,
-  AlertCircle
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 import { createTask, updateTask, deleteTask, updateSetting } from '@/actions/dashboard';
 import type { Task } from '@/types';
@@ -41,6 +42,9 @@ export default function TasksPage() {
   
   const [isAddingList, setIsAddingList] = useState(false);
   const [newListName, setNewListName] = useState('');
+  
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editListName, setEditListName] = useState('');
   
   // --- Derived Data ---
   const today = new Date();
@@ -180,6 +184,51 @@ export default function TasksPage() {
     }
   };
 
+  const handleRenameList = async (oldName: string) => {
+    if (!editListName.trim() || editListName === oldName) {
+      setEditingListId(null);
+      return;
+    }
+    const newName = editListName.trim();
+    const updatedLists = customLists.map(l => l === oldName ? newName : l);
+    const jsonStr = JSON.stringify([...new Set(updatedLists)]);
+    
+    updateSettingInStore('custom_task_lists', jsonStr);
+    try { await updateSetting('custom_task_lists', jsonStr); } catch (err) { console.error(err); }
+    
+    const tasksToUpdate = tasks.filter(t => t.area === oldName);
+    for (const t of tasksToUpdate) {
+      updateTaskInStore(t.id, { area: newName } as any);
+      try { await updateTask(t.id, { area: newName }); } catch (err) { console.error(err); }
+    }
+    
+    if (selectedList.type === 'custom' && selectedList.id === oldName) {
+      setSelectedList({ type: 'custom', id: newName });
+    }
+    setEditingListId(null);
+  };
+
+  const handleDeleteList = async (listName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Möchtest du die Liste "${listName}" wirklich löschen?\nDie Aufgaben darin werden in die Standardliste "Personal" verschoben.`)) return;
+    
+    const updatedLists = customLists.filter(l => l !== listName);
+    const jsonStr = JSON.stringify(updatedLists);
+    
+    updateSettingInStore('custom_task_lists', jsonStr);
+    try { await updateSetting('custom_task_lists', jsonStr); } catch (err) { console.error(err); }
+    
+    const tasksToUpdate = tasks.filter(t => t.area === listName);
+    for (const t of tasksToUpdate) {
+      updateTaskInStore(t.id, { area: 'Personal' } as any);
+      try { await updateTask(t.id, { area: 'Personal' }); } catch (err) { console.error(err); }
+    }
+    
+    if (selectedList.type === 'custom' && selectedList.id === listName) {
+      setSelectedList({ type: 'smart', id: 'today' });
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     if (selectedTaskId === id) setSelectedTaskId(null);
     try {
@@ -282,17 +331,57 @@ export default function TasksPage() {
               {customLists.map(list => {
                 const count = tasks.filter(t => t.area === list && t.status !== 'done').length;
                 const isSelected = selectedList.type === 'custom' && selectedList.id === list;
+                
+                if (editingListId === list) {
+                  return (
+                    <div key={list} className="px-2 py-1">
+                      <div className="flex items-center gap-2 bg-background border border-accent/50 rounded-lg px-2 py-1.5">
+                        <ListIcon className="h-4 w-4 text-accent shrink-0" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={editListName}
+                          onChange={(e) => setEditListName(e.target.value)}
+                          onBlur={() => handleRenameList(list)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleRenameList(list)}
+                          className="w-full bg-transparent text-sm text-foreground focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                
                 return (
                   <button
                     key={list}
                     onClick={() => { setSelectedList({ type: 'custom', id: list }); setSelectedTaskId(null); }}
                     className={cn("w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group", isSelected ? "bg-accent/10 text-accent font-medium" : "hover:bg-overlay text-secondary")}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-1.5 rounded-full", isSelected ? "bg-accent text-white" : "bg-overlay text-muted")}><ListIcon className="h-3.5 w-3.5" /></div>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={cn("p-1.5 rounded-full shrink-0", isSelected ? "bg-accent text-white" : "bg-overlay text-muted")}><ListIcon className="h-3.5 w-3.5" /></div>
                       <span className="text-sm truncate">{list}</span>
                     </div>
-                    <span className="text-xs font-medium opacity-60">{count}</span>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Action Buttons visible on hover */}
+                      <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+                        <div 
+                          onClick={(e) => { e.stopPropagation(); setEditingListId(list); setEditListName(list); }}
+                          className="p-1 hover:bg-background/80 rounded text-muted hover:text-foreground transition-colors"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </div>
+                        {list !== 'Personal' && list !== 'Business' && (
+                          <div 
+                            onClick={(e) => handleDeleteList(list, e)}
+                            className="p-1 hover:bg-red-500/10 rounded text-muted hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium opacity-60 group-hover:hidden">{count}</span>
+                    </div>
                   </button>
                 );
               })}
