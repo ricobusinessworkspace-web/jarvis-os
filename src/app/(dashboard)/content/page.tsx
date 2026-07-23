@@ -21,15 +21,12 @@ import {
   FileText
 } from 'lucide-react';
 import {
-  createTask,
-  updateTask,
-  deleteTask,
   createContentItem,
   updateContentItem,
   deleteContentItem,
   updateSetting
 } from '@/actions/dashboard';
-import type { ContentItem, Task, Subtask } from '@/types';
+import type { ContentItem, Subtask } from '@/types';
 
 type ContentStatus = 'idee' | 'in_arbeit' | 'geplant' | 'veroeffentlicht';
 
@@ -46,16 +43,12 @@ function generateId() {
 
 export default function ContentAndTasksPage() {
   const contentItems = useStore((state) => state.contentItems);
-  const tasks = useStore((state) => state.tasks);
   const settings = useStore((state) => state.settings);
   
   const addContentItem = useStore((state) => state.addContentItem);
   const updateContentItemInStore = useStore((state) => state.updateContentItemInStore);
   const removeContentItem = useStore((state) => state.removeContentItem);
   
-  const addTask = useStore((state) => state.addTask);
-  const updateTaskInStore = useStore((state) => state.updateTaskInStore);
-  const removeTask = useStore((state) => state.removeTask);
   const updateSettingInStore = useStore((state) => state.updateSettingInStore);
 
   // --- Content Form ---
@@ -64,21 +57,11 @@ export default function ContentAndTasksPage() {
   const [newContentDeadline, setNewContentDeadline] = useState('');
   const [showAddContentForm, setShowAddContentForm] = useState(false);
 
-  // --- Task Form ---
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskDeadline, setNewTaskDeadline] = useState('');
-
   // --- Inline Edit State ---
   const [editingCard, setEditingCard] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editProject, setEditProject] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
-  
-  // --- Task Edit State ---
-  const [editingTask, setEditingTask] = useState<string | null>(null);
-  const [editTaskTitle, setEditTaskTitle] = useState('');
-  const [editTaskDeadline, setEditTaskDeadline] = useState('');
-  const [editTaskNotes, setEditTaskNotes] = useState('');
 
   // --- Subtask State ---
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
@@ -225,62 +208,6 @@ export default function ContentAndTasksPage() {
     }
   };
 
-  // --- Task CRUD ---
-  const handleAddTask = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-    try {
-      const isoDeadline = newTaskDeadline ? new Date(newTaskDeadline).toISOString() : null;
-      const res = await createTask({
-        title: newTaskTitle,
-        dueDate: isoDeadline,
-        status: 'todo' as const,
-        priority: 'normal' as const
-      });
-      if (res.success && res.data) {
-        addTask(res.data as any);
-        setNewTaskTitle('');
-        setNewTaskDeadline('');
-      }
-    } catch (err) {
-      console.error('Error creating task:', err);
-    }
-  };
-
-  const handleToggleTask = async (task: Task) => {
-        const newStatus = task.status === 'todo' ? 'done' : 'todo';
-    const completedAt = newStatus === 'done' ? new Date().toISOString().split('T')[0] : null;
-    try {
-      const res = await updateTask(task.id, { status: newStatus, completedAt });
-      if (res.success) updateTaskInStore(task.id, { status: newStatus, completedAt });
-    } catch (err) {
-      console.error('Error toggling task:', err);
-    }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-        try {
-      const res = await deleteTask(id);
-      if (res.success) removeTask(id);
-    } catch (err) {
-      console.error('Error deleting task:', err);
-    }
-  };
-
-  const handleSaveTaskEdit = async (task: Task) => {
-    if (!editTaskTitle.trim()) return;
-    try {
-      const isoDeadline = editTaskDeadline ? new Date(editTaskDeadline).toISOString() : null;
-      const res = await updateTask(task.id, { title: editTaskTitle, dueDate: isoDeadline, notes: editTaskNotes });
-      if (res.success) {
-        updateTaskInStore(task.id, { title: editTaskTitle, dueDate: isoDeadline, notes: editTaskNotes });
-        setEditingTask(null);
-      }
-    } catch (err) {
-      console.error('Error saving task edit:', err);
-    }
-  };
-
   const getDateBadge = (dateStr: string | null) => {
     if (!dateStr) return null;
     const today = new Date();
@@ -294,14 +221,6 @@ export default function ContentAndTasksPage() {
     if (diffDays === 1) return { text: 'Morgen', className: 'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium px-2 py-0.5 rounded text-[10px] flex items-center gap-1' };
     if (diffDays <= 7) return { text: `In ${diffDays} Tagen`, className: 'bg-accent/10 text-accent border border-accent/20 font-medium px-2 py-0.5 rounded text-[10px] flex items-center gap-1' };
     return { text: dateStr, className: 'bg-overlay/50 text-muted border border-border/50 font-medium px-2 py-0.5 rounded text-[10px] flex items-center gap-1' };
-  };
-
-  const handleToggleTaskPriority = async (task: Task) => {
-        const newPriority = task.priority === 'high' ? 'normal' : 'high';
-    try {
-      const res = await updateTask(task.id, { priority: newPriority });
-      if (res.success) updateTaskInStore(task.id, { priority: newPriority });
-    } catch (err) { console.error('Error toggling task priority:', err); }
   };
 
   const handleToggleContentPriority = async (item: ContentItem) => {
@@ -328,11 +247,8 @@ export default function ContentAndTasksPage() {
       </header>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-10">
-        
-        {/* Kanban */}
-        <div className="xl:col-span-3 space-y-6">
-          <div className="flex items-center justify-between">
+      <div className="flex-1 space-y-6">
+        <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-foreground">Projekte Pipeline</h2>
             <button
               onClick={() => setShowAddContentForm(!showAddContentForm)}
@@ -497,89 +413,6 @@ export default function ContentAndTasksPage() {
             })}
           </div>
         </div>
-
-        {/* Global To-Do List */}
-        <div className="space-y-6 xl:col-span-1">
-          <h2 className="text-base font-bold text-foreground">To-Do Liste</h2>
-
-          <form onSubmit={handleAddTask} className="bg-elevated/30 border border-border/30 rounded-2xl p-5 space-y-4">
-            <div>
-              <label className="text-xs text-muted font-medium block mb-1.5">Neue Aufgabe</label>
-              <div className="flex flex-col gap-2">
-                <input type="text" required placeholder="Titel..." value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-2 text-sm text-foreground focus:outline-none focus:border-accent transition-colors" />
-                <div className="flex gap-2">
-                  <input type="date" value={newTaskDeadline} onChange={(e) => setNewTaskDeadline(e.target.value)} className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent transition-colors" />
-                  <button type="submit" className="bg-accent text-white px-3 py-2 rounded-xl hover:bg-accent-hover transition-all"><Plus className="h-4 w-4" /></button>
-                </div>
-              </div>
-            </div>
-          </form>
-
-          <div className="bg-elevated/15 border border-border/20 rounded-2xl p-5 space-y-4">
-            <h3 className="text-xs font-bold text-muted uppercase tracking-wider">Allgemeine Aufgaben</h3>
-            
-            <div className="flex flex-col gap-2.5 max-h-[500px] overflow-y-auto pr-1">
-              <AnimatePresence mode="popLayout">
-                {tasks
-                  .sort((a, b) => {
-                    if (a.status !== b.status) return a.status === 'todo' ? -1 : 1;
-                    const pa = a.priority === 'high' ? 1 : 0;
-                    const pb = b.priority === 'high' ? 1 : 0;
-                    if (pa !== pb) return pb - pa;
-                    return 0;
-                  })
-                  .map((task) => {
-                    const isDone = task.status === 'done';
-                    const isEditing = editingTask === task.id;
-
-                    return (
-                      <motion.div key={task.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className={`p-3.5 rounded-xl border transition-all ${isDone ? 'bg-overlay/10 border-border/15 opacity-50' : 'bg-elevated/30 border-border/30'}`}>
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            <input type="text" value={editTaskTitle} onChange={(e) => setEditTaskTitle(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-accent" autoFocus placeholder="Titel..." />
-                            <textarea value={editTaskNotes} onChange={(e) => setEditTaskNotes(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent min-h-[60px] resize-y" placeholder="Notizen zur Aufgabe..." />
-                            <input type="date" value={editTaskDeadline} onChange={(e) => setEditTaskDeadline(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground focus:outline-none focus:border-accent" />
-                            <div className="flex gap-2">
-                              <button onClick={() => handleSaveTaskEdit(task)} className="text-accent text-xs font-semibold flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Sichern</button>
-                              <button onClick={() => setEditingTask(null)} className="text-muted text-xs font-medium flex items-center gap-1"><X className="h-3.5 w-3.5" /> Abbrechen</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start gap-3">
-                            <button onClick={() => handleToggleTask(task)} className="mt-0.5 shrink-0">
-                              {isDone ? <CheckCircle className="h-5 w-5 text-accent fill-accent/10" /> : <Circle className="h-5 w-5 text-muted/40" />}
-                            </button>
-                            <button onClick={() => handleToggleTaskPriority(task)} className="mt-0.5 shrink-0 transition-colors" title="Priorität">
-                              <Star className={`h-4 w-4 ${task.priority === 'high' ? 'fill-amber-400 text-amber-400' : 'text-muted/30 hover:text-amber-400/60'}`} />
-                            </button>
-                            
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <span className={`text-sm font-medium leading-relaxed block ${isDone ? 'line-through text-muted' : 'text-foreground'}`}>{task.title}</span>
-                              {task.notes && (
-                                <p className={`text-xs leading-relaxed mt-1 mb-2 whitespace-pre-wrap ${isDone ? 'text-muted/60 line-through' : 'text-muted'}`}>
-                                  {task.notes}
-                                </p>
-                              )}
-                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                                {(() => { const badge = getDateBadge(task.dueDate); return badge ? <span className={badge.className}>{badge.text}</span> : null; })()}
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-col gap-1">
-                              <button onClick={() => { setEditingTask(task.id); setEditTaskTitle(task.title); setEditTaskDeadline(task.dueDate ? (typeof task.dueDate === 'string' ? task.dueDate.split('T')[0] : new Date(task.dueDate).toISOString().split('T')[0]) : ''); setEditTaskNotes(task.notes || ''); }} className="text-muted hover:text-foreground p-1 transition-colors" title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => handleDeleteTask(task.id)} className="text-muted hover:text-red-400 p-1 transition-colors" title="Löschen"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-              </AnimatePresence>
-              {tasks.length === 0 && <div className="text-center p-8 border border-dashed border-border/15 rounded-xl"><p className="text-sm text-muted italic">Keine Aufgaben vorhanden.</p></div>}
-            </div>
-          </div>
-        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

@@ -10,6 +10,7 @@ import {
   PhoneCall,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
@@ -18,7 +19,8 @@ import { useState } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Content & Tasks', href: '/content', icon: KanbanSquare },
+  { label: 'Aufgaben', href: '/tasks', icon: CheckCircle2 },
+  { label: 'Content Kanban', href: '/content', icon: KanbanSquare },
 ] as const;
 
 const EXPANDED_WIDTH = 260;

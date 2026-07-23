@@ -13,6 +13,7 @@ export interface Task {
   dueDate: string | null;
   completedAt: string | null;
   projectTags: string[]; // e.g. ['Personal Brand', 'Podcast']
+  area?: string;
   createdAt: string;
   updatedAt: string;
 }

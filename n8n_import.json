@@ -1,0 +1,26 @@
+{
+  "name": "Jarvis Bank Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 3 * * *" }] }
+      },
+      "name": "Täglich 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "command": "cd \"/Users/rico/dev/Jarvis OS\" && npm run sync:banks 2>&1"
+      },
+      "name": "Bank Sync",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [250, 0]
+    }
+  ],
+  "connections": {
+    "Täglich 03:00": { "main": [[{"node": "Bank Sync", "type": "main", "index": 0}]] }
+  }
+}
