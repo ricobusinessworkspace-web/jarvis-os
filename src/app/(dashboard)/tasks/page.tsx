@@ -18,7 +18,7 @@ import {
   CalendarDays,
   AlertCircle
 } from 'lucide-react';
-import { createTask, updateTask, deleteTask } from '@/actions/dashboard';
+import { createTask, updateTask, deleteTask, updateSetting } from '@/actions/dashboard';
 import type { Task } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -31,10 +31,16 @@ export default function TasksPage() {
   const updateTaskInStore = useStore((state) => state.updateTaskInStore);
   const removeTask = useStore((state) => state.removeTask);
 
+  const settings = useStore((state) => state.settings);
+  const updateSettingInStore = useStore((state) => state.updateSettingInStore);
+
   // --- UI State ---
   const [selectedList, setSelectedList] = useState<SelectedList>({ type: 'smart', id: 'today' });
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListName, setNewListName] = useState('');
   
   // --- Derived Data ---
   const today = new Date();
@@ -55,16 +61,23 @@ export default function TasksPage() {
   }), [tasks]);
 
   const customLists = useMemo(() => {
-    const areas = new Set<string>();
+    let explicitLists: string[] = [];
+    try {
+      if (settings.custom_task_lists) {
+        explicitLists = JSON.parse(settings.custom_task_lists);
+      }
+    } catch(e){}
+
+    if (explicitLists.length === 0) {
+      explicitLists = ['Personal', 'Business'];
+    }
+
+    const areas = new Set<string>(explicitLists);
     tasks.forEach(t => {
       if (t.area) areas.add(t.area);
     });
-    if (areas.size === 0) {
-      areas.add('Personal');
-      areas.add('Business');
-    }
     return Array.from(areas);
-  }, [tasks]);
+  }, [tasks, settings.custom_task_lists]);
 
   const currentTasks = useMemo(() => {
     let filtered: Task[] = [];
@@ -141,6 +154,29 @@ export default function TasksPage() {
       await updateTask(selectedTask.id, updates);
     } catch (err) {
       console.error('Error updating task:', err);
+    }
+  };
+
+  const handleAddList = async (e: React.FormEvent | React.FocusEvent) => {
+    e.preventDefault();
+    if (!newListName.trim()) {
+      setIsAddingList(false);
+      return;
+    }
+    
+    const updatedLists = [...new Set([...customLists, newListName.trim()])];
+    const jsonStr = JSON.stringify(updatedLists);
+    
+    // Optimistic UI update
+    updateSettingInStore('custom_task_lists', jsonStr);
+    setNewListName('');
+    setIsAddingList(false);
+    setSelectedList({ type: 'custom', id: newListName.trim() });
+    
+    try {
+      await updateSetting('custom_task_lists', jsonStr);
+    } catch (err) {
+      console.error('Error saving custom list:', err);
     }
   };
 
@@ -240,7 +276,6 @@ export default function TasksPage() {
             </button>
           </div>
 
-          {/* Custom Lists */}
           <div className="pt-4">
             <h3 className="text-xs font-bold text-muted uppercase tracking-wider px-2 mb-2">Meine Listen</h3>
             <div className="space-y-1">
@@ -251,16 +286,44 @@ export default function TasksPage() {
                   <button
                     key={list}
                     onClick={() => { setSelectedList({ type: 'custom', id: list }); setSelectedTaskId(null); }}
-                    className={cn("w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors", isSelected ? "bg-accent/10 text-accent font-medium" : "hover:bg-overlay text-secondary")}
+                    className={cn("w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group", isSelected ? "bg-accent/10 text-accent font-medium" : "hover:bg-overlay text-secondary")}
                   >
                     <div className="flex items-center gap-3">
                       <div className={cn("p-1.5 rounded-full", isSelected ? "bg-accent text-white" : "bg-overlay text-muted")}><ListIcon className="h-3.5 w-3.5" /></div>
-                      <span className="text-sm">{list}</span>
+                      <span className="text-sm truncate">{list}</span>
                     </div>
                     <span className="text-xs font-medium opacity-60">{count}</span>
                   </button>
                 );
               })}
+              
+              {/* Add List Input or Button */}
+              {isAddingList ? (
+                <form onSubmit={handleAddList} className="px-2 pt-2">
+                  <div className="flex items-center gap-2 bg-background border border-accent/50 rounded-lg px-2 py-1.5">
+                    <ListIcon className="h-4 w-4 text-accent shrink-0" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newListName}
+                      onChange={(e) => setNewListName(e.target.value)}
+                      onBlur={handleAddList}
+                      placeholder="Name der Liste..."
+                      className="w-full bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted/50"
+                    />
+                  </div>
+                </form>
+              ) : (
+                <div className="px-2 pt-2">
+                  <button
+                    onClick={() => setIsAddingList(true)}
+                    className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-muted hover:text-foreground hover:bg-overlay transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-sm">Liste hinzufügen</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
