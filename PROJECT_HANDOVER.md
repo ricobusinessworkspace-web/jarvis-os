@@ -1,58 +1,71 @@
 # 🤝 Project Handover
 
-**To:** Next Lead Developer / Agent
-**From:** Previous Agent
-**Date:** 2026-07-15
+**To:** Next Lead Developer / Agent  
+**From:** Antigravity Agent  
+**Date:** 2026-07-23  
 
-Dieses Dokument dient als nahtlose Übergabe für den nachfolgenden Entwicklungs-Agenten. Es beschreibt den aktuellen Stand des Projekts sowie die Aufgaben, die in der letzten Session erfolgreich abgeschlossen wurden, und gibt Hinweise auf mögliche nächste Schritte.
-
----
-
-## ⚡ 1. Projekt-Überblick & Workspaces
-
-Rico arbeitet aktiv an mehreren Systemen, wobei die beiden wichtigsten Repositories wie folgt aufgeteilt sind:
-- **`Jarvis OS`** (`/Users/rico/dev/Jarvis OS`): Die Next.js Web-App (Dashboard, Routines, Sleep Tracking, CRM Overview).
-- **`Lightning CRM`** (`/Users/rico/dev/Lightning CRM`): Die Electron/Node.js CRM-App, über die Leads verwaltet, abtelefoniert ("Call") und kontaktiert ("E-Mail") werden.
-
-Zusätzlich gibt es **Antigravity-Workspaces**:
-Das IDE-Popup "missing folder Poerating205system" stammte daher, dass der iCloud-Workspace `/Users/rico/Library/Mobile Documents/com~apple~CloudDocs/Operating System` im System vermerkt war, der Ordner auf der Festplatte aber physisch nicht existierte. Dieser wurde wiederhergestellt.
+Dieses Dokument dient als nahtlose Übergabe für den nachfolgenden Entwicklungs-Agenten. Es beschreibt die Systemarchitektur von Ricos Jarvis OS, die neuesten abgeschlossenen Epics (insbesondere die Bank-Automatisierung) und die offenen Aufgaben.
 
 ---
 
-## 🚀 2. Aktueller Stand & Kürzlich abgeschlossene Tasks
+## ⚡ 1. Projekt-Überblick & Repositories
 
-In der letzten Session wurden gezielt UI/UX-Probleme und Feature-Requests in `Jarvis OS` behoben:
+Rico arbeitet aktiv an einem zusammenhängenden Produktivitäts- und Business-Ecosystem. Die wichtigsten lokalen Repositories sind:
 
-1. **Pull-to-Refresh Funktion** (`Jarvis OS`):
-   - Eine `PullToRefresh`-Komponente wurde erstellt und im Dashboard-Layout (`src/app/(dashboard)/layout.tsx`) integriert.
-   - Unterstützt sowohl Touch-Swipes (Mobile PWA) als auch Trackpad-Scrolls (MacBook), um die App durch einen Wisch nach unten neu zu laden (Datenaktualisierung).
-
-2. **Habit & Sleep Tracking Navigation** (`Jarvis OS`):
-   - Im `RoutineClient` und `SleepClient` wurde die wochenbasierte Pagination (`weekOffset`) wiederhergestellt. Der User kann nun historische Routine- und Schlafdaten in der Wochenansicht navigieren.
-
-3. **Speichern von Deadlines behoben** (`Jarvis OS`):
-   - Ein Bug im `Content/Task`-Bereich wurde gefixt, bei dem das Setzen eines Deadline-Datums den Speichervorgang blockierte, da Datumsobjekte falsch in ISO-Strings konvertiert wurden.
-
-4. **CRM-Tracker Trennung (Anrufe vs. E-Mails)** (`Jarvis OS`):
-   - **Problem:** Die "Call & Track" und "E-Mail Copy & Track" Buttons im `Lightning CRM` Electron-CRM tracken nun separat `call` und `email` Events in die Datenbank.
-   - **Lösung in `Jarvis OS`:** Der `CrmService.ts` wurde so angepasst, dass nicht nur `type='call'` gezählt wird, sondern auch `type='email'`.
-   - **UI in `Jarvis OS`:** Das `CrmWidget.tsx` wurde visuell umgebaut, sodass nun die Metriken "Heute Calls" und "Woche Calls" direkt über "Heute Mails" und "Woche Mails" (mit passenden Lucide-React Icons) gestapelt angezeigt werden.
-
-5. **Antigravity Workspace Error Fix**:
-   - Die Fehlermeldung "missing folder Poerating205system" auf dem Screen des Users wurde beseitigt, indem der entsprechende fehlende Pfad per CLI (`mkdir -p ...`) auf Ricos Mac neu angelegt wurde.
+1. **`Jarvis OS`** (`/Users/rico/dev/Jarvis OS`): 
+   - **Tech-Stack:** Next.js 16 (Turbopack), Prisma ORM, Supabase Postgres, TailwindCSS.
+   - **Funktion:** Die primäre Web-App (Dashboard, Finanzen, Routines, Sleep Tracking, CRM Overview). Wird automatisch auf Vercel (Production) deployt.
+   
+2. **`Lightning CRM`** (`/Users/rico/dev/Lightning CRM`): 
+   - **Tech-Stack:** Electron, Node.js.
+   - **Funktion:** Die Desktop-App für Kaltakquise und Lead-Management. Scrapt Leads, trackt Anrufe/E-Mails und pusht Statistiken in die Jarvis-DB.
 
 ---
 
-## 🚨 3. Bekannte Einschränkungen & Next Steps
+## 🏦 2. Epic: Banking Automation (Kürzlich abgeschlossen)
 
-### Synchronisation zwischen Apps
-- Rico nutzt die `Jarvis OS` Web-App oft gleichzeitig am Mac und am Handy. Die neue Pull-to-Refresh Methode lindert PWA-Caching-Sorgen, es sollte jedoch bei weiteren Data-Fetching Problemen geprüft werden, ob Next.js Caching-Strategien (`revalidate`) angepasst werden müssen.
+Das größte kürzlich fertiggestellte Feature ist die **vollautomatische Bank-Synchronisation**. 
+*Ursprünglich war GoCardless/Nordigen geplant, jedoch wurden dort Neuanmeldungen deaktiviert. Das System wurde daher auf eine direkte, 100% private **FinTS/HBCI** Architektur umgebaut.*
 
-### Tracker in `Lightning CRM`
-- Der E-Mail Tracker in der Electron-App (`Lightning CRM`) nutzt automatisch die gescrapte E-Mail Adresse aus dem Impressum (`scraper.js`). Der User wünscht, dass dieser Workflow nahtlos läuft. Prüfe bei zukünftigen Reports, ob hier noch Logik im UI-Layer (`main_ui.js` / `pipeline_ui.js`) angepasst werden soll.
+### Die FinTS-Architektur
+1. **Das Sync-Skript (`scripts/sync-banks.ts`):**
+   - Ein lokales Node.js-Skript in Jarvis OS, das die `lib-fints` Bibliothek nutzt.
+   - Verbindet sich direkt mit der **BW-Bank** (Privat, BLZ: 60050101) und der **DKB** (Geschäftlich).
+   - Holt Kontoauszüge (letzte 2 Tage) und den aktuellen Saldo.
+   - Die PINs liegen sicher und ausschließlich in der lokalen `.env` Datei.
+   - TAN-Handling: Fragt beim ersten Start (oder nach 90 Tagen) interaktiv im Terminal nach der TAN (pushTAN/chipTAN).
 
-### Deine Aufgaben für die Zukunft (Next Steps)
-- **Feedback abwarten:** Rico testet derzeit die separaten E-Mail- und Call-Tracker im Jarvis OS Dashboard sowie die Pull-to-Refresh Mechanik.
-- Falls Rico weitere Wünsche zu den Trackern im Kanban-Board von `Lightning CRM` hat, achte darauf, dass die entsprechenden Buttons in `public/ui/pipeline_ui.js` und das Logging in `public/ui/main_ui.js` liegen.
+2. **Der Webhook (`src/app/api/webhooks/finance/route.ts`):**
+   - Das Skript formatiert die Umsätze und schickt sie per `POST` an Ricos Vercel Production-URL.
+   - Der Webhook ist durch das `N8N_WEBHOOK_SECRET` geschützt.
+   - **Idempotenz:** Jeder Umsatz hat eine einzigartige `bankTransactionId`. Der Webhook gleicht diese mit der Datenbank ab und ignoriert Duplikate.
 
-Viel Erfolg für die nächste Session! 🚀
+3. **Automatisierung (n8n):**
+   - Rico hat lokal n8n laufen. Ein einfacher Workflow triggert jede Nacht um 03:00 Uhr einen "Execute Command"-Node, der `npm run sync:banks` im Jarvis OS Verzeichnis ausführt.
+
+---
+
+## 🚀 3. Weitere kürzliche Milestones
+
+- **Datenbank-Migration:** Das Prisma-Schema wurde um das Feld `bankTransactionId` im Modell `Transaction` erweitert. Die Migration wurde per direktem SQL (`add_bank_tx_id.sql`) auf der Supabase-Produktionsdatenbank erfolgreich angewendet.
+- **CRM-Tracker:** Das `Lightning CRM` erfasst nun separat E-Mail- und Call-Events. Jarvis OS zeigt beides gestapelt im `CrmWidget.tsx` auf dem Dashboard an.
+- **PWA UX:** Pull-to-Refresh wurde für das Dashboard implementiert, um Mobile- und Mac-Trackpad-Reloads zu verbessern.
+- **Deployment-Regel:** Code-Änderungen an Jarvis OS werden immer direkt per Git committet und auf den `main` Branch gepusht, damit das Vercel Auto-Deployment greift (Globale User-Regel).
+
+---
+
+## 🚨 4. Bekannte Einschränkungen & Next Steps
+
+### Asset-Tracking (Trade Republic / Revolut)
+Die aktuelle FinTS-Lösung deckt die Haupt-Cashflows (Giro/Business) perfekt ab.
+- **Problem:** Trade Republic und Revolut unterstützen den deutschen FinTS/HBCI-Standard nicht.
+- **Next Step:** Für Revolut könnte in Zukunft die *Enable Banking API* evaluiert werden. Für Trade Republic ist aktuell ein manueller CSV-Export-Import-Workflow am stabilsten, da TR API-Zugriffe stark blockiert.
+
+### TAN-Renewals überwachen
+- **Hinweis für den Agenten:** Alle ca. 90 Tage wird die Bank (wegen PSD2-Richtlinien) eine neue TAN anfordern. Das Sync-Skript wirft dann einen Fehler im Hintergrund. Rico muss das Skript dann einmalig manuell im Terminal (`npm run sync:banks`) starten und die TAN auf dem Handy freigeben.
+
+### UI / Dashboard Polish
+- Da die Bankdaten nun automatisch in `jarvis_transactions` fließen, könnte als nächster Schritt das Dashboard weiter ausgebaut werden (z.B. detaillierte Ausgaben-Kategorien (Pie Charts), Trend-Analysen).
+
+---
+*End of Handover*
