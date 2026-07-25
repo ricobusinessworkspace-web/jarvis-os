@@ -22,7 +22,12 @@ export async function GET(req: NextRequest) {
   try {
     const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
     const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-    const REDIRECT_URI = `${protocol}://${host}/api/auth/google/callback`;
+    
+    // Force exact match for Google Console on Vercel
+    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const REDIRECT_URI = (isVercel && !host.includes('localhost'))
+      ? 'https://jarvis-os-wardogs.vercel.app/api/auth/google/callback'
+      : `${protocol}://${host}/api/auth/google/callback`;
 
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
