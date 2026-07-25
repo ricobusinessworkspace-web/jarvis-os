@@ -20,8 +20,8 @@ function getGoogleConfig() {
 
 export async function GET(req: NextRequest) {
   try {
-    const host = req.headers.get('host') || 'localhost:3000';
-    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000';
+    const protocol = req.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
     const REDIRECT_URI = `${protocol}://${host}/api/auth/google/callback`;
 
     const { searchParams } = new URL(req.url);
