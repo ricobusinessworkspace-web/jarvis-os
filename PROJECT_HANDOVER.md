@@ -54,7 +54,13 @@ Das größte kürzlich fertiggestellte Feature ist die **vollautomatische Bank-S
 
 ---
 
-## 🚨 4. Bekannte Einschränkungen & Next Steps
+## 🎨 4. UI & UX Guidelines (Developer Notes)
+
+- **Native HTML5 Inputs (z.B. Time Picker / Spin Wheel):** Für die Zeiteingabe (Uhrzeiten) soll konsequent das native `<input type="time" />` Tag verwendet werden. Das hat den massiven UX-Vorteil, dass iOS Safari automatisch das eingebettete Apple "Spin Wheel" Interface aufruft, während Android die systemeigene Uhr zeigt. Keine Custom-JS-Picker für Standard-Time-Inputs nutzen!
+
+---
+
+## 🚨 5. Bekannte Einschränkungen & Next Steps
 
 ### Asset-Tracking (Trade Republic / Revolut)
 Die aktuelle FinTS-Lösung deckt die Haupt-Cashflows (Giro/Business) perfekt ab.
