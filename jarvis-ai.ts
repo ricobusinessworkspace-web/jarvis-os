@@ -28,7 +28,7 @@ const c = {
   cyan: '\x1b[36m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', magenta: '\x1b[35m',
 };
 
-const MODEL = process.env.JARVIS_MODEL || 'llama-3.3-70b-versatile';
+const MODEL = process.env.JARVIS_MODEL || 'llama-3.1-8b-instant';
 const client = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1',
   apiKey: process.env.GROQ_API_KEY || '',
@@ -66,7 +66,7 @@ DEINE REGELN FÜR DIE ANTWORTEN (SEHR WICHTIG):
 - Trockener, sarkastischer Humor (britischer Stil á la Jarvis aus Iron Man).
 - Sprich Rico mit "Sir" an.
 - Antworte auf Deutsch.
-- NIEMALS Chain-of-Thought, <think>-Tags oder internes Reasoning ausgeben. /no_think
+- Nutze IMMER <think>...</think> Tags für deine internen Gedanken und Planungen, BEVOR du antwortest! Alles in <think> wird stummgeschaltet und macht dich intelligenter.
 `;
 
 function getDynamicSystemPrompt() {
@@ -187,7 +187,7 @@ class JarvisAgent extends EventEmitter {
   async processInput(text: string) {
     if (!text.trim()) { this.setState('idle'); return; }
     this.history.push({ role: 'user', content: text });
-    if (this.history.length > 6) this.history = this.history.slice(-6);
+    if (this.history.length > 20) this.history = this.history.slice(-20);
     this.setState('thinking');
 
     for (let i = 0; i < 5; i++) {
