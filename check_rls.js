@@ -1,6 +1,4 @@
 const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
 
 async function main() {
   const client = new Client({
@@ -10,13 +8,18 @@ async function main() {
 
   try {
     await client.connect();
-    const sqlPath = path.join(__dirname, 'enable_rls.sql');
-    const sql = fs.readFileSync(sqlPath, 'utf8');
+    const result = await client.query(`
+      SELECT relname 
+      FROM pg_class 
+      WHERE relkind = 'r' 
+        AND relnamespace = 'public'::regnamespace 
+        AND NOT relrowsecurity;
+    `);
     
-    await client.query(sql);
-    console.log("Migration executed successfully via pg.");
+    console.log("Tables without RLS:");
+    result.rows.forEach(r => console.log("-", r.relname));
   } catch (error) {
-    console.error("Migration failed:", error);
+    console.error("Error:", error);
   } finally {
     await client.end();
   }

@@ -34,6 +34,7 @@ interface BankConfig {
   blz: string;
   user: string;
   pin: string;
+  iban?: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -163,17 +164,40 @@ async function syncBank(bank: BankConfig): Promise<SyncResult> {
   }
 
   // Find accounts
-  const bankAccounts = client.config.bankingInformation?.upd?.bankAccounts || [];
+  let bankAccounts = client.config.bankingInformation?.upd?.bankAccounts || [];
   log(`  ↳ ${bankAccounts.length} Konto(en) gefunden`);
 
-  if (bankAccounts.length === 0) {
-    throw new Error('Keine Konten gefunden');
+  if (bankAccounts.length === 0 && bank.iban) {
+    log(`  ↳ Erzwinge IBAN: ${bank.iban}`);
+    // Inject mock account to bypass lib-fints internal validation
+    const mockAccount = {
+      iban: bank.iban,
+      accountNumber: bank.iban, // Some banks use IBAN as internal ID
+      customerId: bank.user,
+      accountType: 'CheckingAccount' as any,
+      currency: 'EUR',
+      holder1: bank.user,
+      blz: bank.blz,
+      allowedTransactions: [
+        { transId: 'HKKAZ', numSignatures: 1 },
+        { transId: 'HKSAL', numSignatures: 1 },
+      ],
+    };
+    
+    if (!client.config.bankingInformation) client.config.bankingInformation = {} as any;
+    if (!client.config.bankingInformation.upd) client.config.bankingInformation.upd = {} as any;
+    if (!client.config.bankingInformation.upd.bankAccounts) client.config.bankingInformation.upd.bankAccounts = [];
+    
+    client.config.bankingInformation.upd.bankAccounts.push(mockAccount as any);
+    bankAccounts = client.config.bankingInformation.upd.bankAccounts;
   }
 
-  // Use first account (usually the main Girokonto)
-  const account = bankAccounts[0];
-  const accountNumber = account.accountNumber;
-  log(`  ↳ Verwende Konto: ${account.iban || accountNumber}`);
+  if (bankAccounts.length === 0) {
+    throw new Error('Keine Konten gefunden und keine IBAN in .env hinterlegt');
+  }
+
+  const accountNumber = bankAccounts[0].accountNumber || bankAccounts[0].iban || "";
+  log(`  ↳ Verwende Konto: ${accountNumber}`);
 
   // ── Fetch Statements ──
   const days = getDaysArg();
@@ -337,6 +361,7 @@ async function main() {
       blz: process.env.FINTS_BW_BLZ || '60050101',
       user: process.env.FINTS_BW_USER,
       pin: process.env.FINTS_BW_PIN,
+      iban: process.env.FINTS_BW_IBAN,
     });
   }
 
@@ -347,6 +372,7 @@ async function main() {
       blz: process.env.FINTS_DKB_BLZ || '12030000',
       user: process.env.FINTS_DKB_USER,
       pin: process.env.FINTS_DKB_PIN,
+      iban: process.env.FINTS_DKB_IBAN,
     });
   }
 

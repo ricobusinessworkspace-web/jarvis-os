@@ -1,6 +1,4 @@
 const { Client } = require('pg');
-const fs = require('fs');
-const path = require('path');
 
 async function main() {
   const client = new Client({
@@ -10,13 +8,16 @@ async function main() {
 
   try {
     await client.connect();
-    const sqlPath = path.join(__dirname, 'enable_rls.sql');
-    const sql = fs.readFileSync(sqlPath, 'utf8');
+    const result = await client.query(`
+      SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check 
+      FROM pg_policies 
+      WHERE tablename IN ('crm_leads', 'crm_events', 'user_profiles');
+    `);
     
-    await client.query(sql);
-    console.log("Migration executed successfully via pg.");
+    console.log("Policies for reference tables:");
+    result.rows.forEach(r => console.log(r));
   } catch (error) {
-    console.error("Migration failed:", error);
+    console.error("Error:", error);
   } finally {
     await client.end();
   }

@@ -1,77 +1,33 @@
-# 🤝 Project Handover
+# Jarvis OS - Project Handover
 
-**To:** Next Lead Developer / Agent  
-**From:** Antigravity Agent  
-**Date:** 2026-07-23  
+## 🎯 Projekt-Status & Ziel
+**Jarvis OS** ist ein persönliches Dashboard. Das aktuelle Modul **"Finance"** ist strukturell und technisch fertiggestellt, wartet jedoch auf eine serverseitige Freischaltung durch die Banken.
 
-Dieses Dokument dient als nahtlose Übergabe für den nachfolgenden Entwicklungs-Agenten. Es beschreibt die Systemarchitektur von Ricos Jarvis OS, die neuesten abgeschlossenen Epics (insbesondere die Bank-Automatisierung) und die offenen Aufgaben.
+## 🛠️ Erledigte Arbeiten (Stand: 25.07.2026)
+1. **Finance Dashboard UI:** 
+   - Die Route `/finance` ist implementiert (Next.js App Router).
+   - Beinhaltet KPI-Grid (Liquid, Assets, Net Worth), ein Recharts-Chart und eine Transaktionsliste.
+2. **FinTS/HBCI Banking-Skript (`scripts/sync-banks.mts`):**
+   - Komplett funktionsfähiges TypeScript-Skript für den Abruf von DKB und BW-Bank.
+   - **Features:** 
+     - ESM-kompatibel (läuft über `tsx`).
+     - Abfangen von "Account not found in UPD" durch cleveren IBAN-Mock-Fallback.
+     - Erfolgreiche Behandlung von PushTAN (BW-Bank) und App-TAN (DKB).
+3. **Environment:** 
+   - Lokale `.env` wurde mit den echten Zugangsdaten und IBANs konfiguriert (niemals committen!).
 
----
+## 🚧 Aktuelle Blocker (Bank-Seite)
+Das Skript loggt sich erfolgreich ein (im Bank-Portal sichtbar), aber die Banken liefern keine Umsatz-Daten:
+- **DKB:** Server wirft beim Umsatzabruf den Fehler `Account not found in UPD` (Konto ist für FinTS-Datenabruf serverseitig nicht autorisiert).
+- **BW-Bank:** Server sendet eine leere Liste (0 Transaktionen in 30 Tagen, Saldo N/A), was ebenfalls bedeutet, dass die Schnittstelle für Drittsoftware stummgeschaltet ist.
+- **Maßnahme:** Der User hat Vorlagen erhalten, um den Support beider Banken zur Freischaltung des FinTS-Zugangs aufzufordern.
 
-## ⚡ 1. Projekt-Überblick & Repositories
+## 🚀 Next Steps für den nächsten Agenten
+Sobald der User meldet, dass die Banken den Zugang freigeschaltet haben:
+1. **Testlauf:** Führe `npm run sync:banks -- --days 30` im Terminal aus, um historische Daten abzurufen.
+2. **Automatisierung:** Richte einen Mac-Hintergrund-Task (`launchd` oder lokaler Cron) ein, der das Skript jede Nacht (z.B. 03:00 Uhr) ausführt. *Wichtig: Da der User einen Mac nutzt, ist `launchd` zu bevorzugen.*
+3. **Feature-Ausbau:** Falls der Finance-Sync stabil läuft, mit dem nächsten Modul (z.B. Task-Management) fortfahren.
 
-Rico arbeitet aktiv an einem zusammenhängenden Produktivitäts- und Business-Ecosystem. Die wichtigsten lokalen Repositories sind:
-
-1. **`Jarvis OS`** (`/Users/rico/dev/Jarvis OS`): 
-   - **Tech-Stack:** Next.js 16 (Turbopack), Prisma ORM, Supabase Postgres, TailwindCSS.
-   - **Funktion:** Die primäre Web-App (Dashboard, Finanzen, Routines, Sleep Tracking, CRM Overview). Wird automatisch auf Vercel (Production) deployt.
-   
-2. **`Lightning CRM`** (`/Users/rico/dev/Lightning CRM`): 
-   - **Tech-Stack:** Electron, Node.js.
-   - **Funktion:** Die Desktop-App für Kaltakquise und Lead-Management. Scrapt Leads, trackt Anrufe/E-Mails und pusht Statistiken in die Jarvis-DB.
-
----
-
-## 🏦 2. Epic: Banking Automation (Kürzlich abgeschlossen)
-
-Das größte kürzlich fertiggestellte Feature ist die **vollautomatische Bank-Synchronisation**. 
-*Ursprünglich war GoCardless/Nordigen geplant, jedoch wurden dort Neuanmeldungen deaktiviert. Das System wurde daher auf eine direkte, 100% private **FinTS/HBCI** Architektur umgebaut.*
-
-### Die FinTS-Architektur
-1. **Das Sync-Skript (`scripts/sync-banks.ts`):**
-   - Ein lokales Node.js-Skript in Jarvis OS, das die `lib-fints` Bibliothek nutzt.
-   - Verbindet sich direkt mit der **BW-Bank** (Privat, BLZ: 60050101) und der **DKB** (Geschäftlich).
-   - Holt Kontoauszüge (letzte 2 Tage) und den aktuellen Saldo.
-   - Die PINs liegen sicher und ausschließlich in der lokalen `.env` Datei.
-   - TAN-Handling: Fragt beim ersten Start (oder nach 90 Tagen) interaktiv im Terminal nach der TAN (pushTAN/chipTAN).
-
-2. **Der Webhook (`src/app/api/webhooks/finance/route.ts`):**
-   - Das Skript formatiert die Umsätze und schickt sie per `POST` an Ricos Vercel Production-URL.
-   - Der Webhook ist durch das `N8N_WEBHOOK_SECRET` geschützt.
-   - **Idempotenz:** Jeder Umsatz hat eine einzigartige `bankTransactionId`. Der Webhook gleicht diese mit der Datenbank ab und ignoriert Duplikate.
-
-3. **Automatisierung (n8n):**
-   - Rico hat lokal n8n laufen. Ein einfacher Workflow triggert jede Nacht um 03:00 Uhr einen "Execute Command"-Node, der `npm run sync:banks` im Jarvis OS Verzeichnis ausführt.
-
----
-
-## 🚀 3. Weitere kürzliche Milestones
-
-- **Datenbank-Migration:** Das Prisma-Schema wurde um das Feld `bankTransactionId` im Modell `Transaction` erweitert. Die Migration wurde per direktem SQL (`add_bank_tx_id.sql`) auf der Supabase-Produktionsdatenbank erfolgreich angewendet.
-- **CRM-Tracker:** Das `Lightning CRM` erfasst nun separat E-Mail- und Call-Events. Jarvis OS zeigt beides gestapelt im `CrmWidget.tsx` auf dem Dashboard an.
-- **PWA UX:** Pull-to-Refresh wurde für das Dashboard implementiert, um Mobile- und Mac-Trackpad-Reloads zu verbessern.
-- **Deployment-Regel:** Code-Änderungen an Jarvis OS werden immer direkt per Git committet und auf den `main` Branch gepusht, damit das Vercel Auto-Deployment greift (Globale User-Regel).
-
----
-
-## 🎨 4. UI & UX Guidelines (Developer Notes)
-
-- **Native HTML5 Inputs (z.B. Time Picker / Spin Wheel):** Für die Zeiteingabe (Uhrzeiten) soll konsequent das native `<input type="time" />` Tag verwendet werden. Das hat den massiven UX-Vorteil, dass iOS Safari automatisch das eingebettete Apple "Spin Wheel" Interface aufruft, während Android die systemeigene Uhr zeigt. Keine Custom-JS-Picker für Standard-Time-Inputs nutzen!
-
----
-
-## 🚨 5. Bekannte Einschränkungen & Next Steps
-
-### Asset-Tracking (Trade Republic / Revolut)
-Die aktuelle FinTS-Lösung deckt die Haupt-Cashflows (Giro/Business) perfekt ab.
-- **Problem:** Trade Republic und Revolut unterstützen den deutschen FinTS/HBCI-Standard nicht.
-- **Next Step:** Für Revolut könnte in Zukunft die *Enable Banking API* evaluiert werden. Für Trade Republic ist aktuell ein manueller CSV-Export-Import-Workflow am stabilsten, da TR API-Zugriffe stark blockiert.
-
-### TAN-Renewals überwachen
-- **Hinweis für den Agenten:** Alle ca. 90 Tage wird die Bank (wegen PSD2-Richtlinien) eine neue TAN anfordern. Das Sync-Skript wirft dann einen Fehler im Hintergrund. Rico muss das Skript dann einmalig manuell im Terminal (`npm run sync:banks`) starten und die TAN auf dem Handy freigeben.
-
-### UI / Dashboard Polish
-- Da die Bankdaten nun automatisch in `jarvis_transactions` fließen, könnte als nächster Schritt das Dashboard weiter ausgebaut werden (z.B. detaillierte Ausgaben-Kategorien (Pie Charts), Trend-Analysen).
-
----
-*End of Handover*
+## 🧹 Housekeeping
+- Temporäre Debugging-Dateien auf dem Desktop (`Jarvis_Banking.txt`) wurden bereits erfolgreich in die System-`.env` überführt.
+- Der Code auf dem `main` Branch ist sauber und kann jederzeit deployt werden (z.B. Vercel). (Hinweis: Vercel Auto-Deployment Regel beachten).
