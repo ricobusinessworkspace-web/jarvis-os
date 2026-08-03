@@ -28,7 +28,7 @@ const c = {
   cyan: '\x1b[36m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', magenta: '\x1b[35m',
 };
 
-const MODEL = process.env.JARVIS_MODEL || 'llama-3.1-8b-instant';
+const MODEL = process.env.JARVIS_MODEL || 'llama-3.3-70b-versatile';
 const client = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1',
   apiKey: process.env.GROQ_API_KEY || '',
@@ -196,7 +196,7 @@ class JarvisAgent extends EventEmitter {
       const messages = [{ role: 'system', content: getDynamicSystemPrompt() }, ...this.history];
       let response;
       try {
-        response = await client.chat.completions.create({ model: MODEL, messages, tools: toolDeclarations, tool_choice: 'auto' });
+        response = await client.chat.completions.create({ model: MODEL, messages, tools: toolDeclarations, tool_choice: 'auto', stream: true });
       } catch (err: any) {
         if (err.status === 429) {
           console.log(`\n  ${c.yellow}JARVIS:${c.reset} Rate-Limit, Sir. Einen Moment.`);
@@ -207,16 +207,51 @@ class JarvisAgent extends EventEmitter {
         return;
       }
 
-      if (this.state !== 'thinking') return;
-      const message = response.choices?.[0]?.message;
-      if (!message) { this.setState('idle'); return; }
+      let rawText = '';
+      let fullText = '';
+      let isFirstText = true;
+      let toolCalls: any[] = [];
 
-      if (message.tool_calls?.length) {
-        this.history.push(message);
-        for (const tc of message.tool_calls) {
+      for await (const chunk of response) {
+        if (this.state !== 'thinking' && this.state !== 'speaking') return;
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) continue;
+
+        if (delta.content) {
+          rawText += delta.content;
+          const displayContent = rawText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+          const newText = displayContent.slice(fullText.length);
+          if (newText) {
+            if (isFirstText) {
+              process.stdout.write(`\n  ${c.cyan}${c.bold}JARVIS:${c.reset} `);
+              isFirstText = false;
+              this.setState('speaking');
+            }
+            process.stdout.write(newText);
+            fullText += newText;
+          }
+        }
+
+        if (delta.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            if (!toolCalls[tc.index]) {
+              toolCalls[tc.index] = { id: tc.id, type: tc.type, function: { name: tc.function?.name || '', arguments: '' } };
+            }
+            if (tc.function?.arguments) {
+              toolCalls[tc.index].function.arguments += tc.function?.arguments;
+            }
+          }
+        }
+      }
+
+      toolCalls = toolCalls.filter(Boolean);
+
+      if (toolCalls.length > 0) {
+        this.history.push({ role: 'assistant', tool_calls: toolCalls, content: rawText || null });
+        for (const tc of toolCalls) {
           let args: any = {};
           try { args = JSON.parse(tc.function.arguments); } catch {}
-          this.spinner.text = `⚙️  ${tc.function.name}`;
+          this.spinner.start(`⚙️  ${tc.function.name}`);
           const result = await executeTool(tc.function.name, args);
           this.history.push({ role: 'tool', tool_call_id: tc.id, name: tc.function.name, content: JSON.stringify(result) });
         }
@@ -224,13 +259,11 @@ class JarvisAgent extends EventEmitter {
         continue;
       }
 
-      const fullText = (message.content || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      fullText = fullText.trim();
       if (!fullText && i < 4) continue;
       if (!fullText) { this.setState('idle'); return; }
 
-      this.history.push({ role: 'assistant', content: fullText });
-      this.setState('speaking');
-      console.log(`\n  ${c.cyan}${c.bold}JARVIS:${c.reset} ${fullText}`);
+      this.history.push({ role: 'assistant', content: rawText });
       await VoiceService.speak(fullText, () => { if (this.state === 'speaking') this.setState('idle'); });
       return;
     }
