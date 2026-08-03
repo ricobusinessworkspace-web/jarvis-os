@@ -28,10 +28,10 @@ const c = {
   cyan: '\x1b[36m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', magenta: '\x1b[35m',
 };
 
-const MODEL = process.env.JARVIS_MODEL || 'llama-3.1-8b-instant';
+const MODEL = process.env.JARVIS_MODEL || 'qwen3:4b';
 const client = new OpenAI({
-  baseURL: process.env.JARVIS_LLM_BASE_URL || 'https://api.groq.com/openai/v1',
-  apiKey: process.env.GROQ_API_KEY || '',
+  baseURL: process.env.JARVIS_LLM_BASE_URL || 'http://localhost:11434/v1',
+  apiKey: 'ollama',
 });
 
 // ============================================================================
@@ -197,10 +197,11 @@ class JarvisAgent extends EventEmitter {
       try {
         response = await client.chat.completions.create({ model: MODEL, messages, tools: toolDeclarations, tool_choice: 'auto' });
       } catch (err: any) {
-        if (err.status === 429) {
-          console.log(`\n  ${c.red}JARVIS:${c.reset} Token-Limit erreicht, Sir.`);
+        const msg = err.message || '';
+        if (msg.toLowerCase().includes('connection error') || err.code === 'ECONNREFUSED') {
+          console.log(`\n  ${c.red}JARVIS:${c.reset} Ollama läuft nicht, Sir. Starte es mit: ${c.cyan}ollama serve${c.reset}`);
         } else {
-          console.error(`\n  ${c.red}API Error:${c.reset}`, err.message || err);
+          console.error(`\n  ${c.red}API Error:${c.reset}`, msg);
         }
         this.setState('idle');
         return;
