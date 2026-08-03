@@ -28,10 +28,10 @@ const c = {
   cyan: '\x1b[36m', green: '\x1b[32m', yellow: '\x1b[33m', red: '\x1b[31m', magenta: '\x1b[35m',
 };
 
-const MODEL = process.env.JARVIS_MODEL || 'qwen3:4b';
+const MODEL = process.env.JARVIS_MODEL || 'llama-3.3-70b-versatile';
 const client = new OpenAI({
-  baseURL: process.env.JARVIS_LLM_BASE_URL || 'http://localhost:11434/v1',
-  apiKey: 'ollama',
+  baseURL: 'https://api.groq.com/openai/v1',
+  apiKey: process.env.GROQ_API_KEY || '',
 });
 
 // ============================================================================
@@ -66,6 +66,7 @@ DEINE REGELN FÜR DIE ANTWORTEN (SEHR WICHTIG):
 - Trockener, sarkastischer Humor (britischer Stil á la Jarvis aus Iron Man).
 - Sprich Rico mit "Sir" an.
 - Antworte auf Deutsch.
+- NIEMALS Chain-of-Thought, <think>-Tags oder internes Reasoning ausgeben. /no_think
 `;
 
 function getDynamicSystemPrompt() {
@@ -197,11 +198,10 @@ class JarvisAgent extends EventEmitter {
       try {
         response = await client.chat.completions.create({ model: MODEL, messages, tools: toolDeclarations, tool_choice: 'auto' });
       } catch (err: any) {
-        const msg = err.message || '';
-        if (msg.toLowerCase().includes('connection error') || err.code === 'ECONNREFUSED') {
-          console.log(`\n  ${c.red}JARVIS:${c.reset} Ollama läuft nicht, Sir. Starte es mit: ${c.cyan}ollama serve${c.reset}`);
+        if (err.status === 429) {
+          console.log(`\n  ${c.yellow}JARVIS:${c.reset} Rate-Limit, Sir. Einen Moment.`);
         } else {
-          console.error(`\n  ${c.red}API Error:${c.reset}`, msg);
+          console.error(`\n  ${c.red}API Error:${c.reset}`, err.message || err);
         }
         this.setState('idle');
         return;
