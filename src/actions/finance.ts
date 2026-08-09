@@ -29,6 +29,7 @@ export async function getFinanceDashboardData() {
   } catch (error: any) {
     console.error('getFinanceDashboardData error:', error);
     return { success: false, error: error.message };
+  }
 }
 
 // ─── Transaction Edit Action ──────────────────────────────────────────────────
