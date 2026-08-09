@@ -347,12 +347,15 @@ model Transaction {
   id                String   @id @default(uuid())
   bankTransactionId String?  @unique @map("bank_transaction_id")
   amount            Float
-  type        String   // "income" or "expense"
-  status      String   @default("pending") // "pending" or "cleared"
-  category    String   // z.B. "Miete", "Provision", "Lebensmittel"
-  description String   @default("")
-  date        DateTime @default(now())
-  createdAt   DateTime @default(now()) @map("created_at")
+  type              String   // "income" or "expense"
+  status            String   @default("pending") // "pending" or "cleared"
+  category          String   // z.B. "Miete", "Provision", "Lebensmittel"
+  description       String   @default("")
+  notes             String   @default("")
+  taxRelevant       Boolean  @default(false) @map("tax_relevant")
+  tags              Json     @default("[]")
+  date              DateTime @default(now())
+  createdAt         DateTime @default(now()) @map("created_at")
 
   @@map("jarvis_transactions")
   @@schema("public")

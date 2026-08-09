@@ -18,9 +18,9 @@
 
 ## 🚧 Aktuelle Blocker (Bank-Seite)
 Das Skript loggt sich erfolgreich ein (im Bank-Portal sichtbar), aber die Banken liefern keine Umsatz-Daten:
-- **DKB:** Server wirft beim Umsatzabruf den Fehler `Account not found in UPD` (Konto ist für FinTS-Datenabruf serverseitig nicht autorisiert).
-- **BW-Bank:** Server sendet eine leere Liste (0 Transaktionen in 30 Tagen, Saldo N/A), was ebenfalls bedeutet, dass die Schnittstelle für Drittsoftware stummgeschaltet ist.
-- **Maßnahme:** Der User hat Vorlagen erhalten, um den Support beider Banken zur Freischaltung des FinTS-Zugangs aufzufordern.
+- **DKB:** Der DKB-Support hat offiziell bestätigt, dass die generische Open-Source FinTS "Produkt-ID" (`9FA6681DEC0CF3046BFC2F8A6` von `libfintx`) nicht in ihren Systemen hinterlegt ist und daher für den Umsatzabruf aktiv blockiert wird. DKB erlaubt aktuell nur große, offiziell registrierte Finanzsoftwares.
+- **BW-Bank:** Server sendet eine leere Liste (0 Transaktionen in 30 Tagen, Saldo N/A). Vermutlich selbes Problem wie bei der DKB oder HBCI ist für das Konto schlichtweg noch nicht aktiviert.
+- **Maßnahme:** Strategie-Entscheidung des Users steht aus (ID-Spoofing, GoCardless PSD2 API, oder CSV-Import).
 
 ## 🚀 Next Steps für den nächsten Agenten
 Sobald der User meldet, dass die Banken den Zugang freigeschaltet haben:

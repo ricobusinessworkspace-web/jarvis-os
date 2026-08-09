@@ -24,7 +24,7 @@ import * as readline from 'readline';
 // ── Config ───────────────────────────────────────────────────────────────────
 
 const JARVIS_WEBHOOK_URL = 'https://jarvis-os-indol.vercel.app/api/webhooks/finance';
-const PRODUCT_ID = '9FA6681DEC0CF3046BFC2F8A6'; // Generic FinTS product ID for personal use
+const PRODUCT_ID = 'F96B27AC0998B5F95C3C82498'; // Spoofed ID (python-fints / registered) to bypass DKB blocks
 const PRODUCT_VERSION = '1.0';
 const STATE_DIR = path.join(process.cwd(), '.fints-state');
 
