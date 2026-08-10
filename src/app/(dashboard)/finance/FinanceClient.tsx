@@ -8,17 +8,18 @@ import {
 import {
   Wallet, TrendingUp, PiggyBank, Landmark, 
   ArrowUpRight, ArrowDownRight, CircleDollarSign,
-  FileText, Percent, Tag, Edit3, X, Check, Loader2
+  FileText, Percent, Tag, Edit3, X, Check, Loader2, Target, Pencil, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@prisma/client';
 import CSVUploader from '@/components/finance/CSVUploader';
-import { updateTransaction } from '@/actions/finance';
+import { updateTransaction, deleteTransaction, updateNetWorthGoal } from '@/actions/finance';
 import { useRouter } from 'next/navigation';
 
 interface FinanceData {
   buckets: { liquid: number, depot: number, assets: number, debt: number };
   netWorth: number;
+  netWorthGoal: number | null;
   transactions: (Transaction & { taxRelevant: boolean; notes: string; tags: any })[];
 }
 
@@ -28,6 +29,9 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
   const [data, setData] = useState<FinanceData>(initialData);
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState(initialData.netWorthGoal ? initialData.netWorthGoal.toString() : '');
   const router = useRouter();
 
   // --- Calculations ---
@@ -56,12 +60,6 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
       .sort((a, b) => b.value - a.value);
   }, [data.transactions]);
 
-  const taxRelevantTotal = useMemo(() => {
-    return data.transactions
-      .filter(t => t.taxRelevant && t.type === 'expense')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-  }, [data.transactions]);
-
   const formatEuro = (val: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val);
   const formatDate = (date: Date) => new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(date));
 
@@ -72,6 +70,9 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
     const res = await updateTransaction(editingTx.id, {
       category: editingTx.category,
       notes: editingTx.notes,
+      description: editingTx.description,
+      amount: editingTx.amount,
+      date: new Date(editingTx.date),
       taxRelevant: editingTx.taxRelevant,
     });
     
@@ -79,7 +80,7 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
       // Optimistic UI update
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === editingTx.id ? { ...t, ...editingTx } : t)
+        transactions: prev.transactions.map(t => t.id === editingTx.id ? { ...t, ...editingTx, date: new Date(editingTx.date) } : t)
       }));
       setEditingTx(null);
       router.refresh();
@@ -87,6 +88,33 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
       alert("Fehler beim Speichern: " + res.error);
     }
     setIsSaving(false);
+  };
+
+  const handleDeleteTx = async () => {
+    if (!editingTx) return;
+    if (!confirm('Transaktion wirklich löschen?')) return;
+    setIsDeleting(true);
+    const res = await deleteTransaction(editingTx.id);
+    if (res.success) {
+      setData(prev => ({
+        ...prev,
+        transactions: prev.transactions.filter(t => t.id !== editingTx.id)
+      }));
+      setEditingTx(null);
+      router.refresh();
+    } else {
+      alert("Fehler beim Löschen: " + res.error);
+    }
+    setIsDeleting(false);
+  };
+
+  const handleSaveGoal = async () => {
+    const target = parseFloat(goalInput);
+    const finalTarget = isNaN(target) ? null : target;
+    await updateNetWorthGoal(finalTarget);
+    setData(prev => ({ ...prev, netWorthGoal: finalTarget }));
+    setIsEditingGoal(false);
+    router.refresh();
   };
 
   return (
@@ -113,12 +141,52 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
             <p className="text-sm text-muted-foreground mt-4 leading-relaxed max-w-[200px]">Das ist dein Spielstand. Jede kluge Entscheidung bringt diese Zahl nach oben.</p>
           </div>
 
-          {/* Tax Report */}
-          <div className="glass p-6 rounded-3xl border border-border bg-gradient-to-tr from-blue-500/5 to-transparent relative overflow-hidden">
-            <Percent className="absolute right-6 top-6 h-12 w-12 text-blue-500/20" />
-            <p className="text-sm font-bold text-blue-400 uppercase tracking-wider mb-2">Steuer-Schublade</p>
-            <p className="text-3xl font-bold text-foreground">{formatEuro(taxRelevantTotal)}</p>
-            <p className="text-xs text-muted-foreground mt-2">Summe der steuerlich absetzbaren Ausgaben.</p>
+          {/* Net Worth Goal */}
+          <div className="glass p-6 rounded-3xl border border-border bg-gradient-to-tr from-purple-500/5 to-transparent relative overflow-hidden flex flex-col justify-between">
+            <Target className="absolute right-6 top-6 h-12 w-12 text-purple-500/20" />
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm font-bold text-purple-400 uppercase tracking-wider">Dein Net Worth Ziel</p>
+                <button onClick={() => setIsEditingGoal(!isEditingGoal)} className="p-1 hover:bg-white/10 rounded-md text-muted-foreground hover:text-white transition-colors">
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </div>
+              
+              {isEditingGoal ? (
+                <div className="flex gap-2 mt-2">
+                  <input 
+                    type="number" 
+                    value={goalInput}
+                    onChange={(e) => setGoalInput(e.target.value)}
+                    className="bg-black/50 border border-white/10 rounded-lg px-3 py-1.5 w-full text-white text-sm focus:outline-none focus:border-purple-500/50"
+                    placeholder="Zielbetrag..."
+                  />
+                  <button onClick={handleSaveGoal} className="bg-purple-500 hover:bg-purple-600 text-white px-4 rounded-lg text-sm font-bold transition-colors">
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-3xl font-bold text-foreground">
+                    {data.netWorthGoal ? formatEuro(data.netWorthGoal) : 'Kein Ziel gesetzt'}
+                  </p>
+                  {data.netWorthGoal && (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                        <span>Fortschritt</span>
+                        <span>{Math.min(100, Math.max(0, (data.netWorth / data.netWorthGoal) * 100)).toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className="h-full bg-gradient-to-r from-purple-500 to-accent rounded-full transition-all duration-1000 ease-out relative"
+                          style={{ width: `${Math.min(100, Math.max(0, (data.netWorth / data.netWorthGoal) * 100))}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -220,11 +288,6 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
                       <span className="text-muted-foreground">{formatDate(tx.date)}</span>
                       <span className="w-1 h-1 rounded-full bg-border"></span>
                       <span className="px-2 py-0.5 rounded-full bg-overlay border border-border/50 text-muted-foreground">{tx.category}</span>
-                      {tx.taxRelevant && (
-                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1">
-                          <FileText className="w-3 h-3" /> Steuer
-                        </span>
-                      )}
                       {tx.notes && (
                         <span className="text-muted-foreground flex items-center gap-1"><Tag className="w-3 h-3"/> Notiz</span>
                       )}
@@ -253,10 +316,41 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
               <X className="w-5 h-5" />
             </button>
             
-            <h2 className="text-xl font-bold text-foreground mb-1">Transaktion bearbeiten</h2>
-            <p className="text-sm text-muted-foreground mb-6 truncate pr-8">{editingTx.description}</p>
+            <h2 className="text-xl font-bold text-foreground mb-6">Transaktion bearbeiten</h2>
             
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Beschreibung</label>
+                <input 
+                  type="text" 
+                  value={editingTx.description || ''}
+                  onChange={e => setEditingTx({...editingTx, description: e.target.value})}
+                  className="w-full bg-overlay border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Betrag (€)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={editingTx.amount || 0}
+                    onChange={e => setEditingTx({...editingTx, amount: parseFloat(e.target.value)})}
+                    className="w-full bg-overlay border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Datum</label>
+                  <input 
+                    type="date" 
+                    value={new Date(editingTx.date).toISOString().split('T')[0]}
+                    onChange={e => setEditingTx({...editingTx, date: e.target.value})}
+                    className="w-full bg-overlay border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Kategorie</label>
                 <select 
@@ -288,24 +382,25 @@ export default function FinanceClient({ initialData }: { initialData: FinanceDat
                   className="w-full bg-overlay border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
                 />
               </div>
-
-              <div className="flex items-center gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl cursor-pointer hover:bg-blue-500/10 transition-colors" onClick={() => setEditingTx({...editingTx, taxRelevant: !editingTx.taxRelevant})}>
-                <div className={cn("w-6 h-6 rounded-md flex items-center justify-center border transition-colors", editingTx.taxRelevant ? "bg-blue-500 border-blue-500 text-white" : "border-border text-transparent")}>
-                  <Check className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-bold text-blue-400">Steuerrelevant</p>
-                  <p className="text-xs text-muted-foreground">In der Steuer-Schublade zusammenfassen</p>
-                </div>
-              </div>
             </div>
 
-            <div className="mt-8 flex gap-3">
-              <button onClick={() => setEditingTx(null)} className="flex-1 px-4 py-3 bg-overlay hover:bg-border/50 text-foreground font-semibold rounded-xl transition-colors">
-                Abbrechen
-              </button>
-              <button onClick={handleSaveEdit} disabled={isSaving} className="flex-1 px-4 py-3 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl transition-colors flex items-center justify-center">
-                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Speichern'}
+            <div className="mt-8 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button onClick={() => setEditingTx(null)} className="flex-1 px-4 py-3 bg-overlay hover:bg-border/50 text-foreground font-semibold rounded-xl transition-colors">
+                  Abbrechen
+                </button>
+                <button onClick={handleSaveEdit} disabled={isSaving} className="flex-1 px-4 py-3 bg-accent hover:bg-accent/90 text-white font-bold rounded-xl transition-colors flex items-center justify-center">
+                  {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Speichern'}
+                </button>
+              </div>
+              
+              <button 
+                onClick={handleDeleteTx} 
+                disabled={isDeleting} 
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl transition-colors border border-red-500/20"
+              >
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Transaktion löschen
               </button>
             </div>
           </div>

@@ -18,12 +18,17 @@ export async function getFinanceDashboardData() {
     // Compute current Net Worth based on buckets
     const netWorth = buckets.liquid + buckets.depot + buckets.assets - buckets.debt;
 
+    // Fetch Goal
+    const goalSetting = await prisma.setting.findUnique({ where: { key: 'finance_net_worth_goal' } });
+    const netWorthGoal = goalSetting?.value ? parseFloat(goalSetting.value) : null;
+
     return { 
       success: true, 
       data: { 
         buckets, 
         netWorth, 
-        transactions 
+        transactions,
+        netWorthGoal
       } 
     };
   } catch (error: any) {
@@ -32,19 +37,63 @@ export async function getFinanceDashboardData() {
   }
 }
 
-// ─── Transaction Edit Action ──────────────────────────────────────────────────
+// ─── Transaction Edit & Delete Actions ────────────────────────────────────────
 export async function updateTransaction(
   id: string, 
-  data: { category?: string; notes?: string; taxRelevant?: boolean }
+  data: { 
+    category?: string; 
+    notes?: string; 
+    taxRelevant?: boolean;
+    description?: string;
+    amount?: number;
+    date?: Date;
+  }
 ) {
   try {
+    const updateData: any = { ...data };
+    // If amount is updated, ensure type stays in sync
+    if (data.amount !== undefined) {
+      updateData.type = data.amount >= 0 ? 'income' : 'expense';
+    }
+
     await prisma.transaction.update({
       where: { id },
-      data
+      data: updateData
     });
     return { success: true };
   } catch (error: any) {
     console.error('updateTransaction error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteTransaction(id: string) {
+  try {
+    await prisma.transaction.delete({
+      where: { id }
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('deleteTransaction error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Goal Action ─────────────────────────────────────────────────────────────
+export async function updateNetWorthGoal(target: number | null) {
+  try {
+    if (target === null) {
+      await prisma.setting.delete({ where: { key: 'finance_net_worth_goal' } }).catch(() => {});
+    } else {
+      await prisma.setting.upsert({
+        where: { key: 'finance_net_worth_goal' },
+        update: { value: target.toString() },
+        create: { key: 'finance_net_worth_goal', value: target.toString() }
+      });
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('updateNetWorthGoal error:', error);
     return { success: false, error: error.message };
   }
 }
