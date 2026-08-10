@@ -36,10 +36,10 @@ export default function CSVUploader() {
             // Find columns dynamically since DKB and BW-Bank differ
             const keys = Object.keys(row);
             
-            const dateKey = keys.find(k => k.toLowerCase().includes('buchungstag') || k.toLowerCase().includes('buchungsdatum'));
-            const amountKey = keys.find(k => k.toLowerCase().includes('betrag'));
-            const descKey = keys.find(k => k.toLowerCase().includes('verwendungszweck'));
-            const nameKey = keys.find(k => k.toLowerCase().includes('begünstigt') || k.toLowerCase().includes('auftraggeber') || k.toLowerCase().includes('name'));
+            const dateKey = keys.find(k => k.toLowerCase().includes('buchungstag') || k.toLowerCase().includes('buchungsdatum') || k.toLowerCase().includes('day of entry') || k.toLowerCase().includes('date'));
+            const amountKey = keys.find(k => k.toLowerCase().includes('betrag') || k.toLowerCase().includes('amount'));
+            const descKey = keys.find(k => k.toLowerCase().includes('verwendungszweck') || k.toLowerCase().includes('purpose'));
+            const nameKey = keys.find(k => k.toLowerCase().includes('begünstigt') || k.toLowerCase().includes('auftraggeber') || k.toLowerCase().includes('name') || k.toLowerCase().includes('beneficiary'));
 
             if (!dateKey || !amountKey) continue; // Skip invalid rows
 
