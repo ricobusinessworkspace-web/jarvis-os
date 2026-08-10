@@ -1,33 +1,33 @@
-# Jarvis OS - Project Handover
+# Jarvis OS – Project Handover 🚀
 
-## 🎯 Projekt-Status & Ziel
-**Jarvis OS** ist ein persönliches Dashboard. Das aktuelle Modul **"Finance"** ist strukturell und technisch fertiggestellt, wartet jedoch auf eine serverseitige Freischaltung durch die Banken.
+## 1. Aktueller Stand (Finance Dashboard 2.0)
+Wir haben einen massiven Architektur-Pivot durchgeführt:
+- **Altes System (FinTS):** Vollständig verworfen und aus dem Codebase entfernt (`scripts/sync-banks.mts` gelöscht). Grund: DKB und BW-Bank blockieren inoffizielle Open-Source-FinTS-Clients systematisch (Whitelist für Produkt-IDs / Format-Crashes).
+- **Neues System (CSV-Import):** Das Finance-Modul ist jetzt zu 100% unabhängig, lokal und extrem stabil. Es nutzt einen smarten CSV-Importer (Drag & Drop), der Umsätze von der DKB und BW-Bank liest, parst und in der Datenbank abspeichert.
 
-## 🛠️ Erledigte Arbeiten (Stand: 25.07.2026)
-1. **Finance Dashboard UI:** 
-   - Die Route `/finance` ist implementiert (Next.js App Router).
-   - Beinhaltet KPI-Grid (Liquid, Assets, Net Worth), ein Recharts-Chart und eine Transaktionsliste.
-2. **FinTS/HBCI Banking-Skript (`scripts/sync-banks.mts`):**
-   - Komplett funktionsfähiges TypeScript-Skript für den Abruf von DKB und BW-Bank.
-   - **Features:** 
-     - ESM-kompatibel (läuft über `tsx`).
-     - Abfangen von "Account not found in UPD" durch cleveren IBAN-Mock-Fallback.
-     - Erfolgreiche Behandlung von PushTAN (BW-Bank) und App-TAN (DKB).
-3. **Environment:** 
-   - Lokale `.env` wurde mit den echten Zugangsdaten und IBANs konfiguriert (niemals committen!).
+## 2. Abgeschlossene Features
+- **CSV Uploader (`src/components/finance/CSVUploader.tsx`):**
+  - Akzeptiert Drag & Drop.
+  - Dynamisches Parsing der Spalten (versteht DKB und BW-Bank Formate automatisch).
+  - Ignoriert Duplikate (über einen deterministischen `bankTransactionId` Hash aus Datum, Betrag und Verwendungszweck).
+- **Auto-Categorization (`src/actions/finance.ts`):**
+  - Jeder neue Umsatz läuft durch eine Regex-/Keyword-Engine und wird automatisch in Kategorien wie `Lebensmittel`, `Wohnen`, `Mobilität`, `Abo/Software`, etc. sortiert.
+- **Interaktives Finance Dashboard (`src/app/(dashboard)/finance/FinanceClient.tsx`):**
+  - **Net Worth Widget:** Zeigt den aktuellen Spielstand.
+  - **Steuer-Schublade (Tax Drawer):** Summiert alle steuerlich absetzbaren Ausgaben in Echtzeit.
+  - **Kategorie-Pie-Chart:** Zeigt die Ausgabenverteilung.
+  - **Transaktions-Liste mit Edit-Modal:** Transaktionen können angeklickt werden. Man kann Kategorien ändern, Notizen/Rechnungsnummern hinzufügen und den `Steuerrelevant`-Schalter umlegen.
 
-## 🚧 Aktuelle Blocker (Bank-Seite)
-Das Skript loggt sich erfolgreich ein (im Bank-Portal sichtbar), aber die Banken liefern keine Umsatz-Daten:
-- **DKB:** Der DKB-Support hat offiziell bestätigt, dass die generische Open-Source FinTS "Produkt-ID" (`9FA6681DEC0CF3046BFC2F8A6` von `libfintx`) nicht in ihren Systemen hinterlegt ist und daher für den Umsatzabruf aktiv blockiert wird. DKB erlaubt aktuell nur große, offiziell registrierte Finanzsoftwares.
-- **BW-Bank:** Server sendet eine leere Liste (0 Transaktionen in 30 Tagen, Saldo N/A). Vermutlich selbes Problem wie bei der DKB oder HBCI ist für das Konto schlichtweg noch nicht aktiviert.
-- **Maßnahme:** Strategie-Entscheidung des Users steht aus (ID-Spoofing, GoCardless PSD2 API, oder CSV-Import).
+## 3. Datenbank-Änderungen (Prisma)
+Das Modell `Transaction` (`jarvis_transactions`) wurde erfolgreich um drei Felder erweitert (via Raw-SQL um Datenverlust zu vermeiden):
+- `notes` (String)
+- `taxRelevant` (Boolean)
+- `tags` (Json)
 
-## 🚀 Next Steps für den nächsten Agenten
-Sobald der User meldet, dass die Banken den Zugang freigeschaltet haben:
-1. **Testlauf:** Führe `npm run sync:banks -- --days 30` im Terminal aus, um historische Daten abzurufen.
-2. **Automatisierung:** Richte einen Mac-Hintergrund-Task (`launchd` oder lokaler Cron) ein, der das Skript jede Nacht (z.B. 03:00 Uhr) ausführt. *Wichtig: Da der User einen Mac nutzt, ist `launchd` zu bevorzugen.*
-3. **Feature-Ausbau:** Falls der Finance-Sync stabil läuft, mit dem nächsten Modul (z.B. Task-Management) fortfahren.
+## 4. Vercel Deployment & Config
+- In der `package.json` wurde das Skript `"build": "next build"` wiederhergestellt, nachdem es zuvor manuell deaktiviert worden war. Das automatische Vercel-Deployment über den `main`-Branch läuft jetzt fehlerfrei.
 
-## 🧹 Housekeeping
-- Temporäre Debugging-Dateien auf dem Desktop (`Jarvis_Banking.txt`) wurden bereits erfolgreich in die System-`.env` überführt.
-- Der Code auf dem `main` Branch ist sauber und kann jederzeit deployt werden (z.B. Vercel). (Hinweis: Vercel Auto-Deployment Regel beachten).
+## 5. Nächste Schritte für den Folge-Agenten
+- **Daten-Visualisierung:** Weiterer Ausbau des Dashboards (z.B. historische Entwicklung des Net Worth als Line-Chart).
+- **Ziele & Motivation:** Einbindung von Sparzielen ("Goals"), um den Gamification-Faktor zu erhöhen.
+- **Claude-Integration für Steuern:** Export-Funktion der steuerrelevanten Transaktionen bauen, sodass diese als strukturierter Prompt an Claude übergeben werden können, um die Steuererklärung noch weiter zu vereinfachen.

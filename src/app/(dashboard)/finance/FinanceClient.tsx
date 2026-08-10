@@ -5,10 +5,10 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { 
+import {
   Wallet, TrendingUp, PiggyBank, Landmark, 
   ArrowUpRight, ArrowDownRight, CircleDollarSign,
-  FileText, Percent, Tag, Edit3, X, Check
+  FileText, Percent, Tag, Edit3, X, Check, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@prisma/client';
