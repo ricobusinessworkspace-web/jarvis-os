@@ -12,33 +12,40 @@ export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col pb-16 px-4 md:px-8 pt-4 md:pt-0 max-w-7xl mx-auto w-full">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="flex flex-col pb-16 px-4 md:px-8 pt-6 max-w-7xl mx-auto w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
         
         {/* ───────────────────────────────────────────────────────── */}
-        {/* LEFT COLUMN: THE ENGINE (50%) */}
+        {/* LEFT COLUMN: THE ENGINE */}
         {/* ───────────────────────────────────────────────────────── */}
-        <section className="space-y-4 flex flex-col">
-          <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2 flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> The Engine
+        <section className="flex flex-col gap-4">
+          <h2 className="text-[11px] font-medium tracking-wider text-muted-foreground/60 uppercase pl-1">
+            The Engine
           </h2>
           
-          <div className="flex flex-col gap-6 flex-1">
-            <FiveAmStreakWidget />
+          {/* Note: For Apple-like interaction, consider adding `active:scale-[0.97] transition-transform` to the individual widget cards in their own components. */}
+          <div className="flex flex-col gap-6">
+            <div className="h-auto">
+              <FiveAmStreakWidget />
+            </div>
             
-            <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-3xl p-4 md:p-8 shadow-sm space-y-8 flex-1 flex flex-col">
+            <div className="h-auto min-h-[300px]">
               <RoutineWidget />
-              <div className="w-full h-px bg-border/30 my-4" />
+            </div>
+            
+            <div className="h-auto min-h-[300px]">
               <SleepWidget />
             </div>
           </div>
         </section>
 
         {/* ───────────────────────────────────────────────────────── */}
-        {/* RIGHT COLUMN: THE BUSINESS (50%) */}
+        {/* RIGHT COLUMN: THE BUSINESS */}
         {/* ───────────────────────────────────────────────────────── */}
-        <section className="space-y-4 flex flex-col">
-          <h2 className="text-xs font-black uppercase tracking-widest text-muted/60 pl-2">The Business</h2>
+        <section className="flex flex-col gap-4">
+          <h2 className="text-[11px] font-medium tracking-wider text-muted-foreground/60 uppercase pl-1">
+            The Business
+          </h2>
           
           <div className="flex flex-col gap-6">
             

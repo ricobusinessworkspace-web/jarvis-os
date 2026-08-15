@@ -1,5 +1,4 @@
 'use client';
-import { getDashboardData } from '@/actions/dashboard';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -86,7 +85,7 @@ export default function Sidebar() {
                   }
                 }}
                 className={cn(
-                  'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                  'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 press',
                   isActive
                     ? 'bg-accent-muted text-accent font-semibold'
                     : 'text-secondary hover:bg-overlay hover:text-foreground'
@@ -122,7 +121,7 @@ export default function Sidebar() {
         <div className="shrink-0 border-t border-border px-3 py-3 space-y-2">
           {/* User section */}
           <div 
-            className="flex items-center gap-3 rounded-lg px-3 py-2 select-none cursor-pointer hover:bg-overlay transition-colors"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 select-none cursor-pointer hover:bg-overlay transition-colors press"
             onClick={() => setProfileOpen(true)}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elevated text-xs font-semibold text-foreground ring-1 ring-border shadow-sm">
@@ -144,7 +143,7 @@ export default function Sidebar() {
           {/* Collapse toggle */}
           <button
             onClick={toggleSidebar}
-            className="flex w-full items-center justify-center rounded-lg py-2 text-muted hover:bg-overlay hover:text-foreground transition-colors duration-150"
+            className="flex w-full items-center justify-center rounded-xl py-2 text-muted hover:bg-overlay hover:text-foreground transition-colors duration-150 press"
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

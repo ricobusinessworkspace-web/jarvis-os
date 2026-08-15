@@ -56,15 +56,15 @@ export default async function FiveAmStreakWidget() {
   }
 
   return (
-    <div className="bg-orange-500/10 backdrop-blur-md border border-orange-500/20 rounded-2xl p-5 shadow-sm flex items-center justify-between transition-all hover:bg-orange-500/15">
+    <div className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm flex items-center justify-between transition-all hover:bg-elevated/50 active:scale-[0.98]">
       <div>
-        <h3 className="text-[10px] font-black tracking-widest text-orange-400 uppercase opacity-80 mb-0.5">5 AM Streak</h3>
-        <div className="text-3xl font-black text-orange-400">
-          {streak} <span className="text-xs font-bold opacity-70 tracking-normal">Tage in Folge</span>
+        <h3 className="text-[10px] font-black tracking-widest text-muted uppercase mb-1">5 AM Club</h3>
+        <div className="text-2xl font-black text-foreground flex items-baseline gap-1.5">
+          {streak} <span className="text-xs font-medium text-muted tracking-normal">Tage in Folge</span>
         </div>
       </div>
-      <div className="h-12 w-12 rounded-full bg-orange-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-        <Sun className="h-6 w-6 text-orange-400" />
+      <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center border border-orange-500/20">
+        <Sun className="h-5 w-5 text-orange-500" />
       </div>
     </div>
   );

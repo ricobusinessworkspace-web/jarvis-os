@@ -28,8 +28,8 @@
   --color-bg-panel:         var(--primitive-black-soft);
   --color-surface-base:     var(--primitive-gray-900);
   --color-surface-hover:    var(--primitive-gray-800);
-  --color-border-base:      var(--primitive-gray-700);
-  --color-border-active:    var(--primitive-gray-600);
+  --color-border-base:      rgba(255, 255, 255, 0.06);
+  --color-border-active:    rgba(255, 255, 255, 0.12);
   --color-text-primary:     var(--primitive-gray-100);
   --color-text-secondary:   var(--primitive-gray-400);
   --color-brand-primary:    var(--primitive-blue-600);
@@ -64,8 +64,8 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
   --duration-fast: 150ms;
-  --duration-normal: 250ms;
-  --duration-slow: 400ms;
+  --duration-normal: 150ms;
+  --duration-slow: 250ms;
 }
 
 @theme inline {
@@ -169,6 +169,20 @@ body {
   border-radius: var(--radius-sm);
 }
 
+.press {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+.card {
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-base);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
 /* ============================================
    Animations
    ============================================ */
@@ -208,12 +222,12 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--color-surface-hover) 25%,
+    var(--color-surface-base) 25%,
     var(--color-bg-panel) 50%,
-    var(--color-surface-hover) 75%
+    var(--color-surface-base) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.5s infinite linear;
   border-radius: var(--radius-md);
 }
 

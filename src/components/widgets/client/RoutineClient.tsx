@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { Sun, Moon, CheckCircle, Pencil, Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sun, Moon, Check, X, Pencil, Flame } from 'lucide-react';
 import { logTrackerItem, updateTrackerItem } from '@/actions/dashboard';
 
 interface Props {
@@ -14,21 +14,41 @@ function getLocalDateString(date = new Date()) {
   return adjustedDate.toISOString().split('T')[0];
 }
 
-function getCurrentWeekDates(offsetWeeks = 0) {
-  const now = new Date();
-  now.setDate(now.getDate() + (offsetWeeks * 7));
-  const dayOfWeek = now.getDay() || 7; 
+function calculateStreak(item: any, todayStr: string) {
+  let streak = 0;
+  const todayDate = new Date(todayStr);
   
-  const dates = [];
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - dayOfWeek + i);
-    dates.push(getLocalDateString(d));
-  }
-  return dates;
-}
+  const getLogStatus = (dateStr: string) => {
+    const log = item.logs.find((l: any) => {
+      const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+      return lDate === dateStr;
+    });
+    return log ? log.status : null;
+  };
 
-const WEEK_DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const todayStatus = getLogStatus(todayStr);
+  
+  if (todayStatus === 'completed') {
+    streak++;
+  } else if (todayStatus === 'not_done') {
+    return 0;
+  }
+  
+  let d = new Date(todayDate);
+  d.setDate(d.getDate() - 1);
+  while (true) {
+    const dateStr = getLocalDateString(d);
+    const status = getLogStatus(dateStr);
+    
+    if (status === 'completed') {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
 
 export function RoutineClient({ initialTrackers }: Props) {
   const [trackers, setTrackers] = useState(initialTrackers);
@@ -40,15 +60,11 @@ export function RoutineClient({ initialTrackers }: Props) {
   const [editingRoutineItem, setEditingRoutineItem] = useState<{ trackerId: string; itemId: string } | null>(null);
   const [routineEditTitle, setRoutineEditTitle] = useState('');
   
-  const [weekOffset, setWeekOffset] = useState(0);
-  
   const todayStr = getLocalDateString();
-  const currentWeekStrs = useMemo(() => getCurrentWeekDates(weekOffset), [weekOffset]);
 
-  const handleToggleRoutineLog = async (trackerId: string, itemId: string, dateStr: string, isDone: boolean) => {
+  const handleToggleRoutineLog = async (trackerId: string, itemId: string, isDone: boolean) => {
     const newStatus = isDone ? 'not_done' : 'completed';
     
-    // Optimistic Update
     setTrackers(prev => prev.map(t => {
       if (t.id === trackerId) {
         return {
@@ -58,13 +74,13 @@ export function RoutineClient({ initialTrackers }: Props) {
               const logs = [...item.logs];
               const logIndex = logs.findIndex(l => {
                 const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
-                return lDate === dateStr;
+                return lDate === todayStr;
               });
               
               if (logIndex >= 0) {
                 logs[logIndex] = { ...logs[logIndex], status: newStatus };
               } else {
-                logs.push({ date: dateStr, status: newStatus });
+                logs.push({ date: todayStr, status: newStatus });
               }
               return { ...item, logs };
             }
@@ -75,14 +91,13 @@ export function RoutineClient({ initialTrackers }: Props) {
       return t;
     }));
 
-    await logTrackerItem(itemId, newStatus, dateStr);
+    await logTrackerItem(itemId, newStatus, todayStr);
   };
 
   const saveRoutineItemEdit = async (trackerId: string, itemId: string) => {
     const title = routineEditTitle.trim();
     if (!title) return;
     
-    // Optimistic Update
     setTrackers(prev => prev.map(t => {
       if (t.id === trackerId) {
         return { ...t, items: t.items.map((item: any) => item.id === itemId ? { ...item, title } : item) };
@@ -94,92 +109,110 @@ export function RoutineClient({ initialTrackers }: Props) {
     await updateTrackerItem(itemId, { title });
   };
 
-  const renderWeeklyRoutineTable = (tracker: any) => {
+  const renderTracker = (tracker: any) => {
     if (!tracker) return null;
     const isMorning = tracker.name.toLowerCase().includes('morgen');
     const Icon = isMorning ? Sun : Moon;
+    const totalItems = tracker.items.length;
     
+    const completedItems = tracker.items.filter((item: any) => {
+      const log = item.logs.find((l: any) => {
+        const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+        return lDate === todayStr;
+      });
+      return log && log.status === 'completed';
+    }).length;
+
+    const progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+
     return (
-      <div className="bg-elevated/30 border border-border/30 rounded-2xl p-4 shadow-sm space-y-3 overflow-x-auto">
-        <div className="flex items-center justify-between pb-3">
-          <h3 className="text-base font-black tracking-tight flex items-center gap-3">
-            <Icon className={`h-5 w-5 ${isMorning ? 'text-amber-400' : 'text-indigo-400'}`} /> {tracker.name}
+      <div className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold tracking-tight flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${isMorning ? 'bg-amber-500/10 text-amber-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
+              <Icon className="h-5 w-5" />
+            </div>
+            {tracker.name}
           </h3>
-          <div className="flex items-center gap-2 bg-overlay/40 p-1.5 rounded-xl border border-border/10 shadow-sm">
-            <button onClick={() => setWeekOffset(prev => prev - 1)} className="px-2 py-1 rounded-md hover:bg-overlay text-muted hover:text-foreground transition-colors flex items-center">◀</button>
-            <span className="text-xs font-bold text-foreground w-24 text-center">
-              {weekOffset === 0 ? 'Diese Woche' : weekOffset === -1 ? 'Letzte Woche' : `${Math.abs(weekOffset)} W. zurück`}
-            </span>
-            <button onClick={() => setWeekOffset(prev => prev + 1)} disabled={weekOffset >= 0} className={`px-2 py-1 rounded-md transition-colors flex items-center ${weekOffset >= 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-overlay text-muted hover:text-foreground'}`}>▶</button>
+          <div className="text-xs font-semibold text-muted">
+            {completedItems}/{totalItems} erledigt
           </div>
         </div>
-        <table className="w-full text-left border-collapse min-w-[400px]">
-          <thead>
-            <tr>
-              <th className="py-1.5 px-2 border-b border-border/20 text-xs text-muted font-bold w-[28%]">Habit</th>
-              {WEEK_DAYS.map((day, i) => (
-                <th key={day} className={`py-1.5 px-1 border-b border-border/20 text-[11px] font-bold text-center ${currentWeekStrs[i] === todayStr ? 'text-accent' : 'text-muted'}`}>
-                  {day}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tracker.items.map((item: any) => (
-              <tr key={item.id} className="hover:bg-overlay/20 transition-colors group">
-                <td className="py-2.5 px-2 border-b border-border/10 text-xs font-semibold text-foreground w-[28%]">
+        
+        <div className="h-1.5 w-full bg-border/30 rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-500 ease-out ${isMorning ? 'bg-amber-500' : 'bg-indigo-500'}`} 
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+
+        <div className="space-y-1 mt-2">
+          {tracker.items.map((item: any) => {
+            const isDone = item.logs.some((l: any) => {
+              const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
+              return lDate === todayStr && l.status === 'completed';
+            });
+            const streak = calculateStreak(item, todayStr);
+
+            return (
+              <div key={item.id} className="flex items-center justify-between p-2 rounded-xl hover:bg-overlay/30 transition-colors group">
+                <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                  <button 
+                    onClick={() => handleToggleRoutineLog(tracker.id, item.id, isDone)} 
+                    className="shrink-0 flex items-center justify-center active:scale-[0.90] transition-transform"
+                  >
+                    <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${isDone ? (isMorning ? 'bg-amber-500 border-amber-500' : 'bg-indigo-500 border-indigo-500') : 'border-border hover:border-muted'}`}>
+                      {isDone && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
+                    </div>
+                  </button>
+                  
                   {editingRoutineItem?.itemId === item.id ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2 flex-1">
                       <input 
                         type="text" 
                         value={routineEditTitle} 
                         onChange={(e) => setRoutineEditTitle(e.target.value)} 
-                        className="bg-elevated border border-border rounded px-2 py-0.5 text-xs text-foreground focus:border-accent outline-none w-full"
+                        className="bg-background border border-border rounded-lg px-2 py-1 text-sm text-foreground focus:border-accent outline-none w-full"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') saveRoutineItemEdit(tracker.id, item.id);
                           if (e.key === 'Escape') setEditingRoutineItem(null);
                         }}
                       />
-                      <button onClick={() => saveRoutineItemEdit(tracker.id, item.id)} className="text-accent hover:text-accent-hover shrink-0">
-                        <Check className="h-3.5 w-3.5" />
+                      <button onClick={() => saveRoutineItemEdit(tracker.id, item.id)} className="text-accent hover:text-accent-hover p-1">
+                        <Check className="h-4 w-4" />
                       </button>
-                      <button onClick={() => setEditingRoutineItem(null)} className="text-muted hover:text-foreground shrink-0">
-                        <X className="h-3.5 w-3.5" />
+                      <button onClick={() => setEditingRoutineItem(null)} className="text-muted hover:text-foreground p-1">
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="truncate pr-1">{item.title}</span>
+                    <div className="flex items-center gap-2 overflow-hidden flex-1">
+                      <span className={`text-sm font-medium truncate transition-colors ${isDone ? 'text-muted line-through' : 'text-foreground'}`}>
+                        {item.title}
+                      </span>
                       <button 
                         onClick={() => {
                           setEditingRoutineItem({ trackerId: tracker.id, itemId: item.id });
                           setRoutineEditTitle(item.title);
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opacity p-0.5 shrink-0"
+                        className="opacity-0 group-hover:opacity-100 text-muted hover:text-foreground transition-opacity p-1 shrink-0"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                     </div>
                   )}
-                </td>
-                {currentWeekStrs.map(dateStr => {
-                  const isDone = item.logs.some((l: any) => {
-                    const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
-                    return lDate === dateStr && l.status === 'completed';
-                  });
-                  return (
-                    <td key={dateStr} className="py-2.5 px-1 border-b border-border/10 text-center">
-                      <button onClick={() => handleToggleRoutineLog(tracker.id, item.id, dateStr, isDone)} className="flex items-center justify-center w-full group-hover:scale-110 transition-transform">
-                        {isDone ? <CheckCircle className="h-4 w-4 text-accent inline-block" /> : <div className="h-4 w-4 rounded-full border-2 border-muted/30 inline-block group-hover:border-accent transition-colors" />}
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                
+                {streak > 0 && (
+                  <div className="flex items-center gap-1 bg-orange-500/10 text-orange-500 px-2 py-1 rounded-lg text-xs font-bold shrink-0">
+                    <Flame className="h-3 w-3" /> {streak}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -188,9 +221,9 @@ export function RoutineClient({ initialTrackers }: Props) {
   const eveningTracker = trackers.find((t: any) => t.name.toLowerCase().includes('abend'));
 
   return (
-    <>
-      {renderWeeklyRoutineTable(morningTracker)}
-      {renderWeeklyRoutineTable(eveningTracker)}
-    </>
+    <div className="space-y-4">
+      {renderTracker(morningTracker)}
+      {renderTracker(eveningTracker)}
+    </div>
   );
 }

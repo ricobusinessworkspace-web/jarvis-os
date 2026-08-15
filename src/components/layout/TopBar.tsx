@@ -1,5 +1,4 @@
 'use client';
-import { createTask } from '@/actions/dashboard';
 
 import { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
@@ -60,7 +59,7 @@ export default function TopBar() {
       <div className={cn('flex items-center gap-2 text-xs font-semibold uppercase tracking-wider', isElectron && 'pl-16')}>
         <button 
           onClick={toggleSidebar} 
-          className="md:hidden mr-1 p-1.5 rounded-md hover:bg-overlay text-muted hover:text-foreground transition-colors electron-no-drag"
+          className="md:hidden mr-1 p-1.5 rounded-md hover:bg-overlay text-muted hover:text-foreground transition-colors press electron-no-drag"
         >
           <Menu size={18} />
         </button>
@@ -102,7 +101,7 @@ export default function TopBar() {
 
         {/* Notification Bell */}
         <button
-          className="relative rounded-lg p-1.5 text-muted hover:bg-overlay hover:text-foreground transition-all duration-150 cursor-pointer"
+          className="relative rounded-lg p-1.5 text-muted hover:bg-overlay hover:text-foreground transition-all duration-150 cursor-pointer press"
           aria-label="Notifications"
         >
           <Bell size={16} />
