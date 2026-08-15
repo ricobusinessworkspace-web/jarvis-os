@@ -23,39 +23,80 @@ export default function CSVUploader() {
     setStatus('parsing');
     setMessage('Analysiere Datei...');
 
+    // First pass: read raw lines to find the actual header row (banks add metadata rows at the top)
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
-      encoding: 'ISO-8859-1', // German banks often use ISO-8859-1 for CSVs
-      complete: async (results) => {
+      encoding: 'ISO-8859-1',
+      complete: async (rawResults) => {
         try {
-          const rawData = results.data as Record<string, string>[];
+          const allRows = rawResults.data as string[][];
+          
+          // Find the header row by looking for a row that contains date/amount keywords
+          let headerRowIndex = -1;
+          const dateKeywords = ['buchungstag', 'buchungsdatum', 'day of entry', 'date', 'datum'];
+          const amountKeywords = ['betrag', 'amount', 'umsatz'];
+          
+          for (let i = 0; i < Math.min(allRows.length, 15); i++) {
+            const rowLower = allRows[i].map(cell => (cell || '').toLowerCase().trim());
+            const hasDate = rowLower.some(cell => dateKeywords.some(kw => cell.includes(kw)));
+            const hasAmount = rowLower.some(cell => amountKeywords.some(kw => cell.includes(kw)));
+            if (hasDate && hasAmount) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+          
+          if (headerRowIndex === -1) {
+            // Fallback: show what we found for debugging
+            const firstRowPreview = allRows.length > 0 ? allRows[0].slice(0, 5).join(', ') : 'leer';
+            setStatus('error');
+            setMessage(`Spalten nicht erkannt. Erste Zeile: "${firstRowPreview}..." – Bitte CSV-CAMT Format verwenden.`);
+            return;
+          }
+
+          // Build header + data from the detected header row
+          const headers = allRows[headerRowIndex].map(h => (h || '').trim());
+          const dataRows = allRows.slice(headerRowIndex + 1);
+          
           const formattedTransactions = [];
 
-          for (const row of rawData) {
-            // Find columns dynamically since DKB and BW-Bank differ
-            const keys = Object.keys(row);
+          for (const cells of dataRows) {
+            if (cells.length < headers.length / 2) continue; // Skip incomplete rows
+            
+            // Build a row object from headers + cells
+            const row: Record<string, string> = {};
+            headers.forEach((h, i) => { row[h] = (cells[i] || '').trim(); });
+            
+            const keys = headers;
             
             const dateKey = keys.find(k => {
               const lower = k.toLowerCase().trim();
-              return lower === 'buchungstag' || lower === 'buchungsdatum' || lower === 'day of entry' || lower === 'date' || lower.includes('buchungstag');
+              return lower === 'buchungstag' || lower === 'buchungsdatum' || lower === 'day of entry' || lower === 'date' || lower.includes('buchungstag') || lower.includes('buchungsdatum');
             });
             const amountKey = keys.find(k => {
               const lower = k.toLowerCase().trim();
               return lower === 'betrag' || lower === 'amount' || lower === 'umsatz' || lower === 'betrag (eur)';
             }) || keys.find(k => k.toLowerCase().includes('betrag') && !k.toLowerCase().includes('ursprünglich'));
             const descKey = keys.find(k => k.toLowerCase().includes('verwendungszweck') || k.toLowerCase().includes('purpose'));
-            const nameKey = keys.find(k => k.toLowerCase().includes('begünstigt') || k.toLowerCase().includes('auftraggeber') || k.toLowerCase().includes('name') || k.toLowerCase().includes('beneficiary') || k.toLowerCase().includes('payer'));
+            const nameKey = keys.find(k => k.toLowerCase().includes('begünstigt') || k.toLowerCase().includes('auftraggeber') || k.toLowerCase().includes('beneficiary') || k.toLowerCase().includes('payer')) 
+              || keys.find(k => k.toLowerCase().trim() === 'name');
 
-            if (!dateKey || !amountKey) continue; // Skip invalid rows
+            if (!dateKey || !amountKey) continue;
 
-            // Parse Date (DD.MM.YYYY to YYYY-MM-DD)
-            const dateParts = row[dateKey].split('.');
+            const dateVal = row[dateKey];
+            if (!dateVal) continue;
+            
+            // Parse Date: support DD.MM.YYYY and DD.MM.YY
+            const dateParts = dateVal.split('.');
             if (dateParts.length !== 3) continue;
-            const isoDate = `20${dateParts[2].length === 2 ? dateParts[2] : dateParts[2].slice(-2)}-${dateParts[1]}-${dateParts[0]}T12:00:00Z`;
+            const year = dateParts[2].length === 2 ? `20${dateParts[2]}` : dateParts[2].length === 4 ? dateParts[2] : `20${dateParts[2].slice(-2)}`;
+            const isoDate = `${year}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}T12:00:00Z`;
 
-            // Parse Amount (replace German comma with dot)
-            let amountStr = row[amountKey].replace(/\./g, '').replace(',', '.');
+            // Parse Amount (handle German formatting: 1.234,56 → 1234.56)
+            const amountRaw = row[amountKey];
+            if (!amountRaw) continue;
+            let amountStr = amountRaw.replace(/\./g, '').replace(',', '.');
             const amount = parseFloat(amountStr);
             if (isNaN(amount)) continue;
 
@@ -75,8 +116,9 @@ export default function CSVUploader() {
           }
 
           if (formattedTransactions.length === 0) {
+            const detectedCols = headers.slice(0, 6).join(', ');
             setStatus('error');
-            setMessage('Keine gültigen Transaktionen gefunden. Falsches CSV-Format?');
+            setMessage(`Keine gültigen Transaktionen. Erkannte Spalten: "${detectedCols}..." (${dataRows.length} Zeilen geparst)`);
             return;
           }
 
