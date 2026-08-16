@@ -12,7 +12,7 @@ export async function getDashboardData() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    const trackers = await prisma.tracker.findMany({
+    let trackers = await prisma.tracker.findMany({
       include: {
         items: {
           include: {
@@ -28,6 +28,26 @@ export async function getDashboardData() {
         }
       }
     });
+
+    // Auto-seed Ursachen Tracker if missing
+    if (!trackers.some(t => t.type === 'intentions' || t.name === 'Ursachen')) {
+      const newTracker = await prisma.tracker.create({
+        data: {
+          name: 'Ursachen',
+          type: 'intentions',
+          description: 'Tägliche Grundsatz-Ziele',
+          items: {
+            create: [
+              { title: 'Fokus-Arbeit', order: 1 },
+              { title: 'Sport / Bewegung', order: 2 },
+              { title: 'Gesunde Ernährung', order: 3 },
+            ]
+          }
+        },
+        include: { items: { include: { logs: true } } }
+      });
+      trackers.push(newTracker);
+    }
 
     const tasks = await prisma.task.findMany({
       orderBy: { createdAt: 'desc' },
