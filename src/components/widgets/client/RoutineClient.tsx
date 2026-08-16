@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Sun, Moon, Check, X, Pencil, Flame } from 'lucide-react';
 import { logTrackerItem, updateTrackerItem } from '@/actions/dashboard';
+import StreakStatsPopover from '@/components/ui/StreakStatsPopover';
 
 interface Props {
   initialTrackers: any[];
@@ -53,6 +54,10 @@ function calculateStreak(item: any, todayStr: string) {
 export function RoutineClient({ initialTrackers }: Props) {
   const [trackers, setTrackers] = useState(initialTrackers);
   
+  // Auto switch based on time, morning if < 14:00
+  const currentHour = new Date().getHours();
+  const [activeTab, setActiveTab] = useState<'morning' | 'evening'>(currentHour < 14 ? 'morning' : 'evening');
+
   useEffect(() => {
     setTrackers(initialTrackers);
   }, [initialTrackers]);
@@ -204,10 +209,16 @@ export function RoutineClient({ initialTrackers }: Props) {
                   )}
                 </div>
                 
-                {streak > 0 && (
-                  <div className="flex items-center gap-1 bg-orange-500/10 text-orange-500 px-2 py-1 rounded-lg text-xs font-bold shrink-0">
-                    <Flame className="h-3 w-3" /> {streak}
-                  </div>
+                {streak > 0 ? (
+                  <StreakStatsPopover logs={item.logs} title={item.title}>
+                    <div className="flex items-center gap-1 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20 px-2 py-1 rounded-lg text-xs font-bold shrink-0 cursor-pointer transition-colors">
+                      <Flame className="h-3 w-3" /> {streak}
+                    </div>
+                  </StreakStatsPopover>
+                ) : (
+                  <StreakStatsPopover logs={item.logs} title={item.title}>
+                    <div className="text-xs text-muted hover:text-foreground cursor-pointer px-2 py-1">Stats</div>
+                  </StreakStatsPopover>
                 )}
               </div>
             );
@@ -220,10 +231,37 @@ export function RoutineClient({ initialTrackers }: Props) {
   const morningTracker = trackers.find((t: any) => t.name.toLowerCase().includes('morgen'));
   const eveningTracker = trackers.find((t: any) => t.name.toLowerCase().includes('abend'));
 
+  const activeTracker = activeTab === 'morning' ? morningTracker : eveningTracker;
+
   return (
-    <div className="space-y-4">
-      {renderTracker(morningTracker)}
-      {renderTracker(eveningTracker)}
+    <div className="flex flex-col gap-4">
+      {/* Apple-style segmented control */}
+      <div className="bg-elevated border border-border/50 p-1 rounded-xl flex items-center w-full max-w-xs mx-auto shadow-sm relative">
+        <div 
+          className="absolute inset-y-1 bg-background shadow rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{ 
+            width: 'calc(50% - 4px)', 
+            transform: `translateX(${activeTab === 'morning' ? '0%' : '100%'})`,
+            left: activeTab === 'morning' ? '4px' : '4px'
+          }}
+        />
+        <button 
+          onClick={() => setActiveTab('morning')}
+          className={`relative z-10 flex-1 py-1.5 text-sm font-medium transition-colors ${activeTab === 'morning' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          Morgen
+        </button>
+        <button 
+          onClick={() => setActiveTab('evening')}
+          className={`relative z-10 flex-1 py-1.5 text-sm font-medium transition-colors ${activeTab === 'evening' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          Abend
+        </button>
+      </div>
+
+      <div className="transition-all duration-300 animate-in fade-in slide-in-from-bottom-2">
+        {renderTracker(activeTracker)}
+      </div>
     </div>
   );
 }

@@ -56,7 +56,13 @@ export async function getDashboardData() {
       orderBy: { createdAt: 'desc' }
     });
 
-    return { success: true, data: { trackers, tasks, personalLogs, todayLog, contentItems } };
+    const settingsRecords = await prisma.setting.findMany();
+    const settings = settingsRecords.reduce((acc, curr) => {
+      acc[curr.key] = curr.value || '';
+      return acc;
+    }, {} as Record<string, string>);
+
+    return { success: true, data: { trackers, tasks, personalLogs, todayLog, contentItems, settings } };
   } catch (error: any) {
     console.error('getDashboardData error:', error);
     return { success: false, error: error.message };
@@ -192,7 +198,22 @@ export async function updateSetting(key: string, value: string) {
       update: { value },
       create: { key, value }
     });
-    revalidatePath('/content');
+    revalidatePath('/', 'layout');
+    return { success: true, data: updated };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function saveDashboardLayout(layout: string[]) {
+  try {
+    const layoutStr = JSON.stringify(layout);
+    const updated = await prisma.setting.upsert({
+      where: { key: 'dashboard_layout' },
+      update: { value: layoutStr },
+      create: { key: 'dashboard_layout', value: layoutStr }
+    });
+    revalidatePath('/', 'layout');
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };

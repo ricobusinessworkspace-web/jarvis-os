@@ -9,6 +9,7 @@ interface AppState {
   trackers: TrackerWithItems[];
   settings: Record<string, string>;
   crmOverrides: Array<{ leadId: string; title: string | null; status: string; deadline: string | null }>;
+  dashboardLayout: string[];
   
   // UI State
   searchQuery: string;
@@ -30,6 +31,7 @@ interface AppState {
   updateTrackerItemTitleInStore: (trackerId: string, itemId: string, title: string) => void;
   updateSettingInStore: (key: string, value: string) => void;
   updateCrmOverrideInStore: (leadId: string, override: { title?: string | null; status?: string; deadline?: string | null }) => void;
+  updateDashboardLayout: (layout: string[]) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -53,11 +55,22 @@ export const useStore = create<AppState>((set) => ({
   trackers: [],
   settings: {},
   crmOverrides: [],
+  dashboardLayout: [],
   
   searchQuery: '',
   setSearchQuery: (query) => set({ searchQuery: query }),
 
-  initialize: (data) => set((state) => ({ ...state, ...data })),
+  initialize: (data) => set((state) => {
+    let layout = state.dashboardLayout;
+    if (data.settings && data.settings['dashboard_layout']) {
+      try {
+        layout = JSON.parse(data.settings['dashboard_layout']);
+      } catch (e) {
+        console.error('Failed to parse dashboard_layout', e);
+      }
+    }
+    return { ...state, ...data, dashboardLayout: layout };
+  }),
 
   addTask: (task) => set((state) => ({ tasks: [task, ...state.tasks] })),
   
@@ -126,5 +139,7 @@ export const useStore = create<AppState>((set) => ({
     return {
       crmOverrides: [...state.crmOverrides.filter(o => o.leadId !== leadId), updated]
     };
-  })
+  }),
+
+  updateDashboardLayout: (layout) => set({ dashboardLayout: layout })
 }));
