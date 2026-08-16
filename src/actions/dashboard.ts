@@ -19,7 +19,7 @@ export async function getDashboardData() {
             logs: {
               where: {
                 date: {
-                  gte: new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000)
+                  gte: new Date(today.getTime() - 31 * 24 * 60 * 60 * 1000)
                 }
               }
             }
