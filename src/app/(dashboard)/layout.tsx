@@ -7,6 +7,7 @@ import TopBar from '@/components/layout/TopBar';
 import { StoreHydrator } from '@/components/layout/StoreHydrator';
 import PullToRefresh from '@/components/PullToRefresh';
 import { cn } from '@/lib/utils';
+import { getDashboardData } from '@/actions/dashboard';
 
 function DashboardShell({ children }: { children: ReactNode }) {
   const { isCollapsed } = useSidebar();
@@ -34,9 +35,12 @@ function DashboardShell({ children }: { children: ReactNode }) {
   );
 }
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const result = await getDashboardData();
+  const initialData = result.success ? result.data : {};
+
   return (
-    <StoreHydrator>
+    <StoreHydrator initialData={initialData}>
       <SidebarProvider>
         <DashboardShell>{children}</DashboardShell>
       </SidebarProvider>
