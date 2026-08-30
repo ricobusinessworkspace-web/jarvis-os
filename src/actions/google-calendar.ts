@@ -117,3 +117,96 @@ export async function fetchCalendarEvents() {
     return { success: false, error: error.message };
   }
 }
+
+export async function fetchGoogleTasks() {
+  try {
+    let token = await getStoredToken();
+    if (!token) return { success: false, error: 'Not connected' };
+
+    const isExpired = Date.now() >= (token.created_at + (token.expires_in * 1000) - 60000);
+    if (isExpired) {
+      const config = getGoogleConfig();
+      if (!config) return { success: false, error: 'CRM credentials missing' };
+
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: config.client_id,
+          client_secret: config.client_secret,
+          refresh_token: token.refresh_token,
+          grant_type: 'refresh_token'
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error_description || 'Failed to refresh token');
+      }
+
+      token = {
+        ...token,
+        access_token: data.access_token,
+        expires_in: data.expires_in,
+        created_at: Date.now()
+      };
+      await saveToken(token);
+    }
+
+    // First get task lists
+    const listsRes = await fetch('https://www.googleapis.com/tasks/v1/users/@me/lists', {
+      headers: { 'Authorization': `Bearer ${token.access_token}` }
+    });
+
+    if (!listsRes.ok) {
+      return { success: false, error: 'Failed to fetch task lists' };
+    }
+
+    const listsData = await listsRes.json();
+    const taskLists = listsData.items || [];
+    if (taskLists.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // Fetch tasks from all lists, filter to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const allTasks: any[] = [];
+
+    for (const list of taskLists) {
+      const tasksUrl = `https://www.googleapis.com/tasks/v1/lists/${list.id}/tasks?showCompleted=true&showHidden=false&dueMin=${today.toISOString()}&dueMax=${tomorrow.toISOString()}`;
+      const tasksRes = await fetch(tasksUrl, {
+        headers: { 'Authorization': `Bearer ${token.access_token}` }
+      });
+
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        const items = (tasksData.items || []).map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          due: t.due,
+          notes: t.notes,
+          listName: list.title
+        }));
+        allTasks.push(...items);
+      }
+    }
+
+    // Sort: incomplete first, then by title
+    allTasks.sort((a, b) => {
+      if (a.status === 'completed' && b.status !== 'completed') return 1;
+      if (a.status !== 'completed' && b.status === 'completed') return -1;
+      return (a.title || '').localeCompare(b.title || '');
+    });
+
+    return { success: true, data: allTasks };
+
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+

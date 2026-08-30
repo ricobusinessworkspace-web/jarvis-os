@@ -24,16 +24,16 @@ import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
 
 const WIDGETS = {
-  routine: { id: 'routine', className: 'col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-3' },
-  intentions: { id: 'intentions', className: 'col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-3' },
-  tasks: { id: 'tasks', className: 'col-span-1 lg:col-span-1 h-[400px]' },
-  calendar: { id: 'calendar', className: 'col-span-1 lg:col-span-1 h-[400px]' },
-  networth: { id: 'networth', className: 'col-span-1 md:col-span-2 lg:col-span-2 min-h-[350px]' },
-  content: { id: 'content', className: 'col-span-1 lg:col-span-1 h-[400px]' },
-  health: { id: 'health', className: 'col-span-1 lg:col-span-1' },
+  routine: { id: 'routine', className: 'col-span-1 md:col-span-2' },
+  performance: { id: 'performance', className: 'col-span-1 md:col-span-2' },
+  avgsleep: { id: 'avgsleep', className: 'col-span-1' },
+  sleep: { id: 'sleep', className: 'col-span-1' },
+  gtasks: { id: 'gtasks', className: 'col-span-1' },
+  calendar: { id: 'calendar', className: 'col-span-1' },
+  tasks: { id: 'tasks', className: 'col-span-1 md:col-span-2 lg:col-span-4' },
 };
 
-const DEFAULT_LAYOUT = ['routine', 'intentions', 'tasks', 'calendar', 'networth', 'content', 'health'];
+const DEFAULT_LAYOUT = ['routine', 'performance', 'avgsleep', 'sleep', 'gtasks', 'calendar', 'tasks'];
 
 function SortableItem({ id, isEditing, children, className }: { id: string, isEditing: boolean, children: React.ReactNode, className?: string }) {
   const {
@@ -137,7 +137,7 @@ export default function DashboardLayoutClient({ widgets }: { widgets: Record<str
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-min">
           <SortableContext
             items={items}
             strategy={rectSortingStrategy}
