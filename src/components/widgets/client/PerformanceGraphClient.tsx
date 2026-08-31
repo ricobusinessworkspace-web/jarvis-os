@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -87,10 +87,13 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
               tick={{ fill: '#888888', fontSize: 10, fontWeight: 600 }}
               dy={10}
             />
+            <YAxis yAxisId="percent" hide domain={[0, 100]} />
+            <YAxis yAxisId="hours" hide domain={[0, 12]} />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
             
             {showMorning && (
               <Area 
+                yAxisId="percent"
                 type="monotone" 
                 dataKey="morningPercent" 
                 name="Morgen-Routine" 
@@ -104,6 +107,7 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
 
             {showEvening && (
               <Area 
+                yAxisId="percent"
                 type="monotone" 
                 dataKey="eveningPercent" 
                 name="Abend-Routine" 
@@ -117,6 +121,7 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
             
             {showSleep && (
               <Area 
+                yAxisId="hours"
                 type="monotone" 
                 dataKey="sleepHours" 
                 name="Schlaf" 
