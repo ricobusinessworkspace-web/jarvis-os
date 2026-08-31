@@ -131,15 +131,15 @@ export function RoutineClient({ initialTrackers }: Props) {
     const progressPercent = totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
 
     return (
-      <div className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold tracking-tight flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${isMorning ? 'bg-amber-500/10 text-amber-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
-              <Icon className="h-5 w-5" />
+      <div className="crm-card">
+        <div className="crm-header">
+          <h3 className="crm-title">
+            <div className={`p-1.5 rounded-lg ${isMorning ? 'bg-amber-500/10 text-amber-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
+              <Icon className="h-4 w-4" />
             </div>
             {tracker.name}
           </h3>
-          <div className="text-xs font-semibold text-muted">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
             {completedItems}/{totalItems} erledigt
           </div>
         </div>

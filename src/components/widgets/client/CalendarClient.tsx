@@ -35,9 +35,9 @@ export function CalendarClient({ initialConnected, initialEvents }: Props) {
   };
 
   return (
-    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm space-y-4 h-full flex flex-col">
-      <div className="flex items-center justify-between border-b border-border/20 pb-3">
-        <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
+    <div className="crm-card h-full">
+      <div className="crm-header">
+        <h3 className="crm-title">
           <Calendar className="h-4 w-4 text-accent" /> Heute
         </h3>
         {connected && (

@@ -36,14 +36,14 @@ export default async function AvgSleepWidget() {
   const iconColorClass = avgSleep >= 7 ? 'text-emerald-500' : avgSleep >= 6 ? 'text-amber-500' : 'text-red-500';
 
   return (
-    <div className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm flex items-center justify-between transition-all hover:bg-elevated/50">
-      <div>
-        <h3 className="text-[10px] font-black tracking-widest text-muted uppercase mb-1">Ø Schlaf (7 Tage)</h3>
-        <div className="text-2xl font-black text-foreground flex items-baseline gap-1.5">
+    <div className="crm-card flex-row items-center justify-between space-y-0 h-full">
+      <div className="flex flex-col">
+        <h3 className="crm-stat-label">Ø Schlaf (7 Tage)</h3>
+        <div className="crm-stat-value flex items-baseline gap-1.5">
           {avgSleep > 0 ? avgSleep : '–'} <span className="text-xs font-medium text-muted tracking-normal">{avgSleep > 0 ? 'Stunden' : 'Keine Daten'}</span>
         </div>
       </div>
-      <div className={`h-10 w-10 rounded-full ${iconBgClass} flex items-center justify-center border`}>
+      <div className={`h-10 w-10 rounded-full ${iconBgClass} flex items-center justify-center border shrink-0`}>
         <Moon className={`h-5 w-5 ${iconColorClass}`} />
       </div>
     </div>

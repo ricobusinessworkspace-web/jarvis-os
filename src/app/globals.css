@@ -243,3 +243,36 @@ body {
     transform: scale(0.98);
   }
 }
+
+/* ============================================
+   CRM Design System (Global Widget Styles)
+   ============================================ */
+@layer components {
+  .crm-card {
+    @apply bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col;
+  }
+  
+  .crm-header {
+    @apply flex items-center justify-between border-b border-border/20 pb-3;
+  }
+  
+  .crm-title {
+    @apply text-sm font-bold tracking-tight flex items-center gap-2.5;
+  }
+  
+  .crm-stat-card {
+    @apply flex flex-col p-3 rounded-xl bg-background/60 border border-border/40;
+  }
+  
+  .crm-stat-label {
+    @apply text-[10px] text-muted font-bold uppercase tracking-wider flex items-center gap-1.5;
+  }
+  
+  .crm-stat-value {
+    @apply text-xl font-black text-foreground mt-0.5;
+  }
+  
+  .crm-badge {
+    @apply text-[10px] font-black bg-accent/15 text-accent px-2.5 py-1 rounded-full tracking-wider uppercase;
+  }
+}

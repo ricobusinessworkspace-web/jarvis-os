@@ -13,12 +13,12 @@ export default async function GoogleTasksWidget() {
   }
 
   return (
-    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm space-y-3 h-full flex flex-col">
-      <div className="flex items-center justify-between border-b border-border/20 pb-3">
-        <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
+    <div className="crm-card h-full justify-between">
+      <div className="crm-header">
+        <h3 className="crm-title">
           <ListTodo className="h-4 w-4 text-blue-400" /> Google Tasks
         </h3>
-        <span className="text-[11px] font-semibold text-muted bg-overlay/50 px-2.5 py-0.5 rounded-full">
+        <span className="crm-badge !bg-overlay/50 !text-muted">
           {tasks.filter((t: any) => t.status !== 'completed').length} offen
         </span>
       </div>

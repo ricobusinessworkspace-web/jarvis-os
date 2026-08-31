@@ -39,45 +39,43 @@ export function SleepClient({ initialTodayLog }: Props) {
   };
 
   return (
-    <div className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm space-y-4">
-      <h3 className="text-base font-bold tracking-tight flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500">
-          <Moon className="h-5 w-5" />
-        </div>
-        Schlaf
-      </h3>
+    <div className="crm-card h-full justify-between">
+      <div className="crm-header">
+        <h3 className="crm-title">
+          <Moon className="h-4 w-4 text-purple-500" /> Schlaf
+        </h3>
+      </div>
       
-      <div className="flex items-center gap-4">
-        <div className="flex-1 space-y-1.5">
-          <label className="text-[10px] font-black uppercase tracking-wider text-muted ml-1">Bettzeit</label>
+      <div className="flex items-center gap-3 mt-auto">
+        <div className="flex-1 flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Bettzeit</label>
           <input
             type="time"
             value={todayLog.bedTime || ''}
             onChange={(e) => handleSleepTimeChange('bedTime', e.target.value)}
-            className="w-full bg-background border border-border/50 rounded-xl text-sm py-2.5 px-3 text-foreground focus:border-purple-500 outline-none shadow-sm transition-all active:scale-[0.97]"
+            className="w-full bg-background border border-border/50 rounded-xl text-sm py-2 px-3 text-foreground focus:border-purple-500 outline-none shadow-sm transition-all"
           />
         </div>
         
-        <div className="flex-1 space-y-1.5">
-          <label className="text-[10px] font-black uppercase tracking-wider text-muted ml-1">Aufgestanden</label>
+        <div className="flex-1 flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-muted">Aufgestanden</label>
           <input
             type="time"
             value={todayLog.wakeTime || ''}
             onChange={(e) => handleSleepTimeChange('wakeTime', e.target.value)}
-            className="w-full bg-background border border-border/50 rounded-xl text-sm py-2.5 px-3 text-foreground focus:border-purple-500 outline-none shadow-sm transition-all active:scale-[0.97]"
+            className="w-full bg-background border border-border/50 rounded-xl text-sm py-2 px-3 text-foreground focus:border-purple-500 outline-none shadow-sm transition-all"
           />
         </div>
       </div>
 
       {todayLog.sleepHours > 0 && (
-        <div className="flex items-center justify-between p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-          <div className="flex items-center gap-2 text-purple-400">
-            <Clock className="h-4 w-4" />
-            <span className="text-sm font-medium">Schlafdauer</span>
-          </div>
-          <div className="text-xl font-black text-purple-400">
-            {todayLog.sleepHours} <span className="text-sm font-bold opacity-70">h</span>
-          </div>
+        <div className="crm-stat-card border-purple-500/20 bg-purple-500/10 !p-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+            <Clock className="h-3 w-3" /> Schlafdauer
+          </span>
+          <span className="text-xl font-black text-purple-400 mt-0.5">
+            {todayLog.sleepHours} <span className="text-xs">h</span>
+          </span>
         </div>
       )}
     </div>

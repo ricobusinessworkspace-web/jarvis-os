@@ -48,9 +48,9 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
   };
 
   return (
-    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm space-y-4 h-full flex flex-col min-h-[350px]">
-      <div className="flex items-center justify-between border-b border-border/20 pb-3">
-        <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
+    <div className="crm-card h-full min-h-[350px]">
+      <div className="crm-header">
+        <h3 className="crm-title">
           <TrendingUp className="h-4 w-4 text-accent" /> Performance
         </h3>
       </div>

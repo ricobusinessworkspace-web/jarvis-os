@@ -163,8 +163,8 @@ export function UnifiedTaskClient({ initialTasks, initialContent, initialEvents 
   const drafts = contentItems.filter(i => i.status === 'draft');
 
   return (
-    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm h-full flex flex-col">
-      <div className="flex items-center justify-between mb-4">
+    <div className="crm-card h-full">
+      <div className="flex items-center justify-between mb-2">
         <div className="bg-elevated border border-border/50 p-1 rounded-xl flex items-center w-full max-w-sm mx-auto shadow-sm relative">
           <div 
             className="absolute inset-y-1 bg-background shadow rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
