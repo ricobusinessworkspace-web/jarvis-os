@@ -44,35 +44,6 @@ export class PerformanceService {
       return acc;
     }, {} as Record<string, number>);
 
-    // 3. Net Worth
-    const kpis = await prisma.kPI.findMany({
-      where: { 
-        name: 'Net Worth',
-        trackedAt: { gte: cutoffDate }
-      }
-    });
-    const netWorthMap = kpis.reduce((acc, kpi) => {
-      const d = getBerlinDateStr(kpi.trackedAt);
-      acc[d] = kpi.value;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // 4. CRM Calls
-    const crmCallsRaw = await prisma.$queryRaw<Array<{day: any, count: number}>>`
-      SELECT DATE(to_timestamp(created_at_ms/1000)) as day, COUNT(*)::int as count 
-      FROM crm_events 
-      WHERE type='call' AND created_at_ms >= ${cutoffMs} 
-      GROUP BY day ORDER BY day
-    `;
-    const crmMap = crmCallsRaw.reduce((acc, row) => {
-      const d = new Date(row.day);
-      if (!isNaN(d.getTime())) {
-        const dStr = getBerlinDateStr(d);
-        acc[dStr] = row.count;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
     // Merge data
     const data = dateRangeStr.map(date => {
       const completedCount = routineMap[date] || 0;
@@ -81,9 +52,7 @@ export class PerformanceService {
       return {
         date,
         routinePercent: Math.round(routinePercent),
-        sleepHours: sleepMap[date] || 0,
-        netWorth: netWorthMap[date] || null,
-        crmCalls: crmMap[date] || 0
+        sleepHours: sleepMap[date] || 0
       };
     });
 

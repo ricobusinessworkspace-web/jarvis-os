@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -9,15 +9,11 @@ interface PerformanceData {
   date: string;
   routinePercent: number;
   sleepHours: number;
-  netWorth: number | null;
-  crmCalls: number;
 }
 
 export function PerformanceGraphClient({ initialData }: { initialData: PerformanceData[] }) {
   const [showRoutine, setShowRoutine] = useState(true);
   const [showSleep, setShowSleep] = useState(true);
-  const [showNetWorth, setShowNetWorth] = useState(false);
-  const [showCRM, setShowCRM] = useState(false);
 
   // Format date to DD.MM
   const data = initialData.map(item => {
@@ -35,7 +31,6 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
             let unit = '';
             if (entry.name === 'Routine') unit = '%';
             if (entry.name === 'Schlaf') unit = 'h';
-            if (entry.name === 'Net Worth') unit = '€'; // Or $ depending on user context, omitting for now
             return (
               <div key={index} className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
@@ -74,18 +69,6 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
         >
           Schlaf
         </button>
-        <button 
-          onClick={() => setShowNetWorth(!showNetWorth)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showNetWorth ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-overlay text-muted border border-border/50'}`}
-        >
-          Net Worth
-        </button>
-        <button 
-          onClick={() => setShowCRM(!showCRM)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showCRM ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-overlay text-muted border border-border/50'}`}
-        >
-          CRM
-        </button>
       </div>
 
       <div className="flex-1 w-full h-full min-h-[200px]">
@@ -121,32 +104,6 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
                 name="Schlaf" 
                 stroke="#a855f7" 
                 fill="none" 
-                strokeWidth={2}
-                isAnimationActive={true}
-              />
-            )}
-            
-            {showNetWorth && (
-              <Area 
-                type="monotone" 
-                dataKey="netWorth" 
-                name="Net Worth" 
-                stroke="#10b981" 
-                fill="none"
-                strokeWidth={2}
-                isAnimationActive={true}
-                connectNulls
-              />
-            )}
-            
-            {showCRM && (
-              <Area 
-                type="step" 
-                dataKey="crmCalls" 
-                name="CRM" 
-                stroke="#3b82f6" 
-                fill="#3b82f6" 
-                fillOpacity={0.2}
                 strokeWidth={2}
                 isAnimationActive={true}
               />
