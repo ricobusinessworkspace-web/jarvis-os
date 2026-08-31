@@ -20,20 +20,39 @@ export class PerformanceService {
     const cutoffMs = cutoffDate.getTime();
     const cutoffStr = getBerlinDateStr(cutoffDate);
 
-    // 1. Routine
+    // 1. Routine (Split into Morning and Evening)
+    const trackers = await prisma.tracker.findMany({
+      include: { _count: { select: { items: true } } }
+    });
+    
+    let totalMorning = 0;
+    let totalEvening = 0;
+    trackers.forEach(t => {
+      const tName = t.name.toLowerCase();
+      if (tName.includes('morgen')) totalMorning += t._count.items;
+      else if (tName.includes('abend')) totalEvening += t._count.items;
+    });
+
     const trackerLogs = await prisma.trackerLog.findMany({
       where: {
         date: { gte: cutoffDate },
         status: 'completed'
+      },
+      include: { item: { include: { tracker: true } } }
+    });
+    
+    const morningMap: Record<string, number> = {};
+    const eveningMap: Record<string, number> = {};
+    
+    trackerLogs.forEach(log => {
+      const d = getBerlinDateStr(log.date);
+      const tName = log.item.tracker.name.toLowerCase();
+      if (tName.includes('morgen')) {
+        morningMap[d] = (morningMap[d] || 0) + 1;
+      } else if (tName.includes('abend')) {
+        eveningMap[d] = (eveningMap[d] || 0) + 1;
       }
     });
-    const totalItemsCount = await prisma.trackerItem.count();
-    
-    const routineMap = trackerLogs.reduce((acc, log) => {
-      const d = getBerlinDateStr(log.date);
-      acc[d] = (acc[d] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
 
     // 2. Sleep Hours
     const personalLogs = await prisma.personalLog.findMany({
@@ -46,12 +65,16 @@ export class PerformanceService {
 
     // Merge data
     const data = dateRangeStr.map(date => {
-      const completedCount = routineMap[date] || 0;
-      const routinePercent = totalItemsCount > 0 ? (completedCount / totalItemsCount) * 100 : 0;
+      const mCount = morningMap[date] || 0;
+      const eCount = eveningMap[date] || 0;
+      
+      const morningPercent = totalMorning > 0 ? (mCount / totalMorning) * 100 : 0;
+      const eveningPercent = totalEvening > 0 ? (eCount / totalEvening) * 100 : 0;
       
       return {
         date,
-        routinePercent: Math.round(routinePercent),
+        morningPercent: Math.round(morningPercent),
+        eveningPercent: Math.round(eveningPercent),
         sleepHours: sleepMap[date] || 0
       };
     });

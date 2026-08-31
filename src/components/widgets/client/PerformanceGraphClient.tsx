@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip, CartesianGrid } from 'recharts';
 import { TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface PerformanceData {
   date: string;
-  routinePercent: number;
+  morningPercent: number;
+  eveningPercent: number;
   sleepHours: number;
 }
 
 export function PerformanceGraphClient({ initialData }: { initialData: PerformanceData[] }) {
-  const [showRoutine, setShowRoutine] = useState(true);
+  const [showMorning, setShowMorning] = useState(true);
+  const [showEvening, setShowEvening] = useState(true);
   const [showSleep, setShowSleep] = useState(true);
 
   // Format date to DD.MM
@@ -26,16 +28,16 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
     if (active && payload && payload.length) {
       return (
         <div className="bg-elevated/90 border border-border/50 rounded-xl p-3 shadow-xl backdrop-blur-md text-sm">
-          <p className="text-muted font-medium mb-2">{label}</p>
+          <p className="text-muted font-bold tracking-tight mb-2 text-[10px] uppercase">{label}</p>
           {payload.map((entry: any, index: number) => {
             let unit = '';
-            if (entry.name === 'Routine') unit = '%';
+            if (entry.name.includes('Routine')) unit = '%';
             if (entry.name === 'Schlaf') unit = 'h';
             return (
               <div key={index} className="flex items-center gap-2 mb-1">
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                <span className="text-foreground">{entry.name}:</span>
-                <span className="text-accent font-semibold">{entry.value}{unit}</span>
+                <span className="text-foreground text-xs font-medium">{entry.name}:</span>
+                <span className="text-accent text-xs font-black">{entry.value}{unit}</span>
               </div>
             );
           })}
@@ -46,32 +48,35 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
   };
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-elevated/30 border border-border/30 rounded-3xl p-5 shadow-sm flex flex-col h-full min-h-[350px]"
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="text-accent w-5 h-5" />
-        <h3 className="font-semibold text-foreground text-lg">Performance</h3>
+    <div className="bg-elevated/40 backdrop-blur-md border border-border/30 rounded-2xl p-5 shadow-sm space-y-4 h-full flex flex-col min-h-[350px]">
+      <div className="flex items-center justify-between border-b border-border/20 pb-3">
+        <h3 className="text-sm font-bold tracking-tight flex items-center gap-2.5">
+          <TrendingUp className="h-4 w-4 text-accent" /> Performance
+        </h3>
       </div>
       
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-2">
         <button 
-          onClick={() => setShowRoutine(!showRoutine)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showRoutine ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-overlay text-muted border border-border/50'}`}
+          onClick={() => setShowMorning(!showMorning)}
+          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${showMorning ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-overlay text-muted border border-border/50'}`}
         >
-          Routine
+          Morgenroutine
+        </button>
+        <button 
+          onClick={() => setShowEvening(!showEvening)}
+          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${showEvening ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-overlay text-muted border border-border/50'}`}
+        >
+          Abendroutine
         </button>
         <button 
           onClick={() => setShowSleep(!showSleep)}
-          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${showSleep ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-overlay text-muted border border-border/50'}`}
+          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-colors ${showSleep ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-overlay text-muted border border-border/50'}`}
         >
           Schlaf
         </button>
       </div>
 
-      <div className="flex-1 w-full h-full min-h-[200px]">
+      <div className="flex-1 w-full h-full min-h-[200px] mt-2">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -79,19 +84,32 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
               dataKey="formattedDate" 
               axisLine={false}
               tickLine={false}
-              tick={{ fill: '#888888', fontSize: 12 }}
+              tick={{ fill: '#888888', fontSize: 10, fontWeight: 600 }}
               dy={10}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
             
-            {showRoutine && (
+            {showMorning && (
               <Area 
                 type="monotone" 
-                dataKey="routinePercent" 
-                name="Routine" 
+                dataKey="morningPercent" 
+                name="Morgen-Routine" 
                 stroke="#f59e0b" 
                 fill="#f59e0b" 
-                fillOpacity={0.1}
+                fillOpacity={0.15}
+                strokeWidth={2}
+                isAnimationActive={true}
+              />
+            )}
+
+            {showEvening && (
+              <Area 
+                type="monotone" 
+                dataKey="eveningPercent" 
+                name="Abend-Routine" 
+                stroke="#3b82f6" 
+                fill="#3b82f6" 
+                fillOpacity={0.15}
                 strokeWidth={2}
                 isAnimationActive={true}
               />
@@ -111,6 +129,6 @@ export function PerformanceGraphClient({ initialData }: { initialData: Performan
           </AreaChart>
         </ResponsiveContainer>
       </div>
-    </motion.div>
+    </div>
   );
 }
