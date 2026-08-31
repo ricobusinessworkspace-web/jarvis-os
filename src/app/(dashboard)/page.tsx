@@ -1,4 +1,4 @@
-import DashboardLayoutClient from '@/components/dashboard/DashboardLayoutClient';
+
 import CalendarWidget from '@/components/widgets/CalendarWidget';
 import RoutineWidget from '@/components/widgets/RoutineWidget';
 import SleepWidget from '@/components/widgets/SleepWidget';
@@ -19,15 +19,39 @@ function SmallWidgetSkeleton() {
 }
 
 export default function DashboardPage() {
-  const widgets = {
-    routine: <Suspense fallback={<WidgetSkeleton />}><RoutineWidget /></Suspense>,
-    performance: <Suspense fallback={<WidgetSkeleton />}><PerformanceGraphWidget /></Suspense>,
-    avgsleep: <Suspense fallback={<SmallWidgetSkeleton />}><AvgSleepWidget /></Suspense>,
-    sleep: <Suspense fallback={<SmallWidgetSkeleton />}><SleepWidget /></Suspense>,
-    gtasks: <Suspense fallback={<SmallWidgetSkeleton />}><GoogleTasksWidget /></Suspense>,
-    calendar: <Suspense fallback={<SmallWidgetSkeleton />}><CalendarWidget /></Suspense>,
-    tasks: <Suspense fallback={<WidgetSkeleton />}><UnifiedTaskWidget /></Suspense>,
-  };
+  return (
+    <div className="flex flex-col pb-16 px-4 md:px-8 pt-6 max-w-7xl mx-auto w-full">
+      <h1 className="text-2xl font-semibold tracking-tight mb-6">Overview</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="col-span-1 min-h-[350px]">
+          <Suspense fallback={<WidgetSkeleton />}><RoutineWidget /></Suspense>
+        </div>
+        <div className="col-span-1 min-h-[350px]">
+          <Suspense fallback={<WidgetSkeleton />}><PerformanceGraphWidget /></Suspense>
+        </div>
+      </div>
 
-  return <DashboardLayoutClient widgets={widgets} />;
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="col-span-1 min-h-[350px]">
+          <Suspense fallback={<WidgetSkeleton />}><CalendarWidget /></Suspense>
+        </div>
+        <div className="col-span-1 min-h-[350px]">
+          <Suspense fallback={<WidgetSkeleton />}><UnifiedTaskWidget /></Suspense>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="col-span-1 h-full">
+          <Suspense fallback={<SmallWidgetSkeleton />}><AvgSleepWidget /></Suspense>
+        </div>
+        <div className="col-span-1 h-full">
+          <Suspense fallback={<SmallWidgetSkeleton />}><SleepWidget /></Suspense>
+        </div>
+        <div className="col-span-1 h-full">
+          <Suspense fallback={<SmallWidgetSkeleton />}><GoogleTasksWidget /></Suspense>
+        </div>
+      </div>
+    </div>
+  );
 }

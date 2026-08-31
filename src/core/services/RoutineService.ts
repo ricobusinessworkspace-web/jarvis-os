@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 export class RoutineService {
   static async getGProjectScore() {
@@ -20,7 +21,7 @@ export class RoutineService {
   static async getTodayRoutines() {
     try {
       const today = new Date();
-      const localTodayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const localTodayStr = getBerlinDateStr(today);
 
       const trackersRes = await this.getDashboardTrackers(today);
       if (trackersRes.error) throw new Error(trackersRes.error);
@@ -52,7 +53,7 @@ export class RoutineService {
   static async markRoutineCompleted(itemId: string) {
     try {
       const today = new Date();
-      const localTodayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const localTodayStr = getBerlinDateStr(today);
       return await this.logTrackerItem(itemId, 'completed', localTodayStr);
     } catch (err: any) {
       return { error: err.message };
@@ -81,7 +82,7 @@ export class RoutineService {
 
       currentDate.setDate(currentDate.getDate() - 1);
       while (true) {
-        const dateStr = new Date(currentDate.getTime() - currentDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        const dateStr = getBerlinDateStr(currentDate);
         const log = allLogs.find((l: any) => typeof l.date === 'string' ? l.date.startsWith(dateStr) : new Date(l.date).toISOString().startsWith(dateStr));
         
         if (!log || !log.wakeTime) break;
@@ -125,11 +126,12 @@ export class RoutineService {
 
   static async getPersonalLogs(today: Date) {
     try {
-      const todayStr = today.toISOString().split('T')[0];
+      const todayStr = getBerlinDateStr(today);
+      const cutoffStr = getBerlinDateStr(new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000));
       const personalLogs = await prisma.personalLog.findMany({
         where: {
           date: {
-            gte: new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            gte: cutoffStr
           }
         }
       });

@@ -1,10 +1,11 @@
 import { prisma } from '@/lib/prisma';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 export const DashboardService = {
   async fetchDashboardData() {
     try {
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
+      const todayStr = getBerlinDateStr(today);
 
       let trackers = await prisma.tracker.findMany({
         include: {

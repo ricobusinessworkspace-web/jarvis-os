@@ -1,29 +1,24 @@
 import { prisma } from '../db';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 export class PerformanceService {
   static async getPerformanceData(days: number = 14) {
     const today = new Date();
     
-    // Generate dates range
-    const dateRange = Array.from({ length: days }).map((_, i) => {
+    // Generate dates range based on Berlin time!
+    const dateRangeStr = Array.from({ length: days }).map((_, i) => {
       const d = new Date(today.getTime());
       d.setDate(d.getDate() - (days - 1 - i));
-      return d;
+      return getBerlinDateStr(d);
     });
-    
-    const formatDate = (date: Date) => {
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    };
-
-    const dateRangeStr = dateRange.map(formatDate);
 
     const cutoffDate = new Date(today.getTime());
     cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    // Start of the day for cutoffDate in UTC so we capture everything correctly
+    // Wait, since we store UTC dates, let's just use the cutoffDate as is.
     const cutoffMs = cutoffDate.getTime();
-    const cutoffStr = formatDate(cutoffDate);
+    const cutoffStr = getBerlinDateStr(cutoffDate);
 
     // 1. Routine
     const trackerLogs = await prisma.trackerLog.findMany({
@@ -35,7 +30,7 @@ export class PerformanceService {
     const totalItemsCount = await prisma.trackerItem.count();
     
     const routineMap = trackerLogs.reduce((acc, log) => {
-      const d = formatDate(log.date);
+      const d = getBerlinDateStr(log.date);
       acc[d] = (acc[d] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -57,7 +52,7 @@ export class PerformanceService {
       }
     });
     const netWorthMap = kpis.reduce((acc, kpi) => {
-      const d = formatDate(kpi.trackedAt);
+      const d = getBerlinDateStr(kpi.trackedAt);
       acc[d] = kpi.value;
       return acc;
     }, {} as Record<string, number>);
@@ -72,7 +67,7 @@ export class PerformanceService {
     const crmMap = crmCallsRaw.reduce((acc, row) => {
       const d = new Date(row.day);
       if (!isNaN(d.getTime())) {
-        const dStr = formatDate(d);
+        const dStr = getBerlinDateStr(d);
         acc[dStr] = row.count;
       }
       return acc;
