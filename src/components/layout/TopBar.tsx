@@ -6,6 +6,7 @@ import { Search, Bell, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import { useSidebar } from './SidebarContext';
+import { ClaudeExportButton } from '@/components/ui/ClaudeExportButton';
 
 function pageNameFromPath(pathname: string): string {
   if (pathname === '/') return 'Dashboard';
@@ -98,6 +99,8 @@ export default function TopBar() {
             ⌘K
           </kbd>
         </div>
+
+        <ClaudeExportButton />
 
         {/* Notification Bell */}
         <button
