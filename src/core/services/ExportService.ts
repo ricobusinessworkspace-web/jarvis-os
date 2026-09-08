@@ -49,7 +49,9 @@ export class ExportService {
       }
 
       lines.push('', '## 2. Vertrieb (aus dem CRM)');
-      if (!crm.error) {
+      if ('error' in crm) {
+        lines.push('- CRM gerade nicht erreichbar');
+      } else {
         lines.push(`- Leads gesamt: ${crm.totalLeads}`);
         lines.push(`- Calls heute / Woche: ${crm.todayCalls} / ${crm.weeklyCalls}`);
       }

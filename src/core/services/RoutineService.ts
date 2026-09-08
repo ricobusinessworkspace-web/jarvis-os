@@ -13,8 +13,8 @@ export class RoutineService {
           unpaid_weekly_debt: s.unpaid_weekly_debt,
         }))
       };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -26,14 +26,14 @@ export class RoutineService {
       const trackersRes = await this.getDashboardTrackers(today);
       if (trackersRes.error) throw new Error(trackersRes.error);
 
-      const routines: any[] = [];
-      trackersRes.trackers?.forEach((tracker: any) => {
-        tracker.items.forEach((item: any) => {
+      const routines: Array<{ id: string; name: string; category: string; status: string }> = [];
+      trackersRes.trackers?.forEach(tracker => {
+        tracker.items.forEach(item => {
           // Find log for today matching the UTC date string
-          const todayLog = item.logs.find((l: any) => {
-            const lDate = typeof l.date === 'string' ? l.date.split('T')[0] : new Date(l.date).toISOString().split('T')[0];
-            return lDate === localTodayStr;
-          });
+          // Logs liegen als UTC-Mitternacht des jeweiligen Kalendertags vor.
+          const todayLog = item.logs.find(
+            l => l.date.toISOString().slice(0, 10) === localTodayStr
+          );
 
           routines.push({
             id: item.id,
@@ -45,8 +45,8 @@ export class RoutineService {
       });
 
       return { routines };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -55,8 +55,8 @@ export class RoutineService {
       const today = new Date();
       const localTodayStr = getBerlinDateStr(today);
       return await this.logTrackerItem(itemId, 'completed', localTodayStr);
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -83,7 +83,7 @@ export class RoutineService {
       currentDate.setDate(currentDate.getDate() - 1);
       while (true) {
         const dateStr = getBerlinDateStr(currentDate);
-        const log = allLogs.find((l: any) => typeof l.date === 'string' ? l.date.startsWith(dateStr) : new Date(l.date).toISOString().startsWith(dateStr));
+        const log = allLogs.find(l => String(l.date).startsWith(dateStr));
         
         if (!log || !log.wakeTime) break;
         
@@ -95,8 +95,8 @@ export class RoutineService {
       }
 
       return { todaySleep: todayLog, streak };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -117,6 +117,7 @@ export class RoutineService {
     const order = ['morgen', 'abend'];
     return trackers
       .map(tracker => ({
+        trackerId: tracker.id,
         name: tracker.name,
         kind: tracker.name.toLowerCase().includes('morgen') ? ('morning' as const) : ('evening' as const),
         items: tracker.items.map(item => ({
@@ -147,8 +148,8 @@ export class RoutineService {
         }
       });
       return { trackers };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -174,12 +175,18 @@ export class RoutineService {
         personalLogs.push(todayLog);
       }
       return { personalLogs, todayLog };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
-  static async savePersonalLog(data: any) {
+  static async savePersonalLog(data: {
+    date: string;
+    sleepHours?: number;
+    bedTime?: string | null;
+    wakeTime?: string | null;
+    [key: string]: unknown;
+  }) {
     try {
       const { date, ...rest } = data;
       
@@ -210,8 +217,8 @@ export class RoutineService {
       });
   
       return { success: true, data: updated };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -224,17 +231,17 @@ export class RoutineService {
         create: { itemId, date, status, completedAt: status === 'completed' ? new Date() : null }
       });
       return { success: true, data: log };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
     }
   }
 
-  static async updateTrackerItem(id: string, data: any) {
+  static async updateTrackerItem(id: string, data: { title?: string; icon?: string | null; order?: number }) {
     try {
       const updated = await prisma.trackerItem.update({ where: { id }, data });
       return { success: true, data: updated };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
     }
   }
 }

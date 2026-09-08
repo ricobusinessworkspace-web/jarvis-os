@@ -60,69 +60,125 @@ interface ResolvedSource {
   priority: number;
 }
 
-interface PersonalLogRow {
-  date: string;
-  sleep_hours: number | null;
-  nutrition_calories: number | null;
-  nutrition_water: number | null;
-  workout_completed: boolean | null;
-}
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/**
+ * Der Semantic Layer ist winzig (unter 30 Zeilen) und ändert sich nur, wenn
+ * du ein Soll bearbeitest. Ihn bei jedem Seitenaufruf dreimal abzufragen
+ * kostet über den Pooler mehr als der ganze Rest — also kurz cachen.
+ */
+type SemanticConfig = {
+  definitions: Awaited<ReturnType<typeof prisma.coreMetricDefinition.findMany>>;
+  sources: Awaited<ReturnType<typeof prisma.coreMetricSource.findMany>>;
+  intentions: Awaited<ReturnType<typeof prisma.coreIntention.findMany>>;
+};
+
+let configCache: { at: number; value: SemanticConfig } | null = null;
+const CONFIG_TTL_MS = 30_000;
+
+/** Nach jeder Änderung an Metriken, Quellen oder Soll-Werten aufrufen. */
+export function invalidateSemanticConfig() {
+  configCache = null;
+}
+
+async function loadSemanticConfig(): Promise<SemanticConfig> {
+  if (configCache && Date.now() - configCache.at < CONFIG_TTL_MS) return configCache.value;
+
+  const definitions = await prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } });
+  const sources = await prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } });
+  const intentions = await prisma.coreIntention.findMany();
+
+  const value = { definitions, sources, intentions };
+  configCache = { at: Date.now(), value };
+  return value;
+}
+
+/**
+ * Fremde Tabellen (`crm_*`) gehören einer anderen Anwendung. Fällt sie aus
+ * oder ändert ihr Schema, darf das Dashboard nicht mit einer leeren Seite
+ * antworten — die Metrik steht dann eben auf „nicht gemessen".
+ */
+async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    console.error(`[AnalyticsService] Quelle "${label}" nicht verfügbar:`, error);
+    return fallback;
+  }
+}
 
 const DEFAULT_LOOKBACK_DAYS = 45;
 
 export class AnalyticsService {
   // ── Rohdaten pro Quellenart, jeweils in einer Abfrage über den ganzen Zeitraum ──
 
-  private static async loadCrmCalls(from: string, to: string, userName: string): Promise<Map<string, number>> {
-    // Großzügige ms-Grenzen, das Bucketing macht Postgres in Berliner Zeit.
+  /**
+   * Alle Tageswerte in **einer** Abfrage.
+   *
+   * Prisma packt über den pgbouncer jede Abfrage in BEGIN/DEALLOCATE/COMMIT —
+   * vier Round-Trips pro Aufruf. Fünf getrennte Quellabfragen kosteten damit
+   * mehr als eine Sekunde, obwohl die Daten winzig sind. Ein UNION ALL mit
+   * Kennzeichnungsspalte macht daraus einen Round-Trip.
+   */
+  private static async loadAllRows(from: string, to: string) {
+    const fromTs = `${from}T00:00:00.000Z`;
+    const toTs = `${to}T23:59:59.999Z`;
     const fromMs = Date.parse(`${from}T00:00:00.000Z`) - 2 * 86400000;
     const toMs = Date.parse(`${to}T00:00:00.000Z`) + 3 * 86400000;
 
-    const rows = await prisma.$queryRaw<Array<{ d: string; c: number }>>`
-      SELECT to_char(to_timestamp(ts / 1000.0) AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD') AS d,
-             COUNT(*)::int AS c
-      FROM crm_calls
-      WHERE by_user_name = ${userName}
-        AND ts >= ${fromMs} AND ts < ${toMs}
-      GROUP BY 1
-    `;
-    return new Map(rows.map(r => [r.d, Number(r.c)]));
-  }
+    return prisma.$queryRaw<
+      Array<{ kind: string; k1: string; k2: string; d: string; value: number }>
+    >`
+      SELECT 'crm_calls' AS kind, by_user_name AS k1, '' AS k2,
+             to_char(to_timestamp(ts / 1000.0) AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD') AS d,
+             COUNT(*)::float8 AS value
+        FROM crm_calls
+       WHERE ts >= ${fromMs} AND ts < ${toMs} AND by_user_name IS NOT NULL
+       GROUP BY 1, 2, 3, 4
 
-  private static async loadTrackerLogs(from: string, to: string) {
-    return prisma.$queryRaw<Array<{ tracker: string; item: string; d: string; status: string }>>`
-      SELECT t.name AS tracker,
-             i.title AS item,
-             to_char(l.date, 'YYYY-MM-DD') AS d,
-             l.status AS status
-      FROM jarvis_tracker_logs l
-      JOIN jarvis_tracker_items i ON i.id = l.item_id
-      JOIN jarvis_trackers      t ON t.id = i.tracker_id
-      WHERE l.date >= ${`${from}T00:00:00.000Z`}::timestamp
-        AND l.date <= ${`${to}T23:59:59.999Z`}::timestamp
-    `;
-  }
+      UNION ALL
+      SELECT 'tracker', t.name, i.title,
+             to_char(l.date, 'YYYY-MM-DD'),
+             (l.status = 'completed')::int::float8
+        FROM jarvis_tracker_logs l
+        JOIN jarvis_tracker_items i ON i.id = l.item_id
+        JOIN jarvis_trackers      t ON t.id = i.tracker_id
+       WHERE l.date >= ${fromTs}::timestamp AND l.date <= ${toTs}::timestamp
+         AND l.status <> 'skipped'
 
-  private static async loadPersonalLogs(from: string, to: string) {
-    return prisma.$queryRaw<PersonalLogRow[]>`
-      SELECT date, sleep_hours, nutrition_calories, nutrition_water, workout_completed
-      FROM jarvis_personal_logs
-      WHERE date >= ${from} AND date <= ${to}
-    `;
-  }
+      UNION ALL
+      SELECT 'personal_log', 'sleep_hours', '', date, sleep_hours::float8
+        FROM jarvis_personal_logs
+       WHERE date >= ${from} AND date <= ${to} AND coalesce(sleep_hours, 0) <> 0
 
-  private static async loadWeight(from: string, to: string): Promise<Map<string, number>> {
-    const rows = await prisma.$queryRaw<Array<{ d: string; w: number }>>`
-      SELECT to_char(date, 'YYYY-MM-DD') AS d, weight AS w
-      FROM jarvis_weight_entries
-      WHERE date >= ${`${from}T00:00:00.000Z`}::timestamp
-        AND date <= ${`${to}T23:59:59.999Z`}::timestamp
-      ORDER BY date ASC
+      UNION ALL
+      SELECT 'personal_log', 'nutrition_calories', '', date, nutrition_calories::float8
+        FROM jarvis_personal_logs
+       WHERE date >= ${from} AND date <= ${to} AND coalesce(nutrition_calories, 0) <> 0
+
+      UNION ALL
+      SELECT 'personal_log', 'workout_completed', '', date, workout_completed::int::float8
+        FROM jarvis_personal_logs
+       WHERE date >= ${from} AND date <= ${to} AND workout_completed IS TRUE
+
+      UNION ALL
+      -- DISTINCT ON in der Unterabfrage: mehrere Wiegungen am Tag, die letzte gilt.
+      -- (ORDER BY darf in einem UNION-Zweig nicht direkt stehen.)
+      SELECT 'weight', '', '', w.d, w.value
+        FROM (
+          SELECT DISTINCT ON (to_char(date, 'YYYY-MM-DD'))
+                 to_char(date, 'YYYY-MM-DD') AS d, weight::float8 AS value
+            FROM jarvis_weight_entries
+           WHERE date >= ${fromTs}::timestamp AND date <= ${toTs}::timestamp
+           ORDER BY to_char(date, 'YYYY-MM-DD'), date DESC
+        ) w
+
+      UNION ALL
+      SELECT 'health', metric_key, '', to_char(date, 'YYYY-MM-DD'), value::float8
+        FROM ingest_health_daily
+       WHERE date >= ${from}::date AND date <= ${to}::date
     `;
-    // Mehrere Wiegungen am Tag: die letzte gilt.
-    return new Map(rows.map(r => [r.d, Number(r.w)]));
   }
 
   /**
@@ -136,7 +192,6 @@ export class AnalyticsService {
     sources: ResolvedSource[]
   ): Promise<Map<string, DayValues>> {
     const byKind = new Map<string, DayValues>();
-    const kinds = new Set(sources.map(s => s.kind));
     const put = (kind: string, metricKey: string, date: string, value: number) => {
       if (!byKind.has(kind)) byKind.set(kind, new Map());
       const perMetric = byKind.get(kind)!;
@@ -144,88 +199,80 @@ export class AnalyticsService {
       perMetric.get(metricKey)!.set(date, value);
     };
 
-    if (kinds.has('crm_calls')) {
-      const today = getBerlinDateStr();
-      for (const s of sources.filter(x => x.kind === 'crm_calls')) {
-        const userName = str(s.config.userName);
-        if (!userName) continue;
-        const calls = await this.loadCrmCalls(from, to, userName);
-        for (const [d, v] of calls) put('crm_calls', s.metricKey, d, v);
+    // Eine Abfrage für alles. Schlägt sie fehl — etwa weil das fremde CRM
+    // gerade nicht da ist —, stehen die Metriken auf „nicht gemessen", statt
+    // dass die Seite kippt.
+    const rows = await safe('Sammelabfrage', () => this.loadAllRows(from, to), []);
 
-        // Eine lückenlose Quelle vergisst nicht: das CRM protokolliert jeden
-        // Anruf, also heißt „keine Zeile" hier wirklich null Anrufe und nicht
-        // „nicht gemessen". Gilt auch für heute — „0 von 60" ist die nützliche
-        // Aussage, „–" würde nach kaputter Anbindung aussehen. Nur künftige
-        // Tage bleiben offen.
-        if (s.config.impliesZero === true) {
-          for (const d of dateRange(from, to)) {
-            if (d > today || isOffDay(d)) continue;
-            if (!calls.has(d)) put('crm_calls', s.metricKey, d, 0);
+    for (const s of sources) {
+      switch (s.kind) {
+        case 'crm_calls': {
+          const userName = str(s.config.userName);
+          if (!userName) break;
+          const seen = new Set<string>();
+          for (const r of rows) {
+            if (r.kind !== 'crm_calls' || r.k1 !== userName) continue;
+            put('crm_calls', s.metricKey, r.d, Number(r.value));
+            seen.add(r.d);
           }
-        }
-      }
-    }
-
-    if (kinds.has('tracker')) {
-      const logs = await this.loadTrackerLogs(from, to);
-      for (const s of sources.filter(x => x.kind === 'tracker')) {
-        const wantTracker = str(s.config.tracker).toLowerCase();
-        const wantItem = str(s.config.item).toLowerCase();
-        // Ohne `item` zählt die Quelle die erledigten Schritte des Trackers
-        // (Morgen-/Abendroutine); mit `item` ist sie ein einzelner Haken.
-        const counting = !wantItem;
-        const tally = new Map<string, number>();
-
-        for (const log of logs) {
-          if (wantTracker && log.tracker.toLowerCase() !== wantTracker) continue;
-          if (wantItem && log.item.toLowerCase() !== wantItem) continue;
-          if (log.status === 'skipped') continue; // bewusst übersprungen ≠ gemessen
-          const done = log.status === 'completed' ? 1 : 0;
-          if (counting) tally.set(log.d, (tally.get(log.d) ?? 0) + done);
-          else put('tracker', s.metricKey, log.d, done);
+          // Eine lückenlose Quelle vergisst nicht: das CRM protokolliert jeden
+          // Anruf, also heißt „keine Zeile" wirklich null Anrufe und nicht
+          // „nicht gemessen". Nur künftige Tage bleiben offen.
+          if (s.config.impliesZero === true && rows.length > 0) {
+            const today = getBerlinDateStr();
+            for (const d of dateRange(from, to)) {
+              if (d > today || isOffDay(d) || seen.has(d)) continue;
+              put('crm_calls', s.metricKey, d, 0);
+            }
+          }
+          break;
         }
 
-        for (const [d, v] of tally) put('tracker', s.metricKey, d, v);
-      }
-    }
+        case 'tracker': {
+          const wantTracker = str(s.config.tracker).toLowerCase();
+          const wantItem = str(s.config.item).toLowerCase();
+          // Ohne `item` zählt die Quelle die erledigten Schritte des Trackers
+          // (Morgen-/Abendroutine); mit `item` ist sie ein einzelner Haken.
+          const counting = !wantItem;
+          const tally = new Map<string, number>();
 
-    if (kinds.has('personal_log')) {
-      const logs = await this.loadPersonalLogs(from, to);
-      for (const s of sources.filter(x => x.kind === 'personal_log')) {
-        const field = str(s.config.field) as keyof PersonalLogRow;
-        // Die App legt Tageszeilen mit Default 0 an — 0 heißt hier „nicht ausgefüllt".
-        const zeroIsNull = s.config.zeroIsNull !== false;
-        for (const row of logs) {
-          const raw = row[field];
-          if (raw === null || raw === undefined) continue;
-          const value = typeof raw === 'boolean' ? (raw ? 1 : 0) : Number(raw);
-          if (Number.isNaN(value)) continue;
-          if (zeroIsNull && value === 0) continue;
-          put('personal_log', s.metricKey, row.date, value);
+          for (const r of rows) {
+            if (r.kind !== 'tracker') continue;
+            if (wantTracker && r.k1.toLowerCase() !== wantTracker) continue;
+            if (wantItem && r.k2.toLowerCase() !== wantItem) continue;
+            if (counting) tally.set(r.d, (tally.get(r.d) ?? 0) + Number(r.value));
+            else put('tracker', s.metricKey, r.d, Number(r.value));
+          }
+          for (const [d, v] of tally) put('tracker', s.metricKey, d, v);
+          break;
         }
-      }
-    }
 
-    if (kinds.has('health')) {
-      const rows = await prisma.$queryRaw<Array<{ d: string; metric_key: string; value: number }>>`
-        SELECT to_char(date, 'YYYY-MM-DD') AS d, metric_key, value
-        FROM ingest_health_daily
-        WHERE date >= ${from}::date AND date <= ${to}::date
-      `;
-      for (const s of sources.filter(x => x.kind === 'health')) {
-        // Ohne `metric` im Config zieht die Quelle ihren eigenen Metrik-Key.
-        const wanted = str(s.config.metric) || s.metricKey;
-        for (const row of rows) {
-          if (row.metric_key !== wanted) continue;
-          put('health', s.metricKey, row.d, Number(row.value));
+        case 'personal_log': {
+          const field = str(s.config.field);
+          for (const r of rows) {
+            if (r.kind !== 'personal_log' || r.k1 !== field) continue;
+            put('personal_log', s.metricKey, r.d, Number(r.value));
+          }
+          break;
         }
-      }
-    }
 
-    if (kinds.has('weight')) {
-      const weights = await this.loadWeight(from, to);
-      for (const s of sources.filter(x => x.kind === 'weight')) {
-        for (const [d, v] of weights) put('weight', s.metricKey, d, v);
+        case 'weight':
+          for (const r of rows) {
+            if (r.kind !== 'weight') continue;
+            put('weight', s.metricKey, r.d, Number(r.value)); // spätere Wiegung gewinnt
+          }
+          break;
+
+        case 'health': {
+          const wanted = str(s.config.metric) || s.metricKey;
+          for (const r of rows) {
+            if (r.kind !== 'health' || r.k1 !== wanted) continue;
+            put('health', s.metricKey, r.d, Number(r.value));
+          }
+          break;
+        }
+
+        // reminders und gproject liefern noch nichts — bewusst kein Platzhalter.
       }
     }
 
@@ -257,26 +304,24 @@ export class AnalyticsService {
    */
   static async getMatrix(from: string, to: string, metricKeys?: string[]): Promise<MetricMatrix> {
     // Sequenziell — siehe Kommentar in app/(dashboard)/page.tsx: eine Verbindung.
-    // Sequenziell statt Promise.all: der Supabase-Pooler gibt pro Instanz genau
-    // eine Verbindung (connection_limit=1). Parallele Abfragen konkurrieren um
-    // sie und laufen in den Pool-Timeout.
-    const definitions = await prisma.coreMetricDefinition.findMany({
-      where: { isActive: true, ...(metricKeys?.length ? { key: { in: metricKeys } } : {}) },
-      orderBy: { sortOrder: 'asc' },
-    });
+    // Aus dem Cache; gefiltert wird im Speicher, die Tabellen sind winzig.
+    const config = await loadSemanticConfig();
 
-    const sources = await prisma.coreMetricSource.findMany({
-      where: { isActive: true, ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}) },
-      orderBy: { priority: 'asc' },
-    });
-
-    const intentions = await prisma.coreIntention.findMany({
-      where: {
-        ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}),
-        validFrom: { lte: new Date(`${to}T00:00:00.000Z`) },
-        OR: [{ validTo: null }, { validTo: { gte: new Date(`${from}T00:00:00.000Z`) } }],
-      },
-    });
+    const wanted = metricKeys?.length ? new Set(metricKeys) : null;
+    const definitions = config.definitions.filter(
+      d => d.isActive && (!wanted || wanted.has(d.key))
+    );
+    const sources = config.sources.filter(
+      s => s.isActive && (!wanted || wanted.has(s.metricKey))
+    );
+    const toDate = new Date(`${to}T00:00:00.000Z`);
+    const fromDate = new Date(`${from}T00:00:00.000Z`);
+    const intentions = config.intentions.filter(
+      i =>
+        (!wanted || wanted.has(i.metricKey)) &&
+        i.validFrom <= toDate &&
+        (i.validTo === null || i.validTo >= fromDate)
+    );
 
     const keys = definitions.map(d => d.key);
     const relevantSources: ResolvedSource[] = sources

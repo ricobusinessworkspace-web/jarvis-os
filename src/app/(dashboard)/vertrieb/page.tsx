@@ -110,10 +110,19 @@ async function Vertrieb() {
             <h3 className="crm-title">Pipeline</h3>
             <span className="text-[10px] uppercase tracking-wider text-muted">crm_leads.stage</span>
           </div>
-          <Funnel stages={pipeline.stages} />
-          <p className="mt-4 border-t border-border/40 pt-3 text-[11px] text-muted">
-            Kaltkartei liegt außerhalb der Pipeline. {pipeline.mine} Leads sind dir zugewiesen.
-          </p>
+          {pipeline.stages.length > 0 ? (
+            <>
+              <Funnel stages={pipeline.stages} />
+              <p className="mt-4 border-t border-border/40 pt-3 text-[11px] text-muted">
+                Kaltkartei liegt außerhalb der Pipeline. {pipeline.mine} Leads sind dir zugewiesen.
+              </p>
+            </>
+          ) : (
+            <p className="text-[13px] leading-relaxed text-muted">
+              Das CRM ist gerade nicht erreichbar. Die Stufen erscheinen wieder, sobald es
+              antwortet — hier steht bewusst keine veraltete Zahl.
+            </p>
+          )}
         </div>
 
         <div className="crm-card">

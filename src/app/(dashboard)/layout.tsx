@@ -6,7 +6,7 @@ import { DashboardShell } from '@/components/layout/DashboardShell';
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const result = await DashboardService.fetchDashboardData();
-  const initialData = result.success ? result.data : {};
+  const initialData = (result.success && result.data) || {};
 
   return (
     <StoreHydrator initialData={initialData}>

@@ -35,13 +35,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const handleLaunchCRM = async () => {
-    try {
-      alert('CRM Launch not supported in Cloud Mode (Web App). Please open the CRM directly.');
-    } catch (e) {
-      console.error('[Sidebar] Failed to launch CRM:', e);
-    }
-  };
 
   return (
     <>

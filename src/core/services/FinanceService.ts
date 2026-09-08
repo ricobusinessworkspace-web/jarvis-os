@@ -40,8 +40,8 @@ export class FinanceService {
       }));
 
       return { history, current, buckets, pipeline };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 }

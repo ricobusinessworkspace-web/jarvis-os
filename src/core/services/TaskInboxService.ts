@@ -38,17 +38,36 @@ interface RawTask {
   subtasks?: Array<{ id?: number | string; text?: string; done?: boolean }>;
 }
 
+/** Name → UUID ändert sich praktisch nie, also einmal pro Instanz nachschlagen. */
+const userIdCache = new Map<string, string | null>();
+
 export class TaskInboxService {
   /** UUID des Nutzers aus dem CRM-Profil — über den Namen, nicht hart verdrahtet. */
   private static async userId(name: string): Promise<string | null> {
+    if (userIdCache.has(name)) return userIdCache.get(name) ?? null;
     const rows = await prisma.$queryRaw<Array<{ id: string }>>`
       SELECT id::text AS id FROM user_profiles WHERE name = ${name} LIMIT 1
     `;
-    return rows[0]?.id ?? null;
+    const id = rows[0]?.id ?? null;
+    userIdCache.set(name, id);
+    return id;
   }
 
-  /** Offene Aufgaben an den eigenen Leads, fälligste zuerst. */
+  /**
+   * Offene Aufgaben an den eigenen Leads, fälligste zuerst.
+   * Fällt das CRM aus, bleibt die Spalte leer statt die Seite zu kippen —
+   * es ist eine fremde Anwendung, auf die wir nur lesend zugreifen.
+   */
   static async getCrmTasks(userName = 'Rico', limit = 20): Promise<CrmTaskItem[]> {
+    try {
+      return await this.loadCrmTasks(userName, limit);
+    } catch (error) {
+      console.error('[TaskInboxService] CRM nicht verfügbar:', error);
+      return [];
+    }
+  }
+
+  private static async loadCrmTasks(userName: string, limit: number): Promise<CrmTaskItem[]> {
     const uid = await this.userId(userName);
     if (!uid) return [];
 
@@ -110,30 +129,43 @@ export class TaskInboxService {
     connected: boolean;
     syncedAt: Date | null;
   }> {
-    const status = await prisma.ingestStatus.findUnique({ where: { source: 'reminders' } });
-    const rows = await prisma.ingestReminder.findMany({
-      where: {
-        completed: false,
-        // Heute fällig oder überfällig; Erinnerungen ohne Datum immer zeigen.
-        OR: [{ dueDate: { lte: today } }, { dueDate: null }],
-      },
-      orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
-      take: 20,
-    });
+    // Status und Liste in einem Round-Trip — jede Prisma-Abfrage kostet über
+    // den pgbouncer mehrere hundert Millisekunden.
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string | null; title: string | null; list_name: string | null;
+        due_at: Date | null; due_date: string | null; synced_at: Date | null;
+      }>
+    >`
+      SELECT r.id, r.title, r.list_name, r.due_at, r.due_date, s.synced_at
+        FROM ingest_status s
+        LEFT JOIN ingest_reminders r
+               ON r.completed = FALSE
+              AND (r.due_date IS NULL OR r.due_date <= ${today})
+       WHERE s.source = 'reminders'
+       ORDER BY r.due_date ASC NULLS LAST, r.priority DESC
+       LIMIT 20
+    `;
+
+    const status = rows.length > 0 ? { syncedAt: rows[0].synced_at } : null;
 
     return {
       connected: status !== null,
       syncedAt: status?.syncedAt ?? null,
-      items: rows.map(r => ({
-        id: r.id,
-        title: r.title,
-        listName: r.listName,
-        dueDate: r.dueDate,
-        dueTime: r.dueAt
-          ? r.dueAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
-          : null,
-        overdue: r.dueDate !== null && r.dueDate < today,
-      })),
+      // Der LEFT JOIN liefert eine Zeile ohne Erinnerung, wenn der Kurzbefehl
+      // zwar lief, aber nichts offen ist — die wird hier herausgefiltert.
+      items: rows
+        .filter(r => r.id !== null)
+        .map(r => ({
+          id: r.id!,
+          title: r.title ?? '',
+          listName: r.list_name ?? '',
+          dueDate: r.due_date,
+          dueTime: r.due_at
+            ? r.due_at.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
+            : null,
+          overdue: r.due_date !== null && r.due_date < today,
+        })),
     };
   }
 }

@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+/**
+ * Historischer Einstiegspunkt. Reicht bewusst denselben Client durch wie
+ * `@/lib/prisma` — zwei Clients teilen sich sonst eine Pooler-Verbindung.
+ */
+export { prisma } from '@/lib/prisma';

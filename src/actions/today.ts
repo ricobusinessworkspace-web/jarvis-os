@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidateTracking } from '@/lib/revalidate';
+import { invalidateSemanticConfig } from '@/core/services/AnalyticsService';
 
 /**
  * Hakt eine Ursache für einen Tag ab — oder wieder ab.
@@ -64,6 +65,8 @@ export async function updateIntention(metricKey: string, baseValue: number, stre
       where: { id: current.id },
       data: { baseValue, stretchValue },
     });
+
+    invalidateSemanticConfig(); // sonst gilt bis zu 30 s der alte Soll-Wert
 
     revalidateTracking();
     return { success: true };
