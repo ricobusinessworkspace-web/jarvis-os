@@ -22,10 +22,10 @@ async function Verlauf({ selected }: { selected: string }) {
   const from = selected < stripFrom ? selected : stripFrom;
   const to = selected > today ? selected : today;
 
-  const [matrix, routines] = await Promise.all([
-    AnalyticsService.getMatrix(from, to, [...URSACHEN, 'body.sleep_hours', 'body.weight', 'body.calories']),
-    RoutineService.getRoutineBlocks(selected),
+  const matrix = await AnalyticsService.getMatrix(from, to, [
+    ...URSACHEN, 'body.sleep_hours', 'body.weight', 'body.calories',
   ]);
+  const routines = await RoutineService.getRoutineBlocks(selected);
 
   const row = matrix[selected] ?? {};
   const data: DaySheetData = {

@@ -15,8 +15,8 @@ export class WeightService {
         take: 7
       });
       return { items };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 
@@ -29,8 +29,8 @@ export class WeightService {
         }
       });
       return { entry };
-    } catch (err: any) {
-      return { error: err.message };
+    } catch (err: unknown) {
+      return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
   }
 }

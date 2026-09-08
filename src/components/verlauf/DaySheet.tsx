@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { Check, Minus } from 'lucide-react';
 import { toggleCause } from '@/actions/today';
 import { saveDayValues, clearCause } from '@/actions/verlauf';
 import { logTrackerItem } from '@/actions/dashboard';
+import { NumberInput } from '@/components/today/NumberInput';
 import type { MetricState } from '@/core/services/AnalyticsService';
 import { cn } from '@/lib/utils';
 
@@ -87,35 +88,6 @@ function TriToggle({
   );
 }
 
-function NumberField({
-  value, unit, disabled, onSave,
-}: { value: number | null; unit: string; disabled?: boolean; onSave: (v: number | null) => void }) {
-  const [draft, setDraft] = useState(value === null ? '' : String(value).replace('.', ','));
-
-  const commit = () => {
-    const raw = draft.trim().replace(',', '.');
-    if (raw === '') return onSave(null);
-    const n = Number(raw);
-    if (!Number.isNaN(n)) onSave(n);
-  };
-
-  return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <input
-        value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-        disabled={disabled}
-        placeholder="–"
-        inputMode="decimal"
-        className="w-20 rounded-lg border border-border bg-background px-2.5 py-1.5 text-right font-mono text-[13px] tabular-nums outline-none focus:border-accent disabled:opacity-40"
-      />
-      <span className="w-6 font-mono text-[11px] text-muted">{unit}</span>
-    </div>
-  );
-}
-
 export function DaySheet({ data }: { data: DaySheetData }) {
   const [pending, startTransition] = useTransition();
   const d = data;
@@ -184,7 +156,7 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         </Field>
 
         <Field label="Schlaf">
-          <NumberField
+          <NumberInput
             value={d.sleepHours}
             unit="h"
             disabled={locked || pending}
@@ -193,7 +165,7 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         </Field>
 
         <Field label="Gewicht">
-          <NumberField
+          <NumberInput
             value={d.weight}
             unit="kg"
             disabled={locked || pending}

@@ -256,23 +256,27 @@ export class AnalyticsService {
    * Speist alle Kalender-, Aktivitäts- und Tagesansichten.
    */
   static async getMatrix(from: string, to: string, metricKeys?: string[]): Promise<MetricMatrix> {
-    const [definitions, sources, intentions] = await Promise.all([
-      prisma.coreMetricDefinition.findMany({
-        where: { isActive: true, ...(metricKeys?.length ? { key: { in: metricKeys } } : {}) },
-        orderBy: { sortOrder: 'asc' },
-      }),
-      prisma.coreMetricSource.findMany({
-        where: { isActive: true, ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}) },
-        orderBy: { priority: 'asc' },
-      }),
-      prisma.coreIntention.findMany({
-        where: {
-          ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}),
-          validFrom: { lte: new Date(`${to}T00:00:00.000Z`) },
-          OR: [{ validTo: null }, { validTo: { gte: new Date(`${from}T00:00:00.000Z`) } }],
-        },
-      }),
-    ]);
+    // Sequenziell — siehe Kommentar in app/(dashboard)/page.tsx: eine Verbindung.
+    // Sequenziell statt Promise.all: der Supabase-Pooler gibt pro Instanz genau
+    // eine Verbindung (connection_limit=1). Parallele Abfragen konkurrieren um
+    // sie und laufen in den Pool-Timeout.
+    const definitions = await prisma.coreMetricDefinition.findMany({
+      where: { isActive: true, ...(metricKeys?.length ? { key: { in: metricKeys } } : {}) },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const sources = await prisma.coreMetricSource.findMany({
+      where: { isActive: true, ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}) },
+      orderBy: { priority: 'asc' },
+    });
+
+    const intentions = await prisma.coreIntention.findMany({
+      where: {
+        ...(metricKeys?.length ? { metricKey: { in: metricKeys } } : {}),
+        validFrom: { lte: new Date(`${to}T00:00:00.000Z`) },
+        OR: [{ validTo: null }, { validTo: { gte: new Date(`${from}T00:00:00.000Z`) } }],
+      },
+    });
 
     const keys = definitions.map(d => d.key);
     const relevantSources: ResolvedSource[] = sources

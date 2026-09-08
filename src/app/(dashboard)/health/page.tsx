@@ -5,6 +5,7 @@ import { getBerlinDateStr } from '@/lib/dateUtils';
 import { blockInfo } from '@/lib/blocks';
 import { MetricCard } from '@/components/today/MetricCard';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
+import { BodyLogCard } from '@/components/today/BodyLogCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,12 +31,10 @@ async function Health() {
   const summaryFrom = block.beforeStart ? monthStart : block.blockStart;
   const from = summaryFrom < monthStart ? summaryFrom : monthStart;
 
-  const [matrix, lastWeight] = await Promise.all([
-    AnalyticsService.getMatrix(from, monthEnd, METRICS.map(m => m.key)),
-    // Ein Gewicht veraltet langsam — die letzte Wiegung gilt, auch wenn sie
-    // außerhalb des angezeigten Monats liegt.
-    WeightService.getLatest(),
-  ]);
+  const matrix = await AnalyticsService.getMatrix(from, monthEnd, METRICS.map(m => m.key));
+  // Ein Gewicht veraltet langsam — die letzte Wiegung gilt, auch wenn sie
+  // außerhalb des angezeigten Monats liegt.
+  const lastWeight = await WeightService.getLatest();
 
   const summaries = Object.fromEntries(
     METRICS.map(m => [m.key, AnalyticsService.summarize(matrix, m.key, summaryFrom, today)])
@@ -65,29 +64,16 @@ async function Health() {
           footRight={`Streak ${summaries['training.sessions']?.streak ?? 0}`}
         />
 
-        <MetricCard
-          title="Schlaf"
-          source="Tagebuch"
-          value={sleep?.value ?? null}
-          base={null}
-          stretch={null}
-          unit="hours"
-          state={sleep?.state ?? 'ungemessen'}
-          emptyHint={sleep?.value == null ? 'Für heute noch nichts eingetragen. Nachtragen geht im Verlauf.' : undefined}
-          footLeft="ohne Zielwert — wird erfasst, nicht bewertet"
-        />
-
-        <MetricCard
-          title="Gewicht"
-          source="Waage"
-          value={weight?.value ?? lastWeight?.value ?? null}
-          base={null}
-          stretch={null}
-          unit="kg"
-          state={weight?.value != null ? 'erfasst' : lastWeight ? 'erfasst' : 'ungemessen'}
-          emptyHint={!lastWeight ? 'Noch keine Wiegung erfasst.' : undefined}
-          footLeft={lastWeight && weight?.value == null ? `zuletzt am ${lastWeight.date.slice(8)}.${lastWeight.date.slice(5, 7)}.` : undefined}
-        />
+        <div className="md:col-span-2">
+          <BodyLogCard
+            date={today}
+            sleepHours={sleep?.value ?? null}
+            weight={weight?.value ?? null}
+            calories={matrix[today]?.['body.calories']?.value ?? null}
+            caloriesConnected={matrix[today]?.['body.calories']?.source === 'health'}
+            lastWeight={lastWeight}
+          />
+        </div>
       </div>
 
       <div className="mt-3">

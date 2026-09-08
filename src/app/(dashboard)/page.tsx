@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
+import { WeightService } from '@/core/services/WeightService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { blockInfo, BLOCK_WEEKS } from '@/lib/blocks';
 import { MetricCard } from '@/components/today/MetricCard';
@@ -9,6 +10,7 @@ import { CausesCard, type CauseRow } from '@/components/today/CausesCard';
 import { TaskInbox } from '@/components/today/TaskInbox';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { RoutineCard } from '@/components/today/RoutineCard';
+import { BodyLogCard } from '@/components/today/BodyLogCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,12 +38,14 @@ async function Today() {
   const summaryFrom = block.beforeStart ? monthStart : block.blockStart;
   const from = summaryFrom < monthStart ? summaryFrom : monthStart;
 
-  const [matrix, crmTasks, reminders, routines] = await Promise.all([
-    AnalyticsService.getMatrix(from, monthEnd),
-    TaskInboxService.getCrmTasks(),
-    TaskInboxService.getReminders(),
-    RoutineService.getRoutineBlocks(today),
-  ]);
+  // Nacheinander, nicht parallel: der Supabase-Pooler gibt pro Instanz genau
+  // eine Verbindung (connection_limit=1). Ein Promise.all lässt die Abfragen
+  // um diese eine Verbindung konkurrieren und in den Pool-Timeout laufen.
+  const matrix = await AnalyticsService.getMatrix(from, monthEnd);
+  const crmTasks = await TaskInboxService.getCrmTasks();
+  const reminders = await TaskInboxService.getReminders();
+  const routines = await RoutineService.getRoutineBlocks(today);
+  const lastWeight = await WeightService.getLatest();
 
   const summaries = Object.fromEntries(
     URSACHEN.map(m => [m.key, AnalyticsService.summarize(matrix, m.key, summaryFrom, today)])
@@ -108,15 +112,13 @@ async function Today() {
           footRight={callsWeek ? `${callsWeek.met}/${callsWeek.tracked} Tage im Block` : undefined}
         />
 
-        <MetricCard
-          title="Kalorien"
-          source="Health"
-          value={calories?.value ?? null}
-          base={calories?.base ?? null}
-          stretch={calories?.stretch ?? null}
-          unit="kcal"
-          state={calories?.state ?? 'ungemessen'}
-          emptyHint="Apple Health ist noch nicht angebunden. Sobald der iOS-Kurzbefehl läuft, landen die Kalorien aus Cronometer hier."
+        <BodyLogCard
+          date={today}
+          sleepHours={cell('body.sleep_hours')?.value ?? null}
+          weight={cell('body.weight')?.value ?? null}
+          calories={calories?.value ?? null}
+          caloriesConnected={calories?.source === 'health'}
+          lastWeight={lastWeight}
         />
 
         <CausesCard rows={causeRows} date={today} />

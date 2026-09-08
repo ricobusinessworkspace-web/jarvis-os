@@ -110,18 +110,16 @@ export class TaskInboxService {
     connected: boolean;
     syncedAt: Date | null;
   }> {
-    const [status, rows] = await Promise.all([
-      prisma.ingestStatus.findUnique({ where: { source: 'reminders' } }),
-      prisma.ingestReminder.findMany({
-        where: {
-          completed: false,
-          // Heute fällig oder überfällig; Erinnerungen ohne Datum immer zeigen.
-          OR: [{ dueDate: { lte: today } }, { dueDate: null }],
-        },
-        orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
-        take: 20,
-      }),
-    ]);
+    const status = await prisma.ingestStatus.findUnique({ where: { source: 'reminders' } });
+    const rows = await prisma.ingestReminder.findMany({
+      where: {
+        completed: false,
+        // Heute fällig oder überfällig; Erinnerungen ohne Datum immer zeigen.
+        OR: [{ dueDate: { lte: today } }, { dueDate: null }],
+      },
+      orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
+      take: 20,
+    });
 
     return {
       connected: status !== null,

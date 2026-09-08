@@ -49,10 +49,8 @@ async function Vertrieb() {
   const summaryFrom = block.beforeStart ? monthStart : block.blockStart;
   const from = summaryFrom < monthStart ? summaryFrom : monthStart;
 
-  const [matrix, pipeline] = await Promise.all([
-    AnalyticsService.getMatrix(from, monthEnd, [CALLS]),
-    CrmService.getPipeline(),
-  ]);
+  const matrix = await AnalyticsService.getMatrix(from, monthEnd, [CALLS]);
+  const pipeline = await CrmService.getPipeline();
 
   const cell = matrix[today]?.[CALLS];
   const summary = AnalyticsService.summarize(matrix, CALLS, summaryFrom, today);
