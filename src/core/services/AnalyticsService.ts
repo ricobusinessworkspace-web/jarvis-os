@@ -154,10 +154,12 @@ export class AnalyticsService {
 
         // Eine lückenlose Quelle vergisst nicht: das CRM protokolliert jeden
         // Anruf, also heißt „keine Zeile" hier wirklich null Anrufe und nicht
-        // „nicht gemessen". Nur für vergangene Tage — der heutige läuft noch.
+        // „nicht gemessen". Gilt auch für heute — „0 von 60" ist die nützliche
+        // Aussage, „–" würde nach kaputter Anbindung aussehen. Nur künftige
+        // Tage bleiben offen.
         if (s.config.impliesZero === true) {
           for (const d of dateRange(from, to)) {
-            if (d >= today || isOffDay(d)) continue;
+            if (d > today || isOffDay(d)) continue;
             if (!calls.has(d)) put('crm_calls', s.metricKey, d, 0);
           }
         }
