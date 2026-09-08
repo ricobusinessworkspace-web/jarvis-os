@@ -2,9 +2,9 @@ import { Square, Circle } from 'lucide-react';
 import type { CrmTaskItem } from '@/core/services/TaskInboxService';
 
 /**
- * Zwei Quellen, klar getrennt: Apple Notes links, die eigenen CRM-Leads
- * rechts. Sie werden bewusst nicht in eine Liste gemischt — die eine
- * bearbeitest du in Notizen, die andere im CRM.
+ * Zwei Quellen, klar getrennt: Apple Erinnerungen links, die eigenen
+ * CRM-Leads rechts. Sie werden bewusst nicht in eine Liste gemischt —
+ * die eine bearbeitest du in Erinnerungen, die andere im CRM.
  */
 
 function Column({ title, count, children }: { title: string; count: string; children: React.ReactNode }) {
@@ -19,7 +19,7 @@ function Column({ title, count, children }: { title: string; count: string; chil
   );
 }
 
-export function TaskInbox({ crmTasks, notesConnected }: { crmTasks: CrmTaskItem[]; notesConnected: boolean }) {
+export function TaskInbox({ crmTasks, remindersConnected }: { crmTasks: CrmTaskItem[]; remindersConnected: boolean }) {
   return (
     <div className="crm-card">
       <div className="crm-header">
@@ -28,10 +28,10 @@ export function TaskInbox({ crmTasks, notesConnected }: { crmTasks: CrmTaskItem[
 
       <div className="grid gap-5 md:grid-cols-2 md:gap-0">
         <div className="md:pr-6">
-          <Column title="Notizen" count={notesConnected ? '' : 'nicht verbunden'}>
-            {notesConnected ? null : (
+          <Column title="Erinnerungen" count={remindersConnected ? '' : 'nicht verbunden'}>
+            {remindersConnected ? null : (
               <p className="border-t border-border/40 py-3 text-[12.5px] leading-relaxed text-muted">
-                Apple Notes ist noch nicht angebunden. Die Aufgaben kommen über einen
+                Apple Erinnerungen sind noch nicht angebunden. Sie kommen über einen
                 iOS-Kurzbefehl herein — bis dahin bleibt die Liste leer statt geraten.
               </p>
             )}

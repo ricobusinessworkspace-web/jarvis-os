@@ -6,8 +6,8 @@ import { prisma } from '../db';
  * `crm` sind die offenen Aufgaben an den Leads, die dir im CRM zugewiesen sind
  * (`crm_leads.claimed_by`). Sie stecken dort als JSON-Array in `task_text`.
  *
- * `notes` kommt aus Apple Notes und ist erst befüllt, wenn der iOS-Kurzbefehl
- * läuft. Bis dahin bewusst leer statt erfunden.
+ * `reminders` kommt aus Apple Erinnerungen und ist erst befüllt, wenn der
+ * iOS-Kurzbefehl läuft. Bis dahin bewusst leer statt erfunden.
  */
 
 export interface CrmTaskItem {
@@ -89,11 +89,11 @@ export class TaskInboxService {
   }
 
   /**
-   * Offene Aufgaben aus Apple Notes.
+   * Heute fällige Apple Erinnerungen.
    * Noch keine Quelle angebunden — liefert eine leere Liste, damit die UI
    * „noch nicht verbunden" zeigen kann statt einer erfundenen Aufgabe.
    */
-  static async getNotesTasks(): Promise<{ items: never[]; connected: boolean }> {
+  static async getReminders(): Promise<{ items: never[]; connected: boolean }> {
     return { items: [], connected: false };
   }
 }

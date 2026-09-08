@@ -36,10 +36,10 @@ async function Today() {
   const summaryFrom = block.beforeStart ? monthStart : block.blockStart;
   const from = summaryFrom < monthStart ? summaryFrom : monthStart;
 
-  const [matrix, crmTasks, notes, routines] = await Promise.all([
+  const [matrix, crmTasks, reminders, routines] = await Promise.all([
     AnalyticsService.getMatrix(from, monthEnd),
     TaskInboxService.getCrmTasks(),
-    TaskInboxService.getNotesTasks(),
+    TaskInboxService.getReminders(),
     RoutineService.getRoutineBlocks(today),
   ]);
 
@@ -129,7 +129,7 @@ async function Today() {
       )}
 
       <div className="mt-3">
-        <TaskInbox crmTasks={crmTasks} notesConnected={notes.connected} />
+        <TaskInbox crmTasks={crmTasks} remindersConnected={reminders.connected} />
       </div>
 
       <div className="mt-3">
