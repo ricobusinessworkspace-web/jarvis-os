@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard,
   KanbanSquare,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   Wallet,
-  Sun
+  Sun,
+  CalendarDays,
+  PhoneCall,
+  HeartPulse
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
@@ -19,8 +20,9 @@ import { useState } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Heute', href: '/', icon: Sun },
-  { label: 'Widgets', href: '/overview', icon: LayoutDashboard },
-  { label: 'Aufgaben', href: '/tasks', icon: CheckCircle2 },
+  { label: 'Verlauf', href: '/verlauf', icon: CalendarDays },
+  { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall },
+  { label: 'Health', href: '/health', icon: HeartPulse },
   { label: 'Content Kanban', href: '/content', icon: KanbanSquare },
   { label: 'Finanzen', href: '/finance', icon: Wallet },
 ] as const;

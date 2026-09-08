@@ -83,12 +83,18 @@ export function ActivityGrid({ matrix, metrics, summaries, from, to, today, titl
                   ))}
                 </div>
 
+                {/* Ohne Zielwert gibt es kein „erfüllt" — dann zählt nur, an wie
+                    vielen Tagen überhaupt etwas erfasst wurde. */}
                 <div className="w-[92px] shrink-0 text-right">
                   <div className="font-mono text-[11.5px] tabular-nums">
-                    {s ? `${s.met} / ${s.tracked}` : '–'}
+                    {!s ? '–' : hasTarget(matrix, metric.key) ? `${s.met} / ${s.tracked}` : `${s.measured} / ${s.tracked}`}
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-muted">
-                    Cov. {s ? formatPercent(s.coverage) : '–'}
+                    {!s
+                      ? '–'
+                      : hasTarget(matrix, metric.key)
+                        ? `Cov. ${formatPercent(s.coverage)}`
+                        : 'erfasst'}
                   </div>
                 </div>
               </div>
@@ -127,6 +133,15 @@ export function ActivityGrid({ matrix, metrics, summaries, from, to, today, titl
       </div>
     </div>
   );
+}
+
+/** Hat die Metrik überhaupt ein hinterlegtes Soll? */
+function hasTarget(matrix: MetricMatrix, metricKey: string): boolean {
+  for (const row of Object.values(matrix)) {
+    const base = row[metricKey]?.base;
+    if (base !== null && base !== undefined) return true;
+  }
+  return false;
 }
 
 function Legend({ className, label }: { className: string; label: string }) {

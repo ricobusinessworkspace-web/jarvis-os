@@ -1,6 +1,39 @@
 import { prisma } from '../db';
 
 export class CrmService {
+  /**
+   * Pipeline-Stufen so, wie das CRM sie führt (`crm_leads.stage`).
+   * Bewusst kein eigenes Mapping — das CRM gibt die Datenschicht vor.
+   */
+  static async getPipeline(userName = 'Rico') {
+    const rows = await prisma.$queryRaw<Array<{ stage: string | null; c: number }>>`
+      SELECT stage, COUNT(*)::int AS c
+      FROM crm_leads
+      WHERE coalesce(status, '') <> 'Uninteressant'
+      GROUP BY stage
+    `;
+
+    const count = (stage: string) => Number(rows.find(r => r.stage === stage)?.c ?? 0);
+
+    const mineRows = await prisma.$queryRaw<Array<{ c: number }>>`
+      SELECT COUNT(*)::int AS c
+      FROM crm_leads l
+      JOIN user_profiles u ON u.id = l.claimed_by
+      WHERE u.name = ${userName} AND coalesce(l.status, '') <> 'Uninteressant'
+    `;
+
+    return {
+      stages: [
+        { label: 'Kaltkartei', count: count('cold'), tone: 'cold' as const },
+        { label: 'pitch', count: count('pitch'), tone: 'open' as const },
+        { label: 'data', count: count('data'), tone: 'open' as const },
+        { label: 'offer', count: count('offer'), tone: 'open' as const },
+        { label: 'closed', count: count('closed'), tone: 'won' as const },
+      ],
+      mine: Number(mineRows[0]?.c ?? 0),
+    };
+  }
+
   static async getOverview() {
     try {
       const nowMs = Date.now();

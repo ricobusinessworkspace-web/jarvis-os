@@ -1,12 +1,14 @@
 import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
+import { RoutineService } from '@/core/services/RoutineService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { blockInfo, BLOCK_WEEKS } from '@/lib/blocks';
 import { MetricCard } from '@/components/today/MetricCard';
 import { CausesCard, type CauseRow } from '@/components/today/CausesCard';
 import { TaskInbox } from '@/components/today/TaskInbox';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
+import { RoutineCard } from '@/components/today/RoutineCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,10 +36,11 @@ async function Today() {
   const summaryFrom = block.beforeStart ? monthStart : block.blockStart;
   const from = summaryFrom < monthStart ? summaryFrom : monthStart;
 
-  const [matrix, crmTasks, reminders] = await Promise.all([
+  const [matrix, crmTasks, reminders, routines] = await Promise.all([
     AnalyticsService.getMatrix(from, monthEnd),
     TaskInboxService.getCrmTasks(),
     TaskInboxService.getReminders(),
+    RoutineService.getRoutineBlocks(today),
   ]);
 
   const summaries = Object.fromEntries(
@@ -118,6 +121,12 @@ async function Today() {
 
         <CausesCard rows={causeRows} date={today} />
       </div>
+
+      {routines.length > 0 && (
+        <div className="mt-3">
+          <RoutineCard blocks={routines} date={today} />
+        </div>
+      )}
 
       <div className="mt-3">
         <TaskInbox crmTasks={crmTasks} remindersConnected={reminders.connected} />

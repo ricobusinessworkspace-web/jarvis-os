@@ -100,6 +100,34 @@ export class RoutineService {
     }
   }
 
+  /** Morgen- und Abendroutine eines Tages, fertig für die Dashboard-Karte. */
+  static async getRoutineBlocks(dateStr: string) {
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+    const trackers = await prisma.tracker.findMany({
+      where: { type: 'routine' },
+      include: {
+        items: {
+          orderBy: { order: 'asc' },
+          include: { logs: { where: { date } } },
+        },
+      },
+    });
+
+    const order = ['morgen', 'abend'];
+    return trackers
+      .map(tracker => ({
+        name: tracker.name,
+        kind: tracker.name.toLowerCase().includes('morgen') ? ('morning' as const) : ('evening' as const),
+        items: tracker.items.map(item => ({
+          id: item.id,
+          title: item.title,
+          done: item.logs.some(l => l.status === 'completed'),
+        })),
+      }))
+      .sort((a, b) => order.indexOf(a.kind === 'morning' ? 'morgen' : 'abend') - order.indexOf(b.kind === 'morning' ? 'morgen' : 'abend'));
+  }
+
   static async getDashboardTrackers(today: Date) {
     try {
       const trackers = await prisma.tracker.findMany({
