@@ -145,11 +145,22 @@ export class AnalyticsService {
     };
 
     if (kinds.has('crm_calls')) {
+      const today = getBerlinDateStr();
       for (const s of sources.filter(x => x.kind === 'crm_calls')) {
         const userName = str(s.config.userName);
         if (!userName) continue;
         const calls = await this.loadCrmCalls(from, to, userName);
         for (const [d, v] of calls) put('crm_calls', s.metricKey, d, v);
+
+        // Eine lückenlose Quelle vergisst nicht: das CRM protokolliert jeden
+        // Anruf, also heißt „keine Zeile" hier wirklich null Anrufe und nicht
+        // „nicht gemessen". Nur für vergangene Tage — der heutige läuft noch.
+        if (s.config.impliesZero === true) {
+          for (const d of dateRange(from, to)) {
+            if (d >= today || isOffDay(d)) continue;
+            if (!calls.has(d)) put('crm_calls', s.metricKey, d, 0);
+          }
+        }
       }
     }
 

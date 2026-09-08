@@ -46,7 +46,9 @@ const SOURCES: Array<{
   priority: number;
 }> = [
   // Calls: echte CRM-Calls, sonst der Tageshaken im Ursachen-Tracker.
-  { metricKey: 'sales.calls_count', kind: 'crm_calls',    config: { userName: CRM_USER },                            priority: 10 },
+  // `impliesZero`: das CRM protokolliert lückenlos, ein Tag ohne Zeile ist
+  // deshalb ein Tag mit null Anrufen — nicht ein vergessener Log.
+  { metricKey: 'sales.calls_count', kind: 'crm_calls',    config: { userName: CRM_USER, impliesZero: true },         priority: 10 },
   { metricKey: 'sales.calls_count', kind: 'tracker',      config: { tracker: 'Ursachen', item: 'Anrufe' },           priority: 90 },
 
   // Training: Haken im Tracker, sonst das Workout-Flag im Personal Log.

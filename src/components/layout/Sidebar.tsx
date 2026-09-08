@@ -6,11 +6,11 @@ import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
   KanbanSquare,
-  PhoneCall,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
-  Wallet
+  Wallet,
+  Sun
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
@@ -18,7 +18,8 @@ import ProfileModal from '@/components/ProfileModal';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { label: 'Heute', href: '/', icon: Sun },
+  { label: 'Widgets', href: '/overview', icon: LayoutDashboard },
   { label: 'Aufgaben', href: '/tasks', icon: CheckCircle2 },
   { label: 'Content Kanban', href: '/content', icon: KanbanSquare },
   { label: 'Finanzen', href: '/finance', icon: Wallet },
