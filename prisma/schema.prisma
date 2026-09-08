@@ -370,3 +370,88 @@ model WeightEntry {
   @@map("jarvis_weight_entries")
   @@schema("public")
 }
+
+// ============================================
+// Core Semantic Layer (Command Center)
+//
+// Migrationen laufen über scripts/core-layer.sql
+// (`npm run core:migrate`) — NICHT über `prisma db push`.
+// Die DB enthält Tabellen fremder Apps (crm_*, g_*, lead_*,
+// user_profiles), die nicht in diesem Schema stehen; db push
+// würde sie löschen.
+// ============================================
+
+model CoreMetricDefinition {
+  key         String   @id
+  label       String
+  unit        String   @default("count")
+  aggregation String   @default("sum")
+  direction   String   @default("higher_is_better")
+  domain      String
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sources    CoreMetricSource[]
+  intentions CoreIntention[]
+  goals      CoreGoal[]
+
+  @@map("core_metric_definitions")
+  @@schema("public")
+}
+
+/// Automatik-Schicht: pro Metrik eine nach `priority` geordnete Liste von
+/// Quellen. Der AnalyticsService nimmt den ersten Treffer. Ein neues System
+/// anzubinden ist damit eine Zeile, kein neuer Code-Pfad.
+model CoreMetricSource {
+  id        String   @id @default(uuid())
+  metricKey String   @map("metric_key")
+  kind      String
+  config    Json     @default("{}")
+  priority  Int      @default(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  metric CoreMetricDefinition @relation(fields: [metricKey], references: [key], onDelete: Cascade)
+
+  @@index([metricKey, priority])
+  @@map("core_metric_sources")
+  @@schema("public")
+}
+
+model CoreIntention {
+  id             String    @id @default(uuid())
+  metricKey      String    @map("metric_key")
+  baseValue      Float     @map("base_value")
+  stretchValue   Float?    @map("stretch_value")
+  comparator     String    @default(">=")
+  activeWeekdays Int[]     @default([1, 2, 3, 4, 5, 6]) @map("active_weekdays")
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  metric CoreMetricDefinition @relation(fields: [metricKey], references: [key], onDelete: Cascade)
+
+  @@map("core_intentions")
+  @@schema("public")
+}
+
+model CoreGoal {
+  id          String    @id @default(uuid())
+  title       String    @unique
+  metricKey   String?   @map("metric_key")
+  /// NULL heißt bewusst „kein Ziel gesetzt" (Messphase) — nie als 0 darstellen.
+  targetValue String?   @map("target_value")
+  comparator  String?
+  horizonEnd  DateTime? @map("horizon_end") @db.Date
+  status      String    @default("active")
+  notes       String    @default("")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  metric CoreMetricDefinition? @relation(fields: [metricKey], references: [key], onDelete: SetNull)
+
+  @@map("core_goals")
+  @@schema("public")
+}
