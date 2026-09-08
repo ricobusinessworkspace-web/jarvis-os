@@ -437,6 +437,44 @@ model CoreIntention {
   @@schema("public")
 }
 
+/// Cache dessen, was die iOS-Kurzbefehle hereinreichen. Apple bleibt die
+/// Wahrheit — hier steht nur eine Kopie, damit die Web-App sie lesen kann.
+model IngestReminder {
+  id        String    @id
+  title     String
+  listName  String    @default("") @map("list_name")
+  dueAt     DateTime? @map("due_at")
+  dueDate   String?   @map("due_date")
+  completed Boolean   @default(false)
+  priority  Int       @default(0)
+  notes     String    @default("")
+  syncedAt  DateTime  @default(now()) @map("synced_at")
+
+  @@index([dueDate])
+  @@map("ingest_reminders")
+  @@schema("public")
+}
+
+model IngestHealthDaily {
+  date      DateTime @db.Date
+  metricKey String   @map("metric_key")
+  value     Float
+  syncedAt  DateTime @default(now()) @map("synced_at")
+
+  @@id([date, metricKey])
+  @@map("ingest_health_daily")
+  @@schema("public")
+}
+
+model IngestStatus {
+  source    String   @id
+  syncedAt  DateTime @default(now()) @map("synced_at")
+  itemCount Int      @default(0) @map("item_count")
+
+  @@map("ingest_status")
+  @@schema("public")
+}
+
 model CoreGoal {
   id          String    @id @default(uuid())
   title       String    @unique

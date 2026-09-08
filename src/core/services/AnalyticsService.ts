@@ -206,6 +206,22 @@ export class AnalyticsService {
       }
     }
 
+    if (kinds.has('health')) {
+      const rows = await prisma.$queryRaw<Array<{ d: string; metric_key: string; value: number }>>`
+        SELECT to_char(date, 'YYYY-MM-DD') AS d, metric_key, value
+        FROM ingest_health_daily
+        WHERE date >= ${from}::date AND date <= ${to}::date
+      `;
+      for (const s of sources.filter(x => x.kind === 'health')) {
+        // Ohne `metric` im Config zieht die Quelle ihren eigenen Metrik-Key.
+        const wanted = str(s.config.metric) || s.metricKey;
+        for (const row of rows) {
+          if (row.metric_key !== wanted) continue;
+          put('health', s.metricKey, row.d, Number(row.value));
+        }
+      }
+    }
+
     if (kinds.has('weight')) {
       const weights = await this.loadWeight(from, to);
       for (const s of sources.filter(x => x.kind === 'weight')) {

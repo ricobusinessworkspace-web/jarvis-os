@@ -59,6 +59,10 @@ const SOURCES: Array<{
   { metricKey: 'content.posts',     kind: 'tracker',      config: { tracker: 'Ursachen', item: 'Personal Brand Post' }, priority: 10 },
 
   { metricKey: 'body.sleep_hours',  kind: 'personal_log', config: { field: 'sleep_hours' },        priority: 10 },
+
+  // Kalorien: bevorzugt aus Apple Health (Cronometer schreibt dorthin),
+  // sonst das alte Feld im Tagebuch.
+  { metricKey: 'body.calories',     kind: 'health',       config: { metric: 'body.calories' },     priority: 10 },
   { metricKey: 'body.calories',     kind: 'personal_log', config: { field: 'nutrition_calories' }, priority: 90 },
   { metricKey: 'body.weight',       kind: 'weight',       config: {},                              priority: 10 },
 

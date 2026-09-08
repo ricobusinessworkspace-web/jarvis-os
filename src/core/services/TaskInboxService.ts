@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 /**
  * Aufgaben-Eingang des Dashboards — zwei getrennte Quellen.
@@ -9,6 +10,15 @@ import { prisma } from '../db';
  * `reminders` kommt aus Apple Erinnerungen und ist erst befüllt, wenn der
  * iOS-Kurzbefehl läuft. Bis dahin bewusst leer statt erfunden.
  */
+
+export interface ReminderItem {
+  id: string;
+  title: string;
+  listName: string;
+  dueDate: string | null;
+  dueTime: string | null;
+  overdue: boolean;
+}
 
 export interface CrmTaskItem {
   id: string;
@@ -89,11 +99,43 @@ export class TaskInboxService {
   }
 
   /**
-   * Heute fällige Apple Erinnerungen.
-   * Noch keine Quelle angebunden — liefert eine leere Liste, damit die UI
-   * „noch nicht verbunden" zeigen kann statt einer erfundenen Aufgabe.
+   * Heute fällige Apple Erinnerungen aus dem Kurzbefehl-Cache.
+   *
+   * `connected` sagt, ob je ein Kurzbefehl geliefert hat. Ohne das kann die UI
+   * eine leere Liste nicht deuten — „nichts zu tun" und „nicht verbunden"
+   * sehen sonst gleich aus.
    */
-  static async getReminders(): Promise<{ items: never[]; connected: boolean }> {
-    return { items: [], connected: false };
+  static async getReminders(today = getBerlinDateStr()): Promise<{
+    items: ReminderItem[];
+    connected: boolean;
+    syncedAt: Date | null;
+  }> {
+    const [status, rows] = await Promise.all([
+      prisma.ingestStatus.findUnique({ where: { source: 'reminders' } }),
+      prisma.ingestReminder.findMany({
+        where: {
+          completed: false,
+          // Heute fällig oder überfällig; Erinnerungen ohne Datum immer zeigen.
+          OR: [{ dueDate: { lte: today } }, { dueDate: null }],
+        },
+        orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }],
+        take: 20,
+      }),
+    ]);
+
+    return {
+      connected: status !== null,
+      syncedAt: status?.syncedAt ?? null,
+      items: rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        listName: r.listName,
+        dueDate: r.dueDate,
+        dueTime: r.dueAt
+          ? r.dueAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' })
+          : null,
+        overdue: r.dueDate !== null && r.dueDate < today,
+      })),
+    };
   }
 }

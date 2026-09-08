@@ -73,3 +73,41 @@ CREATE TABLE IF NOT EXISTS core_goals (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_core_goals_title ON core_goals (title);
+
+-- ============================================================
+--  Ingest-Schicht — was die iOS-Kurzbefehle hereinreichen
+--
+--  Apple Erinnerungen und Health haben keine Cloud-API. Beides kommt
+--  über Kurzbefehl-Automationen vom iPhone an POST /api/ingest/apple.
+--  Diese Tabellen sind reiner Cache: Apple bleibt die Wahrheit.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS ingest_reminders (
+  id         TEXT        PRIMARY KEY,   -- Erinnerungs-ID aus iOS
+  title      TEXT        NOT NULL,
+  list_name  TEXT        NOT NULL DEFAULT '',
+  due_at     TIMESTAMPTZ,
+  due_date   TEXT,                      -- YYYY-MM-DD Berliner Zeit, zum Filtern
+  completed  BOOLEAN     NOT NULL DEFAULT FALSE,
+  priority   INTEGER     NOT NULL DEFAULT 0,
+  notes      TEXT        NOT NULL DEFAULT '',
+  synced_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingest_reminders_due ON ingest_reminders (due_date);
+
+CREATE TABLE IF NOT EXISTS ingest_health_daily (
+  date       DATE             NOT NULL,
+  metric_key TEXT             NOT NULL,
+  value      DOUBLE PRECISION NOT NULL,
+  synced_at  TIMESTAMPTZ      NOT NULL DEFAULT now(),
+  PRIMARY KEY (date, metric_key)
+);
+
+-- Damit die UI ehrlich „verbunden / zuletzt vor 12 Minuten" sagen kann,
+-- statt eine leere Liste als „nichts zu tun" auszugeben.
+CREATE TABLE IF NOT EXISTS ingest_status (
+  source     TEXT        PRIMARY KEY,   -- 'reminders' | 'health'
+  synced_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  item_count INTEGER     NOT NULL DEFAULT 0
+);

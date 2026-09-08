@@ -129,7 +129,11 @@ async function Today() {
       )}
 
       <div className="mt-3">
-        <TaskInbox crmTasks={crmTasks} remindersConnected={reminders.connected} />
+        <TaskInbox
+          crmTasks={crmTasks}
+          reminders={reminders.items}
+          remindersConnected={reminders.connected}
+        />
       </div>
 
       <div className="mt-3">

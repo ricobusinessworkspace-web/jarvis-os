@@ -1,5 +1,6 @@
 import { Square, Circle } from 'lucide-react';
-import type { CrmTaskItem } from '@/core/services/TaskInboxService';
+import type { CrmTaskItem, ReminderItem } from '@/core/services/TaskInboxService';
+import { cn } from '@/lib/utils';
 
 /**
  * Zwei Quellen, klar getrennt: Apple Erinnerungen links, die eigenen
@@ -19,7 +20,13 @@ function Column({ title, count, children }: { title: string; count: string; chil
   );
 }
 
-export function TaskInbox({ crmTasks, remindersConnected }: { crmTasks: CrmTaskItem[]; remindersConnected: boolean }) {
+export function TaskInbox({
+  crmTasks, reminders, remindersConnected,
+}: {
+  crmTasks: CrmTaskItem[];
+  reminders: ReminderItem[];
+  remindersConnected: boolean;
+}) {
   return (
     <div className="crm-card">
       <div className="crm-header">
@@ -28,12 +35,46 @@ export function TaskInbox({ crmTasks, remindersConnected }: { crmTasks: CrmTaskI
 
       <div className="grid gap-5 md:grid-cols-2 md:gap-0">
         <div className="md:pr-6">
-          <Column title="Erinnerungen" count={remindersConnected ? '' : 'nicht verbunden'}>
-            {remindersConnected ? null : (
+          <Column
+            title="Erinnerungen"
+            count={!remindersConnected ? 'nicht verbunden' : `${reminders.length} offen`}
+          >
+            {!remindersConnected ? (
               <p className="border-t border-border/40 py-3 text-[12.5px] leading-relaxed text-muted">
                 Apple Erinnerungen sind noch nicht angebunden. Sie kommen über einen
                 iOS-Kurzbefehl herein — bis dahin bleibt die Liste leer statt geraten.
               </p>
+            ) : reminders.length === 0 ? (
+              <p className="border-t border-border/40 py-3 text-[12.5px] text-muted">
+                Nichts offen für heute.
+              </p>
+            ) : (
+              <div className="flex flex-col">
+                {reminders.slice(0, 5).map(r => (
+                  <div key={r.id} className="flex items-center gap-2.5 border-t border-border/40 py-2 text-[12.5px]">
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} />
+                    <span className="min-w-0 flex-1 truncate">{r.title}</span>
+                    {r.listName && (
+                      <span className="shrink-0 rounded border border-border/60 px-1.5 py-0.5 text-[9.5px] text-muted">
+                        {r.listName}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        'shrink-0 font-mono text-[10.5px]',
+                        r.overdue ? 'text-amber-500' : 'text-muted'
+                      )}
+                    >
+                      {r.overdue ? 'überfällig' : (r.dueTime ?? '–')}
+                    </span>
+                  </div>
+                ))}
+                {reminders.length > 5 && (
+                  <div className="border-t border-border/40 pt-2.5 text-[11.5px] text-muted">
+                    {reminders.length - 5} weitere in Erinnerungen
+                  </div>
+                )}
+              </div>
             )}
           </Column>
         </div>
