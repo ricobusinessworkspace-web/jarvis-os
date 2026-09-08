@@ -65,15 +65,23 @@ actions/dashboard.ts                    Server Actions + revalidatePath('/', 'la
 | **Vertriebs-KPIs** | Kommen aus dem CRM (Calls, Ziel, Stufen, Conversion). Jarvis liest, baut nicht nach. |
 | **Call-Ziel** | **Basis 30** (6-Monats-Plan) / **Soll 60** (`user_profiles.daily_call_goal`). |
 | **Fallback** | CRM offline → manueller Tageshaken, sichtbar als Badge „manuell". Dashboard bleibt eigenständig. |
-| **Aufgaben** | **Apple Reminders ersetzt `/tasks`.** Route + Sidebar raus, `jarvis_tasks` archiviert. |
-| **Reminders-Modus** | **Read-only + Deep Link.** Reminders bleibt einzige Wahrheit, Tippen öffnet die App. Kein Outbox-Sync. |
+| **Aufgaben** | **Apple Notes ersetzt `/tasks`.** Route + Sidebar raus, `jarvis_tasks` archiviert. |
+| **Notes-Modus** | **Read-only + Deep Link.** Notes bleibt einzige Wahrheit, Tippen öffnet die App. Kein Outbox-Sync. |
 | **Kalorien** | Über **Apple Health**, nicht über eine App-API. Logging-App bleibt **Cronometer** (Free-Tier hat Barcode + Health-Sync; MyFitnessPal hat Barcode hinter der Paywall). App jederzeit tauschbar. |
 | **Punktesystem** | **Vorerst nicht in der UI** — das G-Projekt ist noch nicht funktionstüchtig (`g_*` leer). Das Design ergibt sich aus der Implementierung, wenn es live geht. |
-| **Ingest** | Ein Pipe: `POST /api/ingest/*` (Bearer + Vercel-Bypass-Header), gefüllt von **iOS-Kurzbefehl-Automationen**. Reminders, Health-Kalorien und künftige Quellen sind nur Metrik-Quellen. |
-| **Aufgaben-Quellen** | Zwei getrennte Listen in einer Karte: **Erinnerungen** (Apple) und **CRM · deine Leads** (`crm_leads.task_text` JSON, gefiltert auf `claimed_by = Rico` → 102 Leads, aktuell 11 offene Aufgaben). |
+| **Ingest** | Ein Pipe: `POST /api/ingest/*` (Bearer + Vercel-Bypass-Header), gefüllt von **iOS-Kurzbefehl-Automationen**. Notes, Health-Kalorien und künftige Quellen sind nur Metrik-Quellen. |
+| **Aufgaben-Quellen** | Zwei getrennte Listen in einer Karte: **Notizen** (Apple Notes) und **CRM · deine Leads** (`crm_leads.task_text` JSON, gefiltert auf `claimed_by = Rico` → 102 Leads, aktuell 11 offene Aufgaben). |
 | **Automatik** | Metriken werden von Quellen **automatisch erfüllt**, nicht nur manuell abgehakt (siehe §3a). |
 | **Lightning CRM** | Meilenstein-Anzeige **entfernt**. Bleibt als `core_goals`-Eintrag in den Daten, ohne UI-Fläche. |
 | **Aktivität** | Der Monatsverlauf (eine Metrik pro Zeile) steht **auf dem Dashboard**, nicht versteckt im Verlauf. |
+
+| **Struktur** | **Heute** (Startseite) · **Verlauf** · **Vertrieb** · **Health** · **Finance (WIP)**. |
+| **Kalender** | Kein Monatsgitter als Hauptanzeige. **Tages-Navigator + editierbares Tagesblatt**; Monatsverlauf nur eine Metrik pro Zeile. |
+| **Off-Day** | Sonntag ausgegraut, nicht im Adherence-/Coverage-Nenner. |
+| **Solls** | In `core_intentions`, **in der UI editierbar** (Basis + Soll getrennt). |
+| **Block** | Block 1 ab 2026-09-01, 12 Wochen, Mo–Sa getrackt. *(Startdatum-Detail siehe offene Frage)* |
+
+---
 
 ### 3a. Automatik-Schicht (`core_metric_sources`)
 
@@ -85,7 +93,7 @@ von Quellen:
 ```
 core_metric_sources
   metric_key      z.B. content.posts
-  kind            'crm' | 'tracker' | 'health' | 'reminders' | 'gproject' | 'manual'
+  kind            'crm' | 'tracker' | 'health' | 'notes' | 'gproject' | 'manual'
   config          jsonb — z.B. { rule: 'posting' } oder { table: 'crm_calls', user: '…' }
   priority        1 = gewinnt; 'manual' immer als letzte Stufe
 ```
@@ -94,11 +102,6 @@ core_metric_sources
 Treffer inklusive `source`, damit die UI zeigen kann, **woher** ein Wert stammt
 („auto aus CRM" / „manuell"). Neue Systeme anzubinden heißt dann: eine Zeile in
 `core_metric_sources`, kein neuer Code-Pfad.
-| **Struktur** | **Heute** (Startseite) · **Verlauf** · **Vertrieb** · **Health** · **Finance (WIP)**. |
-| **Kalender** | Kein Monatsgitter als Hauptanzeige. **Tages-Navigator + editierbares Tagesblatt**; Monatsverlauf nur eine Metrik pro Zeile. |
-| **Off-Day** | Sonntag ausgegraut, nicht im Adherence-/Coverage-Nenner. |
-| **Solls** | In `core_intentions`, **in der UI editierbar** (Basis + Soll getrennt). |
-| **Block** | Block 1 ab 2026-09-01, 12 Wochen, Mo–Sa getrackt. *(Startdatum-Detail siehe offene Frage)* |
 
 ---
 
@@ -114,7 +117,7 @@ Nur der heutige Tag, ruhig, wenige Karten:
 - **Kalorien** — Ist / Ziel aus Apple Health, Makros als Nebenzeile
 - **Ursachen** — Calls / Training / Post, drei Zustände, Streak, Adherence + Coverage,
   je Zeile die Quelle („auto aus CRM" / „manuell" / später „auto aus G-Projekt")
-- **Aufgaben** — zweigeteilt: *Erinnerungen* (Apple, read-only + Deep Link) und
+- **Aufgaben** — zweigeteilt: *Notizen* (Apple Notes, read-only + Deep Link) und
   *CRM · deine Leads* (offene `task_text`-Einträge mit Lead-Name und Stage)
 - **Aktivität** — Monatsverlauf, eine Metrik pro Zeile, Wochen durch Abstände getrennt,
   Tag anklickbar → springt in den Verlauf
@@ -153,7 +156,7 @@ Bestehende Seite als Reiter mit WIP-Badge. Kein Umbau.
    `{ value|null, base, stretch, state, source }`. Invariante: keine Quelle → `null`.
    Quellen: `crm_calls` (gefiltert auf Rico) · `crm_leads.stage` ·
    `jarvis_tracker_logs` · `jarvis_personal_logs` · `jarvis_weight_entries` ·
-   `tracker_user_stats` · Ingest-Cache (Reminders / Health).
+   `tracker_user_stats` · Ingest-Cache (Notes / Health).
 4. `src/lib/blocks.ts` — Block/Woche/Off-Day.
 5. Server Action `updateIntention()` für editierbare Solls.
 
@@ -162,18 +165,18 @@ Soll änderbar, `revenue.monthly` nachweislich nicht gesetzt.
 
 ### Phase 2 — Apple-Ingest
 1. `POST /api/ingest/apple` (Bearer, wie `webhook-auth.ts`) + Cache-Tabellen
-   `ingest_reminders`, `ingest_health`.
-2. Zwei iOS-Kurzbefehl-Automationen (Reminders heute · Health Nahrungsenergie),
+   `ingest_notes`, `ingest_health`.
+2. Zwei iOS-Kurzbefehl-Automationen (Notiz-Inhalt · Health Nahrungsenergie),
    inkl. `x-vercel-protection-bypass`-Header wie beim Scriptable-Widget.
 3. Generischer `POST /api/ingest/metrics` für künftige Quellen.
 4. Dokumentation der Kurzbefehle in `APPLE_INTEGRATION.md`.
 
-**Fertig wenn:** Reminders und Kalorien erscheinen ohne manuelles Zutun im Dashboard;
+**Fertig wenn:** Notiz-Aufgaben und Kalorien erscheinen ohne manuelles Zutun im Dashboard;
 Ausfall der Automation zeigt „nicht gemessen", nicht 0.
 
 ### Phase 3 — Heute-Dashboard
 Route `/` neu (altes Grid nach `/overview` oder ablösen). Karten wie 4.2.
-Aufgaben-Karte zweigeteilt: Reminders (read-only + Deep Link) und CRM-Lead-Aufgaben
+Aufgaben-Karte zweigeteilt: Notizen aus Apple Notes (read-only + Deep Link) und CRM-Lead-Aufgaben
 (`crm_leads.task_text` parsen, `claimed_by`-Filter, offene Einträge, Deep Link ins CRM).
 Aktivitäts-Monatsverlauf als eigene Karte, Zellen klickbar → Verlauf.
 
