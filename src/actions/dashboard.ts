@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { revalidateTracking } from '@/lib/revalidate';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -190,7 +191,7 @@ export async function savePersonalLog(data: any) {
       create: { date, ...rest, sleepHours }
     });
 
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -205,7 +206,7 @@ export async function logTrackerItem(itemId: string, status: string, dateStr: st
       update: { status, completedAt: status === 'completed' ? new Date() : null },
       create: { itemId, date, status, completedAt: status === 'completed' ? new Date() : null }
     });
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true, data: log };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -215,7 +216,7 @@ export async function logTrackerItem(itemId: string, status: string, dateStr: st
 export async function updateTrackerItem(id: string, data: any) {
   try {
     const updated = await prisma.trackerItem.update({ where: { id }, data });
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true, data: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -344,7 +345,7 @@ export async function addWeightEntry(weight: number) {
         date: new Date()
       }
     });
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true, data: entry };
   } catch (error: any) {
     return { success: false, error: error.message };

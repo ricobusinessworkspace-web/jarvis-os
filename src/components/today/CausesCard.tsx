@@ -42,16 +42,30 @@ function StateBox({ state }: { state: MetricState }) {
 }
 
 export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
-  const [pending, startTransition] = useTransition();
-  const [busy, setBusy] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  // Der Haken sitzt sofort; der Server bestätigt gleich darauf und rendert neu.
+  // Ohne das wartet der Klick auf die Runde zur Datenbank und fühlt sich hängend an.
+  const [pendingState, setPendingState] = useState<Record<string, MetricState>>({});
+  const stateOf = (row: CauseRow) => pendingState[row.metricKey] ?? row.state;
 
   const toggle = (row: CauseRow) => {
     if (!row.toggleable) return;
-    const done = !(row.state === 'soll' || row.state === 'basis');
-    setBusy(row.metricKey);
+    const current = stateOf(row);
+    const done = !(current === 'soll' || current === 'basis');
+
+    setPendingState(prev => ({ ...prev, [row.metricKey]: done ? 'soll' : 'unter' }));
+
     startTransition(async () => {
-      await toggleCause(row.metricKey, date, done);
-      setBusy(null);
+      const res = await toggleCause(row.metricKey, date, done);
+      // Bei Erfolg gilt wieder der Server-Wert, bei Fehler ebenso — dann springt
+      // die Anzeige zurück, statt eine Änderung vorzutäuschen, die nicht ankam.
+      if (!res?.success) console.error('[Ursachen]', res?.error);
+      setPendingState(prev => {
+        const next = { ...prev };
+        delete next[row.metricKey];
+        return next;
+      });
     });
   };
 
@@ -64,7 +78,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
       <div className="flex flex-col">
         {rows.map(row => {
           const soll = row.stretch ?? row.base;
-          const isBusy = busy === row.metricKey && pending;
+          const state = stateOf(row);
 
           return (
             <div
@@ -73,15 +87,14 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
             >
               <button
                 onClick={() => toggle(row)}
-                disabled={!row.toggleable || isBusy}
+                disabled={!row.toggleable}
                 aria-label={`${row.label} abhaken`}
                 className={cn(
                   'shrink-0 transition-transform',
-                  row.toggleable ? 'active:scale-90 cursor-pointer' : 'cursor-default',
-                  isBusy && 'opacity-50'
+                  row.toggleable ? 'cursor-pointer active:scale-90' : 'cursor-default'
                 )}
               >
-                <StateBox state={row.state} />
+                <StateBox state={state} />
               </button>
 
               <div className="min-w-0 flex-1">
@@ -95,7 +108,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
               </div>
 
               <div className="shrink-0 text-right">
-                <div className={cn('font-mono text-sm tabular-nums', STATE_TEXT[row.state])}>
+                <div className={cn('font-mono text-sm tabular-nums', STATE_TEXT[state])}>
                   {row.value === null ? '–' : row.value.toLocaleString('de-DE')}
                   {soll !== null && row.value !== null && (
                     <span className="text-muted"> / {soll}</span>

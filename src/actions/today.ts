@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
+import { revalidateTracking } from '@/lib/revalidate';
 
 /**
  * Hakt eine Ursache für einen Tag ab — oder wieder ab.
@@ -47,7 +47,7 @@ export async function toggleCause(metricKey: string, dateStr: string, done: bool
       create: { itemId: item.id, date, status, completedAt: done ? new Date() : null },
     });
 
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
@@ -65,7 +65,7 @@ export async function updateIntention(metricKey: string, baseValue: number, stre
       data: { baseValue, stretchValue },
     });
 
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };

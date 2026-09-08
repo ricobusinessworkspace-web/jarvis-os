@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { revalidatePath } from 'next/cache';
+import { revalidateTracking } from '@/lib/revalidate';
 
 /**
  * Werte eines einzelnen Tages nachtragen oder korrigieren.
@@ -44,7 +44,7 @@ export async function saveDayValues(
       }
     }
 
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
@@ -76,7 +76,7 @@ export async function clearCause(metricKey: string, dateStr: string) {
       where: { itemId: item.id, date: new Date(`${dateStr}T00:00:00.000Z`) },
     });
 
-    revalidatePath('/', 'layout');
+    revalidateTracking();
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
