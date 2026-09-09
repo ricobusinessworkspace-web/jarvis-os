@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   },
 };
 
-import EcosystemLoader from "@/components/ui/EcosystemLoader";
 
 export default function RootLayout({
   children,
@@ -28,10 +27,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={`${inter.variable} h-full antialiased dark`}>
-      <body className="min-h-full">
-        <EcosystemLoader />
-        {children}
-      </body>
+      {/*
+        Kein Lade-Overlay mehr: der EcosystemLoader legte einen schwarzen
+        Vollbild-Layer über die App und nahm ihn erst per useEffect weg — also
+        erst nach vollständiger Hydration. Der Inhalt ist serverseitig längst
+        gerendert; das Overlay hat ihn nur versteckt und den Start künstlich
+        verlängert.
+      */}
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

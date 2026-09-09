@@ -85,9 +85,13 @@ export function invalidateSemanticConfig() {
 async function loadSemanticConfig(): Promise<SemanticConfig> {
   if (configCache && Date.now() - configCache.at < CONFIG_TTL_MS) return configCache.value;
 
-  const definitions = await prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } });
-  const sources = await prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } });
-  const intentions = await prisma.coreIntention.findMany();
+  // Gebündelt: $transaction schickt die drei Abfragen in einem Rutsch statt in
+  // drei Runden. Über den pgbouncer kostet jede Runde mehrere hundert Millisekunden.
+  const [definitions, sources, intentions] = await prisma.$transaction([
+    prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
+    prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
+    prisma.coreIntention.findMany(),
+  ]);
 
   const value = { definitions, sources, intentions };
   configCache = { at: Date.now(), value };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useOptimistic, useState, useTransition } from 'react';
 import { Check, Sun, Moon, Pencil, Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { logTrackerItem } from '@/actions/dashboard';
 import {
@@ -32,22 +32,27 @@ export interface RoutineBlock {
  */
 export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: string }) {
   const [editing, setEditing] = useState(false);
-  const [, startTransition] = useTransition();
 
-  // Haken sofort setzen, Server zieht nach.
-  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
-  const isDone = (item: RoutineItem) => optimistic[item.id] ?? item.done;
+  /**
+   * `useOptimistic` statt eigenem State: der gesetzte Haken bleibt genau so
+   * lange stehen, bis die neuen Server-Daten da sind, und geht dann nahtlos
+   * in sie über. Vorher habe ich den optimistischen Wert selbst gelöscht,
+   * sobald die Action zurückkam — da war die Seite aber noch nicht neu
+   * gerendert, und der Haken sprang sichtbar zurück.
+   */
+  const [optimisticBlocks, applyOptimistic] = useOptimistic(
+    blocks,
+    (state: RoutineBlock[], patch: { id: string; done: boolean }) =>
+      state.map(b => ({
+        ...b,
+        items: b.items.map(i => (i.id === patch.id ? { ...i, done: patch.done } : i)),
+      }))
+  );
 
-  const toggle = (item: RoutineItem) => {
-    const next = !isDone(item);
-    setOptimistic(prev => ({ ...prev, [item.id]: next }));
+  const toggle = (item: RoutineItem, startTransition: React.TransitionStartFunction) => {
     startTransition(async () => {
-      await logTrackerItem(item.id, next ? 'completed' : 'not_done', date);
-      setOptimistic(prev => {
-        const rest = { ...prev };
-        delete rest[item.id];
-        return rest;
-      });
+      applyOptimistic({ id: item.id, done: !item.done });
+      await logTrackerItem(item.id, !item.done ? 'completed' : 'not_done', date);
     });
   };
 
@@ -70,12 +75,11 @@ export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: st
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 md:gap-0">
-        {blocks.map((block, idx) => (
+        {optimisticBlocks.map((block, idx) => (
           <RoutineColumn
             key={block.trackerId}
             block={block}
             editing={editing}
-            isDone={isDone}
             onToggle={toggle}
             className={
               idx === 0
@@ -90,15 +94,15 @@ export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: st
 }
 
 function RoutineColumn({
-  block, editing, isDone, onToggle, className,
+  block, editing, onToggle, className,
 }: {
   block: RoutineBlock;
   editing: boolean;
-  isDone: (i: RoutineItem) => boolean;
-  onToggle: (i: RoutineItem) => void;
+  onToggle: (i: RoutineItem, start: React.TransitionStartFunction) => void;
   className: string;
 }) {
   const [, startTransition] = useTransition();
+  const isDone = (item: RoutineItem) => item.done;
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -160,7 +164,7 @@ function RoutineColumn({
           <div key={item.id} className="flex items-center gap-2 border-t border-border/30 py-[6px] first:border-t-0">
             {!editing ? (
               <button
-                onClick={() => onToggle(item)}
+                onClick={() => onToggle(item, startTransition)}
                 className="flex flex-1 items-center gap-2.5 text-left text-[12.5px]"
               >
                 <span

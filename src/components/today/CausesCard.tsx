@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useOptimistic, useTransition } from 'react';
 import { Check, Flame } from 'lucide-react';
 import { toggleCause } from '@/actions/today';
 import { STATE_TEXT, SOURCE_LABEL, formatPercent } from '@/lib/metricState';
@@ -44,28 +44,25 @@ function StateBox({ state }: { state: MetricState }) {
 export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
   const [, startTransition] = useTransition();
 
-  // Der Haken sitzt sofort; der Server bestätigt gleich darauf und rendert neu.
-  // Ohne das wartet der Klick auf die Runde zur Datenbank und fühlt sich hängend an.
-  const [pendingState, setPendingState] = useState<Record<string, MetricState>>({});
-  const stateOf = (row: CauseRow) => pendingState[row.metricKey] ?? row.state;
+  /**
+   * Der Haken sitzt sofort und bleibt sitzen, bis die neuen Server-Daten da
+   * sind — `useOptimistic` löst ihn genau dann ab. Eigener State hatte den
+   * Wert zu früh verworfen, wodurch die Anzeige kurz zurücksprang.
+   */
+  const [optimisticRows, applyOptimistic] = useOptimistic(
+    rows,
+    (state: CauseRow[], patch: { metricKey: string; state: MetricState }) =>
+      state.map(r => (r.metricKey === patch.metricKey ? { ...r, state: patch.state } : r))
+  );
 
   const toggle = (row: CauseRow) => {
     if (!row.toggleable) return;
-    const current = stateOf(row);
-    const done = !(current === 'soll' || current === 'basis');
-
-    setPendingState(prev => ({ ...prev, [row.metricKey]: done ? 'soll' : 'unter' }));
+    const done = !(row.state === 'soll' || row.state === 'basis');
 
     startTransition(async () => {
+      applyOptimistic({ metricKey: row.metricKey, state: done ? 'soll' : 'unter' });
       const res = await toggleCause(row.metricKey, date, done);
-      // Bei Erfolg gilt wieder der Server-Wert, bei Fehler ebenso — dann springt
-      // die Anzeige zurück, statt eine Änderung vorzutäuschen, die nicht ankam.
       if (!res?.success) console.error('[Ursachen]', res?.error);
-      setPendingState(prev => {
-        const next = { ...prev };
-        delete next[row.metricKey];
-        return next;
-      });
     });
   };
 
@@ -76,9 +73,9 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
       </div>
 
       <div className="flex flex-col">
-        {rows.map(row => {
+        {optimisticRows.map(row => {
           const soll = row.stretch ?? row.base;
-          const state = stateOf(row);
+          const state = row.state;
 
           return (
             <div

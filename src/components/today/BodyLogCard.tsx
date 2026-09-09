@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useOptimistic, useTransition } from 'react';
 import { saveDayValues } from '@/actions/verlauf';
 import { NumberInput } from './NumberInput';
 import { cn } from '@/lib/utils';
@@ -29,11 +29,20 @@ export function BodyLogCard({
 }) {
   const [pending, startTransition] = useTransition();
 
+  // Eingetragener Wert bleibt stehen, bis der Server neu gerendert hat.
+  const [shown, applyOptimistic] = useOptimistic(
+    { sleepHours, weight },
+    (state, patch: { sleepHours?: number | null; weight?: number | null }) => ({ ...state, ...patch })
+  );
+
   const save = (patch: { sleepHours?: number | null; weight?: number | null }) =>
-    startTransition(() => void saveDayValues(date, patch));
+    startTransition(async () => {
+      applyOptimistic(patch);
+      await saveDayValues(date, patch);
+    });
 
   const weightHint =
-    weight !== null
+    shown.weight !== null
       ? 'heute gewogen'
       : lastWeight
         ? `zuletzt ${lastWeight.value.toLocaleString('de-DE', { minimumFractionDigits: 1 })} kg am ${lastWeight.date.slice(8)}.${lastWeight.date.slice(5, 7)}.`
@@ -52,7 +61,7 @@ export function BodyLogCard({
             <div className="text-[13px]">Schlaf</div>
             <div className="mt-0.5 text-[10.5px] text-muted">letzte Nacht</div>
           </div>
-          <NumberInput value={sleepHours} unit="h" disabled={pending} onSave={v => save({ sleepHours: v })} />
+          <NumberInput value={shown.sleepHours} unit="h" disabled={pending} onSave={v => save({ sleepHours: v })} />
         </div>
 
         <div className="flex items-center gap-3 border-t border-border/40 py-2">
@@ -60,7 +69,7 @@ export function BodyLogCard({
             <div className="text-[13px]">Gewicht</div>
             <div className="mt-0.5 truncate text-[10.5px] text-muted">{weightHint}</div>
           </div>
-          <NumberInput value={weight} unit="kg" disabled={pending} onSave={v => save({ weight: v })} />
+          <NumberInput value={shown.weight} unit="kg" disabled={pending} onSave={v => save({ weight: v })} />
         </div>
 
         <div className="flex items-center gap-3 border-t border-border/40 py-2">

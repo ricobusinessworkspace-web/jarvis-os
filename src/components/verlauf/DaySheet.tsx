@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useOptimistic, useTransition } from 'react';
 import { Check, Minus } from 'lucide-react';
 import { toggleCause } from '@/actions/today';
 import { saveDayValues, clearCause } from '@/actions/verlauf';
@@ -88,12 +88,38 @@ function TriToggle({
   );
 }
 
+type Patch =
+  | { field: 'training' | 'post'; state: MetricState }
+  | { field: 'sleepHours' | 'weight'; value: number | null };
+
 export function DaySheet({ data }: { data: DaySheetData }) {
   const [pending, startTransition] = useTransition();
-  const d = data;
+
+  /**
+   * Wie in den Karten auf dem Dashboard: der angezeigte Wert bleibt stehen,
+   * bis der Server neu gerendert hat. Sonst springt die Anzeige zwischendurch
+   * auf den alten Stand zurück.
+   */
+  const [d, applyOptimistic] = useOptimistic(data, (state: DaySheetData, patch: Patch): DaySheetData => {
+    switch (patch.field) {
+      case 'training':
+        return { ...state, training: { ...state.training, state: patch.state } };
+      case 'post':
+        return { ...state, post: { ...state.post, state: patch.state } };
+      case 'sleepHours':
+        return { ...state, sleepHours: patch.value };
+      case 'weight':
+        return { ...state, weight: patch.value };
+    }
+  });
+
   const locked = d.isFuture;
 
-  const run = (fn: () => Promise<unknown>) => startTransition(() => void fn());
+  const run = (patch: Patch, fn: () => Promise<unknown>) =>
+    startTransition(async () => {
+      applyOptimistic(patch);
+      await fn();
+    });
 
   const title = new Date(`${d.date}T12:00:00Z`).toLocaleDateString('de-DE', {
     weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
@@ -133,8 +159,16 @@ export function DaySheet({ data }: { data: DaySheetData }) {
           <TriToggle
             state={d.training.state}
             disabled={locked || pending}
-            onSet={done => run(() => toggleCause('training.sessions', d.date, done))}
-            onClear={() => run(() => clearCause('training.sessions', d.date))}
+            onSet={done =>
+              run({ field: 'training', state: done ? 'soll' : 'unter' }, () =>
+                toggleCause('training.sessions', d.date, done)
+              )
+            }
+            onClear={() =>
+              run({ field: 'training', state: 'ungemessen' }, () =>
+                clearCause('training.sessions', d.date)
+              )
+            }
           />
         </Field>
 
@@ -142,8 +176,16 @@ export function DaySheet({ data }: { data: DaySheetData }) {
           <TriToggle
             state={d.post.state}
             disabled={locked || pending}
-            onSet={done => run(() => toggleCause('content.posts', d.date, done))}
-            onClear={() => run(() => clearCause('content.posts', d.date))}
+            onSet={done =>
+              run({ field: 'post', state: done ? 'soll' : 'unter' }, () =>
+                toggleCause('content.posts', d.date, done)
+              )
+            }
+            onClear={() =>
+              run({ field: 'post', state: 'ungemessen' }, () =>
+                clearCause('content.posts', d.date)
+              )
+            }
           />
         </Field>
 
@@ -160,7 +202,7 @@ export function DaySheet({ data }: { data: DaySheetData }) {
             value={d.sleepHours}
             unit="h"
             disabled={locked || pending}
-            onSave={v => run(() => saveDayValues(d.date, { sleepHours: v }))}
+            onSave={v => run({ field: 'sleepHours', value: v }, () => saveDayValues(d.date, { sleepHours: v }))}
           />
         </Field>
 
@@ -169,7 +211,7 @@ export function DaySheet({ data }: { data: DaySheetData }) {
             value={d.weight}
             unit="kg"
             disabled={locked || pending}
-            onSave={v => run(() => saveDayValues(d.date, { weight: v }))}
+            onSave={v => run({ field: 'weight', value: v }, () => saveDayValues(d.date, { weight: v }))}
           />
         </Field>
 
@@ -192,7 +234,9 @@ export function DaySheet({ data }: { data: DaySheetData }) {
                         key={item.id}
                         disabled={locked || pending}
                         onClick={() =>
-                          run(() => logTrackerItem(item.id, item.done ? 'not_done' : 'completed', d.date))
+                          startTransition(async () => {
+                            await logTrackerItem(item.id, item.done ? 'not_done' : 'completed', d.date);
+                          })
                         }
                         className={cn(
                           'rounded-lg border px-2.5 py-1 text-[11.5px] transition-colors',

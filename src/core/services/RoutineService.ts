@@ -100,33 +100,49 @@ export class RoutineService {
     }
   }
 
-  /** Morgen- und Abendroutine eines Tages, fertig für die Dashboard-Karte. */
+  /**
+   * Morgen- und Abendroutine eines Tages, fertig für die Dashboard-Karte.
+   * Eine Rohabfrage statt eines verschachtelten `include` — Prisma löst das
+   * sonst in mehrere Runden auf, und jede kostet über den Pooler spürbar.
+   */
   static async getRoutineBlocks(dateStr: string) {
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const rows = await prisma.$queryRaw<
+      Array<{
+        tracker_id: string; tracker_name: string;
+        item_id: string; title: string; sort: number; done: boolean;
+      }>
+    >`
+      SELECT t.id   AS tracker_id,
+             t.name AS tracker_name,
+             i.id   AS item_id,
+             i.title,
+             i."order" AS sort,
+             COALESCE(l.status = 'completed', FALSE) AS done
+        FROM jarvis_trackers t
+        JOIN jarvis_tracker_items i ON i.tracker_id = t.id
+        LEFT JOIN jarvis_tracker_logs l
+               ON l.item_id = i.id
+              AND l.date = ${`${dateStr}T00:00:00.000Z`}::timestamp
+       WHERE t.type = 'routine'
+       ORDER BY t.name, i."order"
+    `;
 
-    const trackers = await prisma.tracker.findMany({
-      where: { type: 'routine' },
-      include: {
-        items: {
-          orderBy: { order: 'asc' },
-          include: { logs: { where: { date } } },
-        },
-      },
-    });
+    const byTracker = new Map<string, { trackerId: string; name: string; kind: 'morning' | 'evening'; items: Array<{ id: string; title: string; done: boolean }> }>();
 
-    const order = ['morgen', 'abend'];
-    return trackers
-      .map(tracker => ({
-        trackerId: tracker.id,
-        name: tracker.name,
-        kind: tracker.name.toLowerCase().includes('morgen') ? ('morning' as const) : ('evening' as const),
-        items: tracker.items.map(item => ({
-          id: item.id,
-          title: item.title,
-          done: item.logs.some(l => l.status === 'completed'),
-        })),
-      }))
-      .sort((a, b) => order.indexOf(a.kind === 'morning' ? 'morgen' : 'abend') - order.indexOf(b.kind === 'morning' ? 'morgen' : 'abend'));
+    for (const r of rows) {
+      if (!byTracker.has(r.tracker_id)) {
+        byTracker.set(r.tracker_id, {
+          trackerId: r.tracker_id,
+          name: r.tracker_name,
+          kind: r.tracker_name.toLowerCase().includes('morgen') ? 'morning' : 'evening',
+          items: [],
+        });
+      }
+      byTracker.get(r.tracker_id)!.items.push({ id: r.item_id, title: r.title, done: r.done });
+    }
+
+    // Morgen vor Abend.
+    return [...byTracker.values()].sort((a, b) => (a.kind === 'morning' ? -1 : 1) - (b.kind === 'morning' ? -1 : 1));
   }
 
   static async getDashboardTrackers(today: Date) {

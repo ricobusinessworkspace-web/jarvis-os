@@ -14,12 +14,12 @@ import { prisma } from '@/lib/prisma';
 export const DashboardService = {
   async fetchDashboardData() {
     try {
-      // Nacheinander: der Supabase-Pooler gibt pro Instanz eine Verbindung.
-      const contentItems = await prisma.contentItem.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
+      // Gebündelt in einer Runde statt zweier.
+      const [contentItems, settingsRecords] = await prisma.$transaction([
+        prisma.contentItem.findMany({ orderBy: { createdAt: 'desc' } }),
+        prisma.setting.findMany(),
+      ]);
 
-      const settingsRecords = await prisma.setting.findMany();
       const settings = settingsRecords.reduce((acc, curr) => {
         acc[curr.key] = curr.value || '';
         return acc;
