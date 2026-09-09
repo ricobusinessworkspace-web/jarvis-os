@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Build-Artefakt, gehört nicht ins Repo
+tsconfig.tsbuildinfo

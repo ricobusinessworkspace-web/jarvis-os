@@ -53,6 +53,8 @@ To bypass this without disabling Vercel Authentication for the entire project:
 
 **Header:** `x-vercel-protection-bypass: <SECRET_TOKEN>`
 
+> Das Token gehört **nicht** in dieses Dokument. Es steht in den Vercel-Einstellungen.
+
 ## 3. The Scriptable Code
 
 This is the production-ready Scriptable code currently used by the user.
@@ -65,7 +67,7 @@ This is the production-ready Scriptable code currently used by the user.
 ```javascript
 // ====== CONFIGURATION ======
 const API_URL = "https://jarvis-os-wardogs.vercel.app/api/widgets/routines?token=jarvis-scriptable-secret-123";
-const VERCEL_BYPASS_TOKEN = "4aqlDAcWy3hTwud2GZmm53cXJtYrnXHW"; 
+const VERCEL_BYPASS_TOKEN = "DEIN_BYPASS_TOKEN"; // Vercel → Settings → Deployment Protection 
 const DASHBOARD_URL = "https://jarvis-os-wardogs.vercel.app/routines";
 // ===========================
 

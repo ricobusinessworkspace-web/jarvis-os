@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jarvis OS
 
-## Getting Started
+Persönliches Operating System. Kern ist ein **Command Center**, das den
+6-Monats-Plan gegen echte Daten hält — nach dem Prinzip *Ursachen vor
+Wirkungen*: die tägliche Handlung ist die Stellschraube, Umsatz und Pipeline
+sind Folgen.
 
-First, run the development server:
+## Loslegen
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Braucht `DATABASE_URL` und `DIRECT_URL` in `.env` (siehe `.env.example`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Ansichten
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | Inhalt |
+|---|---|
+| `/` | Heute — Calls, Körper, Ursachen, Routine, Aufgaben, Monatsverlauf |
+| `/verlauf` | Tage nachtragen und korrigieren |
+| `/vertrieb` | Calls gegen CRM-Ziel, Pipeline |
+| `/health` | Training, Schlaf, Gewicht |
+| `/content`, `/finance` | Content-Kanban, Finanzen |
 
-## Learn More
+## Befehle
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run core:migrate   # Tabellen anlegen (idempotent)
+npm run core:seed      # Semantic Layer befüllen (idempotent)
+npm run core:check     # Daten gegen die Datenbank nachrechnen
+npm run build          # Produktionsbuild inkl. Typprüfung
+npm run test:e2e       # Playwright-Rauchtest
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Dokumente
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **`HANDOVER.md`** — Architektur, Fallstricke, offene Punkte. Erster Anlaufpunkt.
+- `AGENTS.md` — Regeln für KI-Agenten in diesem Repo
+- `APPLE_INTEGRATION.md` — iOS-Kurzbefehle für Erinnerungen und Health
+- `MOBILE_WIDGET_HANDOVER.md` — iPhone-Widget über Scriptable
+- `N8N_FINANCE_WORKFLOW.md` — Bank-Sync
+- `RICOS_WORKSPACE_GUIDE.md` — Arbeitsweise und Cockpit-Philosophie
 
-## Deploy on Vercel
+## Warnung
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Migrationen laufen über `scripts/core-layer.sql`, **nicht** über
+`prisma db push`. Die Datenbank enthält Tabellen fremder Anwendungen
+(`crm_*`, `g_*`, `user_profiles`), die nicht in `schema.prisma` stehen —
+`db push` würde sie löschen.

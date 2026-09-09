@@ -1,49 +1,45 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Jarvis OS Dashboard E2E Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to the dashboard before each test
+/**
+ * Rauchtest für die Heute-Ansicht. Prüft, dass die Seite rendert, die Karten
+ * da sind und nichts hängen bleibt — nicht einzelne Zahlen, die sich täglich
+ * ändern.
+ */
+test.describe('Heute-Ansicht', () => {
+  test('rendert alle Karten', async ({ page }) => {
     await page.goto('/');
-  });
 
-  test('should display page title and render successfully', async ({ page }) => {
-    // Assert the document title is correct
     await expect(page).toHaveTitle(/Jarvis OS/);
 
-    // Assert that the dashboard header (greeting) is visible
-    const greetingHeader = page.locator('h1:has-text("Rico")');
-    await expect(greetingHeader).toBeVisible();
+    // Datum als Überschrift, z.B. „Mittwoch, 9. September"
+    await expect(page.locator('h1')).toContainText(/\w+tag, \d+\. \w+/);
 
-    // Verify there are performance metrics on the page
-    const metricsHeader = page.locator('h2:has-text("Performance Metrics")');
-    await expect(metricsHeader).toBeVisible();
-  });
-
-  test('should show sidebar navigation links', async ({ page }) => {
-    // Assert that sidebar links exist and are accessible
-    const dashboardLink = page.locator('a[href="/"]');
-    await expect(dashboardLink).toBeVisible();
-
-    const projectsLink = page.locator('a[href="/projects"]');
-    await expect(projectsLink).toBeVisible();
-
-    const tasksLink = page.locator('a[href="/tasks"]');
-    await expect(tasksLink).toBeVisible();
-
-    const goalsLink = page.locator('a[href="/goals"]');
-    await expect(goalsLink).toBeVisible();
-
-    const knowledgeLink = page.locator('a[href="/knowledge"]');
-    await expect(knowledgeLink).toBeVisible();
-  });
-
-  test('should toggle sidebar collision / collapse state', async ({ page }) => {
-    // Find sidebar collapse button and click it
-    const toggleButton = page.locator('button[aria-label="Toggle Sidebar"], button:has(svg)');
-    if (await toggleButton.count() > 0) {
-      await toggleButton.first().click();
-      // The margin of main content changes - we can check visual changes or class additions
-      // For this sample test, just ensuring the interaction does not throw errors is good.
+    for (const titel of ['Calls', 'Körper', 'Ursachen', 'Aufgaben', 'Aktivität']) {
+      await expect(page.getByRole('heading', { name: titel, exact: true })).toBeVisible();
     }
+  });
+
+  test('zeigt die Blockposition', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByText(/Block \d+ · Woche \d+ von 12/)).toBeVisible();
+  });
+
+  test('Reiter sind erreichbar', async ({ page }) => {
+    for (const [pfad, titel] of [
+      ['/verlauf', 'Verlauf'],
+      ['/vertrieb', 'Vertrieb'],
+      ['/health', 'Health'],
+    ] as const) {
+      await page.goto(pfad);
+      await expect(page.getByRole('heading', { name: titel, level: 1 })).toBeVisible();
+    }
+  });
+
+  test('Routine lässt sich bearbeiten', async ({ page }) => {
+    await page.goto('/');
+    const routine = page.locator('.crm-card').filter({ hasText: 'Routine' }).first();
+    await routine.getByRole('button', { name: 'Bearbeiten' }).click();
+    // Im Bearbeiten-Modus gibt es ein Feld zum Anlegen neuer Schritte.
+    await expect(routine.getByPlaceholder('Schritt hinzufügen')).toBeVisible();
   });
 });
