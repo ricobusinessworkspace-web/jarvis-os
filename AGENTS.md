@@ -8,10 +8,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Arbeitsablauf (verbindlich)
 
-Vor jeder Aufgabe:
+**Einmal beim Session-Start:**
+- `~/dev/coding-workflow-standards.md` lesen — projektübergreifende Verfassung
 
-1. `~/dev/coding-workflow-standards.md` lesen — projektübergreifende Verfassung
-2. `./HANDOVER.md` lesen — aktueller Projektstand, gelöste Probleme, offene Fragen
-3. Aufgabe umsetzen, Code-Qualität nicht kompromittieren
-4. `HANDOVER.md` aktualisieren — nur betroffene Sections, keine Komplettneufassung
-5. Completion Summary liefern (ein Absatz, Bullet Points)
+**Vor jeder Prompt:**
+- `./HANDOVER.md` lesen — aktueller Stand, gelöste Probleme, offene Fragen
+
+**Nach jeder Prompt:**
+- `HANDOVER.md` aktualisieren — nur betroffene Sections, keine Komplettneufassung
+- Completion Summary liefern (ein Absatz, Bullet Points)
+
+Code-Qualität wird dabei nie kompromittiert.
