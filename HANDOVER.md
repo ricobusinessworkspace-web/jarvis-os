@@ -31,8 +31,12 @@ Pipeline sind nur Folgen.
 - **Abgeleitete Ziele**: fertig. Eine Intention ist jetzt *entweder* eine feste
   Zahl *oder* eine Ableitung (`routine_completeness`, `health_target`,
   `weight_trajectory`). Schlaf hat ein festes Ziel bekommen (Basis 6 h, Soll 8 h).
-  **Offen: Kalorien- und Gewichtsziel muss Rico einmal aus Cronometer schicken**
-  (`docs/apple-shortcuts.md` Schritt 5), bis dahin „Ziel fehlt".
+  Kalorien- und Gewichtsziel sind am 2026-09-10 gesetzt: **2.880 kcal** (Basis
+  3.168) und **80 → 75 kg bis 2027-03-01**. Rico trainiert hart, 2.880 ist
+  deshalb bewusst kein niedriger Wert — bei geschätzt ~3.100 Erhaltungsbedarf
+  entspricht es den ~220 kcal Tagesdefizit, die das Gewichtsziel rechnerisch
+  braucht. **Ob die Annahme stimmt, entscheidet die Gewichtskurve:** bleibt sie
+  in 4–6 Wochen flach, war 2.880 doch Erhaltung und muss runter.
 - **Korrektur von Hand**: fertig. Kalorien sind auf „Heute" und im Verlauf
   eintragbar; der Handwert schlägt jeden Sync, ist als „von Hand" markiert und
   per Knopf zurücksetzbar.
@@ -40,15 +44,10 @@ Pipeline sind nur Folgen.
   Ereignisquelle und KI-Export-Button sind raus. ⌘K öffnet stattdessen eine
   echte Befehlspalette. Der Zustand-Store ist damit vollständig entfallen —
   das Dashboard-Layout macht jetzt **keine** Datenbankabfrage mehr.
-- **Apple-Anbindung** (Erinnerungen + Health-Kalorien): Endpunkt live und gegen
-  Production verifiziert. `INGEST_SECRET` ist in Vercel Production gesetzt.
-  Kurzbefehl „Jarvis: Reminders" steht auf Ricos iPhone und **liefert bereits**
-  (Find Reminders → Repeat → Dictionary → POST). **Offen:**
-  (a) `parseReminders` im Working Tree ist **noch nicht deployed** — bis dahin
-  zeigt die Aufgaben-Karte eine einzige Erinnerung mit JSON-Text als Titel;
-  (b) Kurzbefehl „Jarvis: Kalorien" (Schritt 4) und die Automationen (Schritt 6).
-  Testdaten: 1.840 kcal auf dem 2026-09-10, werden beim ersten echten Sync
-  überschrieben.
+- **Apple-Anbindung** (Erinnerungen + Health-Kalorien): **fertig und im Betrieb**
+  seit 2026-09-10. Beide Kurzbefehle stehen auf Ricos iPhone, vier Automationen
+  laufen (Reminders/Cronometer je `Is Closed`, plus 08:00 und 23:00). Sync gegen
+  Production verifiziert. Aufbau und alle Fallstricke: `docs/apple-shortcuts.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
