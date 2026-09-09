@@ -36,10 +36,11 @@ npm run test:e2e       # Playwright-Rauchtest
 
 ## Dokumente
 
-- **`HANDOVER.md`** — Architektur, Fallstricke, offene Punkte. Erster Anlaufpunkt.
+- **`HANDOVER.md`** — Projektstand, gelöste Probleme, offene Entscheidungen. **Erster Anlaufpunkt für jeden Agenten.**
 - `AGENTS.md` — Regeln für KI-Agenten in diesem Repo
+- `~/dev/coding-workflow-standards.md` — projektübergreifender Arbeitsablauf
 - `APPLE_INTEGRATION.md` — iOS-Kurzbefehle für Erinnerungen und Health
-- `MOBILE_WIDGET_HANDOVER.md` — iPhone-Widget über Scriptable
+- `IOS_WIDGET.md` — iPhone-Widget über Scriptable
 - `N8N_FINANCE_WORKFLOW.md` — Bank-Sync
 - `DATENBANK_BRIEFING.md` — Messungen und offene Punkte zur Datenbankanbindung
 - `RICOS_WORKSPACE_GUIDE.md` — Arbeitsweise und Cockpit-Philosophie

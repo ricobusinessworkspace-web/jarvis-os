@@ -1,6 +1,8 @@
-# Mobile Developer Handover: iOS Routine Widget
+# iOS Routine Widget (Scriptable)
 
-This document provides all technical details required to maintain, debug, or extend the native iOS Routine Widget for Jarvis OS. The widget is currently implemented using the third-party iOS app **Scriptable**, which executes JavaScript to render native iOS UI components.
+> Referenzdokument, kein Handover. Das Projekt-Handover ist `HANDOVER.md`.
+
+Technische Details zum Warten und Erweitern des iOS-Routine-Widgets für Jarvis OS. The widget is currently implemented using the third-party iOS app **Scriptable**, which executes JavaScript to render native iOS UI components.
 
 ## Architecture Overview
 The widget connects to a dedicated Next.js API route to fetch the user's daily habits (routines). 
