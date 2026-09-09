@@ -1,16 +1,22 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, Bell, Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useStore } from '@/lib/store';
 import { useSidebar } from './SidebarContext';
-import { ClaudeExportButton } from '@/components/ui/ClaudeExportButton';
+import { CommandPalette } from './CommandPalette';
+
+/**
+ * Ort, Zeit, Sprungmarke — mehr nicht.
+ *
+ * Vorher standen hier eine Suchleiste, die in einen ungelesenen Store schrieb,
+ * eine Glocke ohne Ereignisquelle und ein Export-Knopf für Claude. Alle drei
+ * sahen nach Funktion aus und hatten keine. Was bleibt, tut wirklich etwas.
+ */
 
 function pageNameFromPath(pathname: string): string {
-  if (pathname === '/') return 'Dashboard';
-  if (pathname.startsWith('/content')) return 'Content & Tasks';
+  if (pathname === '/') return 'Heute';
   const segment = pathname.split('/').filter(Boolean).pop() ?? '';
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
@@ -20,97 +26,59 @@ export default function TopBar() {
   const pageName = pageNameFromPath(pathname);
   const { toggleSidebar } = useSidebar();
 
+  // Erst nach der Hydration setzen: die Serverzeit weicht sonst von der des
+  // Browsers ab und React meckert über den Unterschied.
   const [now, setNow] = useState<Date | null>(null);
-  const [isElectron, setIsElectron] = useState(false);
-  
-  const searchQuery = useStore((state) => state.searchQuery);
-  const setSearchQuery = useStore((state) => state.setSearchQuery);
-  
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
-     
     const timeout = setTimeout(() => setNow(new Date()), 0);
-    const interval = setInterval(() => setNow(new Date()), 30000);
+    const interval = setInterval(() => setNow(new Date()), 30_000);
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
     };
   }, []);
 
-  useEffect(() => {
-    // Focus input on Cmd+K
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   return (
-    <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 px-4 md:px-6 glass border-b border-border electron-drag select-none"
-    >
-      {/* ── Left: Breadcrumb ──────────────── */}
-      <div className={cn('flex items-center gap-2 text-xs font-semibold uppercase tracking-wider', isElectron && 'pl-16')}>
-        <button 
-          onClick={toggleSidebar} 
-          className="md:hidden mr-1 p-1.5 rounded-md hover:bg-overlay text-muted hover:text-foreground transition-colors press electron-no-drag"
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border px-4 glass electron-drag select-none md:px-6">
+      <div className="flex items-center gap-2 text-xs font-medium tracking-wide">
+        <button
+          onClick={toggleSidebar}
+          className="press electron-no-drag -ml-1 mr-1 rounded-lg p-1.5 text-muted transition-colors hover:bg-overlay hover:text-foreground md:hidden"
+          aria-label="Menü"
         >
           <Menu size={18} />
         </button>
-        <span className="text-muted hidden sm:inline">Jarvis OS</span>
-        <span className="text-muted hidden sm:inline">/</span>
-        <span className="font-black text-foreground truncate max-w-[120px] sm:max-w-none">{pageName}</span>
+        <span className="hidden text-muted sm:inline">Jarvis OS</span>
+        <span className="hidden text-muted/50 sm:inline">/</span>
+        <span className="max-w-[140px] truncate font-semibold text-foreground sm:max-w-none">
+          {pageName}
+        </span>
       </div>
 
-      {/* ── Center / Right: Clock, Search & Notifications ── */}
-      <div className="flex items-center gap-4 electron-no-drag">
-        {/* Clock */}
+      <div className="electron-no-drag flex items-center gap-3">
         {now && (
-          <span className="hidden md:block text-xs font-semibold text-muted tracking-wide whitespace-nowrap">
+          <span className="hidden whitespace-nowrap font-mono text-[11.5px] tabular-nums text-muted md:block">
             {now.toLocaleDateString('de-DE', {
-              weekday: 'short',
-              day: 'numeric',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
+              weekday: 'short', day: 'numeric', month: 'short',
+              hour: '2-digit', minute: '2-digit',
             })}
           </span>
         )}
 
-        {/* Global Search Input */}
-        <div className="relative flex items-center bg-surface border border-border rounded-lg px-2.5 py-1 text-xs text-muted hover:border-border-hover focus-within:border-accent transition-colors duration-150">
-          <Search size={13} className="mr-1.5 shrink-0 text-muted" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent text-foreground text-xs focus:outline-none w-28 sm:w-44 placeholder:text-muted/60"
-          />
-          <kbd className="ml-1.5 hidden sm:inline-flex items-center rounded bg-elevated px-1.5 py-0.5 font-mono text-[9px] text-muted border border-border/40 select-none">
-            ⌘K
-          </kbd>
-        </div>
-
-        <ClaudeExportButton />
-
-        {/* Notification Bell */}
         <button
-          className="relative rounded-lg p-1.5 text-muted hover:bg-overlay hover:text-foreground transition-all duration-150 cursor-pointer press"
-          aria-label="Notifications"
+          onClick={() => window.dispatchEvent(new Event('jarvis:command-palette'))}
+          aria-label="Befehle öffnen"
+          className={cn(
+            'press flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1 text-muted transition-colors',
+            'hover:border-border-hover hover:text-foreground'
+          )}
         >
-          <Bell size={16} />
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+          <Search size={13} />
+          <kbd className="hidden font-mono text-[10px] tracking-wide sm:inline">⌘K</kbd>
         </button>
       </div>
+
+      <CommandPalette />
     </header>
   );
 }

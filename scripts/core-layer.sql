@@ -111,3 +111,71 @@ CREATE TABLE IF NOT EXISTS ingest_status (
   synced_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   item_count INTEGER     NOT NULL DEFAULT 0
 );
+
+-- ============================================================
+--  Abgeleitete Ziele
+--
+--  Bis hierher war ein Soll immer eine feste Zahl aus dem Plan. Manche
+--  Ziele kennt aber ein angeschlossenes System besser als der Plan:
+--  das Kalorienziel steht in Cronometer, das Gewichtsziel samt Zieldatum
+--  ebenso, und wie viele Schritte eine Routine hat, weiß die Routine.
+--
+--  Eine Intention ist deshalb ab jetzt **entweder** statisch (base_value
+--  gesetzt) **oder** abgeleitet (derived_kind gesetzt). Lässt sich ein
+--  abgeleitetes Ziel gerade nicht auflösen, wird nichts erfunden — die
+--  Metrik steht dann auf „Ziel fehlt". Siehe AnalyticsService.
+-- ============================================================
+
+ALTER TABLE core_intentions ALTER COLUMN base_value DROP NOT NULL;
+ALTER TABLE core_intentions ADD COLUMN IF NOT EXISTS derived_kind   TEXT;
+ALTER TABLE core_intentions ADD COLUMN IF NOT EXISTS derived_config JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- Entweder-oder, nicht beides und nicht keins.
+ALTER TABLE core_intentions DROP CONSTRAINT IF EXISTS core_intentions_target_present;
+ALTER TABLE core_intentions ADD  CONSTRAINT core_intentions_target_present
+  CHECK (base_value IS NOT NULL OR derived_kind IS NOT NULL);
+
+-- Zielwerte, die aus Apple Health / Cronometer hereinkommen.
+-- Gewicht braucht zusätzlich Start und Zieldatum, damit sich für heute
+-- ein Zwischenziel interpolieren lässt.
+CREATE TABLE IF NOT EXISTS ingest_health_targets (
+  metric_key   TEXT             PRIMARY KEY,
+  target_value DOUBLE PRECISION NOT NULL,
+  target_date  DATE,
+  start_value  DOUBLE PRECISION,
+  start_date   DATE,
+  synced_at    TIMESTAMPTZ      NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+--  Korrekturen von Hand
+--
+--  Kalorien kommen aus Health und sind dort die Wahrheit. Wer aber einen
+--  Tag ohne Sync durchgetrackt hat, muss ihn nachtragen können, ohne die
+--  Quell-App zu öffnen. Diese Tabelle gewinnt gegen jede Automatik
+--  (Quelle `manual`, priority 1) — bis sie für den Tag gelöscht wird.
+--
+--  value IS NULL heißt bewusst „nicht gemessen" und ist etwas anderes
+--  als „keine Zeile" (= keine Korrektur vorhanden).
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS core_manual_values (
+  date       DATE             NOT NULL,
+  metric_key TEXT             NOT NULL REFERENCES core_metric_definitions(key) ON DELETE CASCADE,
+  value      DOUBLE PRECISION,
+  note       TEXT             NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ      NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ      NOT NULL DEFAULT now(),
+  PRIMARY KEY (date, metric_key)
+);
+
+-- ============================================================
+--  Pflichtschritte einer Routine
+--
+--  „Basis erreicht" heißt bei einer Routine nicht „irgendwelche 4 von 6",
+--  sondern: die Schritte, die wirklich zählen, sind erledigt. Welche das
+--  sind, markiert Rico im Routine-Editor — nicht eine Zahl im Code.
+-- ============================================================
+
+ALTER TABLE jarvis_tracker_items
+  ADD COLUMN IF NOT EXISTS required BOOLEAN NOT NULL DEFAULT FALSE;

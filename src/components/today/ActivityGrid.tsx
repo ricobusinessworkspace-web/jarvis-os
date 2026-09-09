@@ -124,10 +124,11 @@ export function ActivityGrid({ matrix, metrics, summaries, from, to, today, titl
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-border/40 pt-3 text-[11px] text-muted">
-        <Legend className="bg-emerald-400" label="Soll" />
-        <Legend className="bg-emerald-700" label="Basis" />
-        <Legend className="bg-amber-500" label="darunter" />
-        <Legend className="bg-sky-500/60" label="erfasst" />
+        <Legend className="bg-foreground" label="Soll" />
+        <Legend className="bg-foreground/40" label="Basis" />
+        <Legend className="bg-error/70" label="darunter" />
+        <Legend className="bg-foreground/[0.16]" label="erfasst" />
+        <Legend className="bg-foreground/[0.16] border border-dashed border-foreground/50" label="Ziel fehlt" />
         <Legend className="ring-1 ring-inset ring-white/15" label="nicht gemessen" />
         <Legend className="bg-white/[0.03]" label="Off-Day" />
       </div>

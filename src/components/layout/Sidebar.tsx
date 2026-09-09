@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  KanbanSquare,
   ChevronLeft,
   ChevronRight,
   Wallet,
@@ -23,7 +22,6 @@ const NAV_ITEMS = [
   { label: 'Verlauf', href: '/verlauf', icon: CalendarDays },
   { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall },
   { label: 'Health', href: '/health', icon: HeartPulse },
-  { label: 'Content Kanban', href: '/content', icon: KanbanSquare },
   { label: 'Finanzen', href: '/finance', icon: Wallet },
 ] as const;
 

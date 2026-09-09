@@ -200,6 +200,8 @@ model TrackerItem {
   order            Int
   expectedDuration Int?
   startWindow      String?
+  /// Pflichtschritt — entscheidet, ob die Routine als „Basis erreicht" gilt.
+  required         Boolean      @default(false)
   tracker          Tracker      @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   logs             TrackerLog[]
 
@@ -419,12 +421,19 @@ model CoreMetricSource {
   @@schema("public")
 }
 
+/// Entweder statisch (`baseValue` gesetzt) oder abgeleitet (`derivedKind`
+/// gesetzt) — nie beides, nie keins. Ein abgeleitetes Ziel, das sich gerade
+/// nicht auflösen lässt, wird nicht geraten: die Metrik steht dann auf
+/// „Ziel fehlt".
 model CoreIntention {
   id             String    @id @default(uuid())
   metricKey      String    @map("metric_key")
-  baseValue      Float     @map("base_value")
+  baseValue      Float?    @map("base_value")
   stretchValue   Float?    @map("stretch_value")
   comparator     String    @default(">=")
+  /// routine_completeness | health_target | weight_trajectory
+  derivedKind    String?   @map("derived_kind")
+  derivedConfig  Json      @default("{}") @map("derived_config")
   activeWeekdays Int[]     @default([1, 2, 3, 4, 5, 6]) @map("active_weekdays")
   validFrom      DateTime  @map("valid_from") @db.Date
   validTo        DateTime? @map("valid_to") @db.Date
@@ -434,6 +443,36 @@ model CoreIntention {
   metric CoreMetricDefinition @relation(fields: [metricKey], references: [key], onDelete: Cascade)
 
   @@map("core_intentions")
+  @@schema("public")
+}
+
+/// Zielwerte aus Apple Health / Cronometer. Gewicht trägt zusätzlich Start
+/// und Zieldatum, damit sich für heute ein Zwischenziel interpolieren lässt.
+model IngestHealthTarget {
+  metricKey   String    @id @map("metric_key")
+  targetValue Float     @map("target_value")
+  targetDate  DateTime? @map("target_date") @db.Date
+  startValue  Float?    @map("start_value")
+  startDate   DateTime? @map("start_date") @db.Date
+  syncedAt    DateTime  @default(now()) @map("synced_at")
+
+  @@map("ingest_health_targets")
+  @@schema("public")
+}
+
+/// Korrektur von Hand für genau einen Tag. Gewinnt gegen jede Automatik,
+/// bis sie gelöscht wird. `value = null` heißt bewusst „nicht gemessen" und
+/// ist etwas anderes als „keine Zeile".
+model CoreManualValue {
+  date      DateTime @db.Date
+  metricKey String   @map("metric_key")
+  value     Float?
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([date, metricKey])
+  @@map("core_manual_values")
   @@schema("public")
 }
 

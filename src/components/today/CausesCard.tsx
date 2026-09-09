@@ -29,14 +29,16 @@ function StateBox({ state }: { state: MetricState }) {
     <div
       className={cn(
         'h-5 w-5 shrink-0 rounded-md border-[1.5px] flex items-center justify-center transition-colors',
-        done && 'bg-emerald-500 border-emerald-500',
-        state === 'unter' && 'border-amber-500 bg-amber-500/15',
+        done && 'bg-foreground border-foreground',
+        state === 'unter' && 'border-error/50 bg-error/12',
         state === 'ungemessen' && 'border-dashed border-white/25',
-        state === 'erfasst' && 'border-sky-500/60 bg-sky-500/15',
+        state === 'erfasst' && 'border-white/20 bg-white/[0.06]',
+        // Wert da, Maß fehlt: gefüllt wie „erfasst", aber offener Rand.
+        state === 'zielfehlt' && 'border-dashed border-white/45 bg-white/[0.06]',
         state === 'offday' && 'border-white/10 bg-white/[0.03]'
       )}
     >
-      {done && <Check className="h-3 w-3 text-black/70" strokeWidth={3.5} />}
+      {done && <Check className="h-3 w-3 text-background" strokeWidth={3.5} />}
     </div>
   );
 }
@@ -112,7 +114,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
                   )}
                 </div>
                 {row.streak > 0 && (
-                  <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-amber-500">
+                  <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-muted">
                     <Flame className="h-3 w-3" />
                     {row.streak}
                   </div>

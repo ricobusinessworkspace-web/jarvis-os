@@ -11,13 +11,15 @@ import { TaskInbox } from '@/components/today/TaskInbox';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { RoutineCard } from '@/components/today/RoutineCard';
 import { BodyLogCard } from '@/components/today/BodyLogCard';
+import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
 
 export const dynamic = 'force-dynamic';
 
+/** `sub` wird aus den echten Soll-Werten gebildet — siehe `targetSub`. */
 const URSACHEN = [
-  { key: 'sales.calls_count', label: 'Calls', sub: 'Basis 30 · Soll 60' },
-  { key: 'training.sessions', label: 'Training', sub: '1 × Mo–Sa' },
-  { key: 'content.posts', label: 'Post', sub: '1 × Mo–Sa' },
+  { key: 'sales.calls_count', label: 'Calls' },
+  { key: 'training.sessions', label: 'Training' },
+  { key: 'content.posts', label: 'Post' },
 ];
 
 function lastDayOfMonth(dateStr: string): string {
@@ -51,9 +53,11 @@ async function Today() {
     URSACHEN.map(m => [m.key, AnalyticsService.summarize(matrix, m.key, summaryFrom, today)])
   );
 
-  const cell = (key: string) => matrix[today]?.[key];
+  const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
   const calls = cell('sales.calls_count');
-  const calories = cell('body.calories');
+
+  // Beschriftungen kommen aus den echten Zielen, nicht aus fest getipptem Text.
+  const gridMetrics = URSACHEN.map(m => ({ ...m, sub: targetSub(cell(m.key)) }));
 
   const causeRows: CauseRow[] = URSACHEN.map(m => {
     const c = cell(m.key);
@@ -61,11 +65,11 @@ async function Today() {
     return {
       metricKey: m.key,
       label: m.label === 'Post' ? 'Personal Brand Post' : m.label === 'Training' ? 'Trainingseinheit' : m.label,
-      value: c?.value ?? null,
-      base: c?.base ?? null,
-      stretch: c?.stretch ?? null,
-      state: c?.state ?? 'ungemessen',
-      source: c?.source ?? null,
+      value: c.value,
+      base: c.base,
+      stretch: c.stretch,
+      state: c.state,
+      source: c.source,
       streak: s?.streak ?? 0,
       adherence: s?.adherence ?? null,
       coverage: s?.coverage ?? null,
@@ -103,21 +107,21 @@ async function Today() {
         <MetricCard
           title="Calls"
           source="CRM"
-          value={calls?.value ?? null}
-          base={calls?.base ?? null}
-          stretch={calls?.stretch ?? null}
+          value={calls.value}
+          base={calls.base}
+          stretch={calls.stretch}
           unit="count"
-          state={calls?.state ?? 'ungemessen'}
+          state={calls.state}
+          targetHint={calls.targetHint}
           footLeft="Ziel aus CRM-Profil"
           footRight={callsWeek ? `${callsWeek.met}/${callsWeek.tracked} Tage im Block` : undefined}
         />
 
         <BodyLogCard
           date={today}
-          sleepHours={cell('body.sleep_hours')?.value ?? null}
-          weight={cell('body.weight')?.value ?? null}
-          calories={calories?.value ?? null}
-          caloriesConnected={calories?.source === 'health'}
+          sleep={cell('body.sleep_hours')}
+          weight={cell('body.weight')}
+          calories={cell('body.calories')}
           lastWeight={lastWeight}
         />
 
@@ -141,7 +145,7 @@ async function Today() {
       <div className="mt-3">
         <ActivityGrid
           matrix={matrix}
-          metrics={URSACHEN}
+          metrics={gridMetrics}
           summaries={summaries}
           from={monthStart}
           to={monthEnd}

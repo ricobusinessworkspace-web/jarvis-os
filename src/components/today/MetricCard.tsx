@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { STATE_TEXT, STATE_BAR, formatValue } from '@/lib/metricState';
 import type { MetricState } from '@/core/services/AnalyticsService';
 import { cn } from '@/lib/utils';
@@ -14,10 +15,12 @@ interface Props {
   footRight?: string;
   /** Ersetzt die Zahl, wenn es schlicht keine Datenquelle gibt. */
   emptyHint?: string;
+  /** Warum sich das Ziel nicht auflösen ließ — nur bei `zielfehlt` gesetzt. */
+  targetHint?: string;
 }
 
 export function MetricCard({
-  title, source, value, base, stretch, unit, state, footLeft, footRight, emptyHint,
+  title, source, value, base, stretch, unit, state, footLeft, footRight, emptyHint, targetHint,
 }: Props) {
   const goal = stretch ?? base;
   const fill = value !== null && goal ? Math.min(100, (value / goal) * 100) : 0;
@@ -46,13 +49,23 @@ export function MetricCard({
         </div>
       )}
 
+      {/* Der Wert steht, das Maß fehlt. Bewusst als Hinweis mit Grund, nicht
+          als stiller „erfasst"-Zustand — sonst sieht ein kaputter Anschluss
+          aus wie eine Design-Entscheidung. */}
+      {state === 'zielfehlt' && (
+        <div className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted">
+          <AlertTriangle className="mt-[1px] h-3 w-3 shrink-0" strokeWidth={2} />
+          <span>Ziel fehlt{targetHint ? ` — ${targetHint}` : ''}</span>
+        </div>
+      )}
+
       <div className="mt-auto pt-4">
         {goal !== null && (
           <div className="relative h-1.5 rounded-full bg-white/[0.07]">
             <div className={cn('h-full rounded-full', STATE_BAR[state])} style={{ width: `${fill}%` }} />
             {basisAt !== null && (
               <span
-                className="absolute -top-[3px] h-3 w-px bg-white/25"
+                className="absolute -top-[3px] h-3 w-px bg-white/30"
                 style={{ left: `${basisAt}%` }}
                 title={`Basis ${base}`}
               />

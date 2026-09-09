@@ -5,6 +5,7 @@ import { Check, Sun, Moon, Pencil, Plus, Trash2, ChevronUp, ChevronDown, X } fro
 import { logTrackerItem } from '@/actions/dashboard';
 import {
   addRoutineItem, renameRoutineItem, deleteRoutineItem, moveRoutineItem, renameRoutine,
+  setRoutineItemRequired,
 } from '@/actions/routines';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +13,8 @@ export interface RoutineItem {
   id: string;
   title: string;
   done: boolean;
+  /** Pflichtschritt — nur wenn alle erledigt sind, gilt die Routine als „Basis". */
+  required: boolean;
 }
 
 export interface RoutineBlock {
@@ -26,9 +29,14 @@ export interface RoutineBlock {
  * Kein Umschalter: „alles auf einen Blick" heißt, dass abends auch der
  * Morgen noch nachgetragen werden kann.
  *
- * Im Bearbeiten-Modus lassen sich Schritte umbenennen, verschieben, löschen
- * und ergänzen. Löschen nimmt die Historie des Schritts mit, deshalb braucht
- * es dort einen zweiten Klick.
+ * Im Bearbeiten-Modus lassen sich Schritte umbenennen, verschieben, löschen,
+ * ergänzen und als **Pflicht** markieren. Löschen nimmt die Historie des
+ * Schritts mit, deshalb braucht es dort einen zweiten Klick.
+ *
+ * Die Pflichtschritte sind das Soll der Routine: „Basis erreicht" heißt, dass
+ * genau sie erledigt sind — nicht, dass irgendwelche vier von sechs abgehakt
+ * wurden. Deshalb stehen sie hier auch außerhalb des Bearbeiten-Modus klar
+ * lesbar, während optionale Schritte zurücktreten.
  */
 export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: string }) {
   const [editing, setEditing] = useState(false);
@@ -114,15 +122,16 @@ function RoutineColumn({
 
   const done = block.items.filter(isDone).length;
   const total = block.items.length;
+  const required = block.items.filter(i => i.required);
+  const requiredDone = required.filter(isDone).length;
+  // Morgen und Abend unterscheiden sich durchs Symbol, nicht durch die Farbe —
+  // Farbe bleibt im ganzen Dashboard für Zustände reserviert.
   const Icon = block.kind === 'morning' ? Sun : Moon;
-  const accent = block.kind === 'morning' ? 'text-amber-400' : 'text-indigo-400';
-  const bar = block.kind === 'morning' ? 'bg-amber-400' : 'bg-indigo-400';
-  const boxOn = block.kind === 'morning' ? 'border-amber-400 bg-amber-400' : 'border-indigo-400 bg-indigo-400';
 
   return (
     <div className={cn('min-w-0', className)}>
       <div className="mb-2 flex items-center gap-2">
-        <Icon className={cn('h-3.5 w-3.5 shrink-0', accent)} />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted" />
         {editing && editingName ? (
           <input
             value={nameDraft}
@@ -152,11 +161,33 @@ function RoutineColumn({
         </span>
       </div>
 
-      <div className="mb-3 h-1 rounded-full bg-white/[0.07]">
+      {/* Zwei Marken, eine Leiste: der helle Teil ist der Fortschritt, der
+          Strich sitzt dort, wo die Pflichtschritte abgearbeitet wären. */}
+      <div className="relative mb-1.5 h-1 rounded-full bg-white/[0.07]">
         <div
-          className={cn('h-full rounded-full transition-all duration-500', bar)}
+          className="h-full rounded-full bg-foreground transition-all duration-500"
           style={{ width: total ? `${(done / total) * 100}%` : '0%' }}
         />
+        {required.length > 0 && required.length < total && (
+          <span
+            className="absolute -top-[3px] h-[10px] w-px bg-white/30"
+            style={{ left: `${(required.length / total) * 100}%` }}
+            title={`${required.length} Pflichtschritte = Basis`}
+          />
+        )}
+      </div>
+
+      <div className="mb-3 text-[10.5px] text-muted">
+        {required.length === 0 ? (
+          <span>kein Pflichtschritt markiert — keine Basis</span>
+        ) : (
+          <span>
+            Pflicht{' '}
+            <span className={cn('font-mono tabular-nums', requiredDone >= required.length && 'text-foreground')}>
+              {requiredDone}/{required.length}
+            </span>
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col">
@@ -170,12 +201,22 @@ function RoutineColumn({
                 <span
                   className={cn(
                     'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border-[1.5px] transition-colors',
-                    isDone(item) ? boxOn : 'border-white/20'
+                    isDone(item)
+                      ? 'border-foreground bg-foreground'
+                      : item.required ? 'border-white/35' : 'border-white/15'
                   )}
                 >
-                  {isDone(item) && <Check className="h-3 w-3 text-black/70" strokeWidth={3.5} />}
+                  {isDone(item) && <Check className="h-3 w-3 text-background" strokeWidth={3.5} />}
                 </span>
-                <span className={cn('truncate', isDone(item) && 'text-muted line-through')}>{item.title}</span>
+                <span
+                  className={cn(
+                    'truncate',
+                    !item.required && 'text-foreground/55',
+                    isDone(item) && 'text-muted line-through'
+                  )}
+                >
+                  {item.title}
+                </span>
               </button>
             ) : (
               <>
@@ -223,6 +264,23 @@ function RoutineColumn({
                 )}
 
                 <button
+                  onClick={() => run(() => setRoutineItemRequired(item.id, !item.required))}
+                  className={cn(
+                    'shrink-0 rounded-md border px-1.5 py-[3px] text-[9.5px] font-semibold uppercase tracking-wider transition-colors',
+                    item.required
+                      ? 'border-foreground/30 bg-foreground/10 text-foreground'
+                      : 'border-border text-muted hover:text-foreground'
+                  )}
+                  title={
+                    item.required
+                      ? 'Pflichtschritt — zählt zur Basis'
+                      : 'Optional — zählt nur zum Soll'
+                  }
+                >
+                  Pflicht
+                </button>
+
+                <button
                   onClick={() => {
                     if (confirmDelete === item.id) {
                       run(() => deleteRoutineItem(item.id));
@@ -268,8 +326,9 @@ function RoutineColumn({
 
       {editing && (
         <p className="mt-2 text-[10.5px] leading-relaxed text-muted">
-          Namen antippen zum Umbenennen. Löschen entfernt auch die bisherige Historie
-          dieses Schritts.
+          Namen antippen zum Umbenennen. <span className="text-foreground">Pflicht</span> markiert
+          die Schritte, die für „Basis erreicht&ldquo; zählen — alle anderen zählen nur aufs Soll.
+          Löschen entfernt auch die bisherige Historie dieses Schritts.
         </p>
       )}
     </div>

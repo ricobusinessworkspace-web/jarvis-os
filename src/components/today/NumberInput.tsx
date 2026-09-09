@@ -66,7 +66,7 @@ export function NumberInput({
         inputMode="decimal"
         className="w-20 rounded-lg border border-border bg-background px-2.5 py-1.5 text-right font-mono text-[13px] tabular-nums outline-none transition-colors focus:border-accent disabled:opacity-40"
       />
-      {unit && <span className="w-6 font-mono text-[11px] text-muted">{unit}</span>}
+      {unit && <span className="min-w-6 font-mono text-[11px] text-muted">{unit}</span>}
     </div>
   );
 }

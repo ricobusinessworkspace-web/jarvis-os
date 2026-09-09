@@ -47,7 +47,10 @@ async function Verlauf({ selected }: { selected: string }) {
       value: row['content.posts']?.value ?? null,
       state: row['content.posts']?.state ?? 'ungemessen',
     },
-    calories: row['body.calories']?.value ?? null,
+    calories: {
+      value: row['body.calories']?.value ?? null,
+      source: row['body.calories']?.source ?? null,
+    },
     sleepHours: row['body.sleep_hours']?.value ?? null,
     weight: row['body.weight']?.value ?? null,
     routines,

@@ -27,10 +27,10 @@ function Funnel({ stages }: { stages: Array<{ label: string; count: number; tone
             className={
               'h-5 rounded border ' +
               (s.tone === 'won'
-                ? 'border-emerald-500/30 bg-emerald-500/15'
+                ? 'border-foreground/25 bg-foreground/15'
                 : s.tone === 'cold'
                   ? 'border-border/60 bg-white/[0.05]'
-                  : 'border-accent/30 bg-accent/15')
+                  : 'border-foreground/15 bg-foreground/[0.08]')
             }
             style={{ width: `${Math.max(3, (s.count / max) * 100)}%` }}
           />
@@ -93,7 +93,7 @@ async function Vertrieb() {
         <div className="crm-card h-full">
           <div className="crm-header">
             <h3 className="crm-title">Conversion</h3>
-            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
+            <span className="rounded-md border border-border/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
               Messphase
             </span>
           </div>
@@ -128,7 +128,7 @@ async function Vertrieb() {
         <div className="crm-card">
           <div className="crm-header">
             <h3 className="crm-title">Umsatzziel</h3>
-            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
+            <span className="rounded-md border border-border/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
               pending
             </span>
           </div>

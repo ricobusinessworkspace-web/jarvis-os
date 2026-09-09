@@ -3,7 +3,7 @@
 import { useOptimistic, useTransition } from 'react';
 import { Check, Minus } from 'lucide-react';
 import { toggleCause } from '@/actions/today';
-import { saveDayValues, clearCause } from '@/actions/verlauf';
+import { saveDayValues, clearCause, setManualValue, clearManualValue } from '@/actions/verlauf';
 import { logTrackerItem } from '@/actions/dashboard';
 import { NumberInput } from '@/components/today/NumberInput';
 import type { MetricState } from '@/core/services/AnalyticsService';
@@ -17,10 +17,15 @@ export interface DaySheetData {
   calls: { value: number | null; base: number | null; stretch: number | null; state: MetricState };
   training: { value: number | null; state: MetricState };
   post: { value: number | null; state: MetricState };
-  calories: number | null;
+  /** `source` unterscheidet den Health-Wert von einer Korrektur von Hand. */
+  calories: { value: number | null; source: string | null };
   sleepHours: number | null;
   weight: number | null;
-  routines: Array<{ name: string; kind: 'morning' | 'evening'; items: Array<{ id: string; title: string; done: boolean }> }>;
+  routines: Array<{
+    name: string;
+    kind: 'morning' | 'evening';
+    items: Array<{ id: string; title: string; done: boolean; required: boolean }>;
+  }>;
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -57,7 +62,7 @@ function TriToggle({
         title="geschafft"
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
-          done ? 'border-emerald-500 bg-emerald-500 text-black/70' : 'border-border text-muted hover:text-foreground'
+          done ? 'border-foreground bg-foreground text-background' : 'border-border text-muted hover:text-foreground'
         )}
       >
         <Check className="h-3.5 w-3.5" strokeWidth={3} />
@@ -68,7 +73,7 @@ function TriToggle({
         title="nicht geschafft"
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
-          missed ? 'border-amber-500 bg-amber-500/20 text-amber-500' : 'border-border text-muted hover:text-foreground'
+          missed ? 'border-error/60 bg-error/15 text-error' : 'border-border text-muted hover:text-foreground'
         )}
       >
         <Minus className="h-3.5 w-3.5" strokeWidth={3} />
@@ -90,7 +95,8 @@ function TriToggle({
 
 type Patch =
   | { field: 'training' | 'post'; state: MetricState }
-  | { field: 'sleepHours' | 'weight'; value: number | null };
+  | { field: 'sleepHours' | 'weight'; value: number | null }
+  | { field: 'calories'; value: number | null; source: string | null };
 
 export function DaySheet({ data }: { data: DaySheetData }) {
   const [pending, startTransition] = useTransition();
@@ -110,6 +116,8 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         return { ...state, sleepHours: patch.value };
       case 'weight':
         return { ...state, weight: patch.value };
+      case 'calories':
+        return { ...state, calories: { value: patch.value, source: patch.source } };
     }
   });
 
@@ -134,9 +142,9 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         <span
           className={cn(
             'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-            d.isToday ? 'bg-emerald-500/15 text-emerald-400'
+            d.isToday ? 'bg-foreground/10 text-foreground'
               : d.isOffDay || d.isFuture ? 'bg-white/[0.06] text-muted'
-                : 'bg-amber-500/15 text-amber-500'
+                : 'bg-white/[0.06] text-muted'
           )}
         >
           {d.isToday ? 'Heute' : d.isFuture ? 'Zukunft' : d.isOffDay ? 'Off-Day' : 'Nachtragen möglich'}
@@ -191,10 +199,44 @@ export function DaySheet({ data }: { data: DaySheetData }) {
 
         <GroupLabel>Körper</GroupLabel>
 
-        <Field label="Kalorien" hint="aus Apple Health — Korrekturen in Cronometer">
-          <span className="shrink-0 font-mono text-[13px] tabular-nums text-muted">
-            {d.calories === null ? '– nicht verbunden' : `${d.calories.toLocaleString('de-DE')} kcal`}
-          </span>
+        {/* Health ist die Wahrheit — aber ein Tag, an dem der Kurzbefehl nie
+            lief, muss trotzdem nachtragbar sein, ohne Cronometer zu öffnen.
+            Die Korrektur schlägt danach jeden Sync, bis sie zurückgenommen
+            wird; deshalb sagt die Zeile auch klar, dass sie von Hand kam. */}
+        <Field
+          label="Kalorien"
+          hint={
+            d.calories.source === 'manual'
+              ? 'von Hand — überschreibt Apple Health für diesen Tag'
+              : 'aus Apple Health — sonst hier nachtragen'
+          }
+        >
+          <div className="flex shrink-0 items-center gap-2">
+            {d.calories.source === 'manual' && (
+              <button
+                onClick={() =>
+                  run({ field: 'calories', value: null, source: null }, () =>
+                    clearManualValue('body.calories', d.date)
+                  )
+                }
+                disabled={locked || pending}
+                className="rounded-lg border border-border px-2 py-1 text-[10.5px] text-muted transition-colors hover:text-foreground"
+                title="Korrektur zurücknehmen — ab dann gilt wieder Apple Health"
+              >
+                zurücksetzen
+              </button>
+            )}
+            <NumberInput
+              value={d.calories.value}
+              unit="kcal"
+              disabled={locked || pending}
+              onSave={v =>
+                run({ field: 'calories', value: v, source: 'manual' }, () =>
+                  setManualValue('body.calories', d.date, v)
+                )
+              }
+            />
+          </div>
         </Field>
 
         <Field label="Schlaf">
@@ -241,7 +283,7 @@ export function DaySheet({ data }: { data: DaySheetData }) {
                         className={cn(
                           'rounded-lg border px-2.5 py-1 text-[11.5px] transition-colors',
                           item.done
-                            ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
+                            ? 'border-foreground/25 bg-foreground/10 text-foreground'
                             : 'border-border text-muted hover:text-foreground'
                         )}
                       >

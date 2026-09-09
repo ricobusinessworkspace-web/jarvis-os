@@ -6,16 +6,18 @@ import { blockInfo } from '@/lib/blocks';
 import { MetricCard } from '@/components/today/MetricCard';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { BodyLogCard } from '@/components/today/BodyLogCard';
+import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
 
 export const dynamic = 'force-dynamic';
 
+/** `sub` wird aus den echten Soll-Werten gebildet — siehe `targetSub`. */
 const METRICS = [
-  { key: 'training.sessions', label: 'Training', sub: '1 × Mo–Sa' },
-  { key: 'routine.morning', label: 'Morgen', sub: 'Routine' },
-  { key: 'routine.evening', label: 'Abend', sub: 'Routine' },
-  { key: 'body.sleep_hours', label: 'Schlaf', sub: 'Stunden' },
-  { key: 'body.calories', label: 'Kalorien', sub: 'kcal' },
-  { key: 'body.weight', label: 'Gewicht', sub: 'kg' },
+  { key: 'training.sessions', label: 'Training', unit: 'count' },
+  { key: 'routine.morning', label: 'Morgen', unit: 'count' },
+  { key: 'routine.evening', label: 'Abend', unit: 'count' },
+  { key: 'body.sleep_hours', label: 'Schlaf', unit: 'hours' },
+  { key: 'body.calories', label: 'Kalorien', unit: 'kcal' },
+  { key: 'body.weight', label: 'Gewicht', unit: 'kg' },
 ];
 
 function lastDayOfMonth(dateStr: string): string {
@@ -40,9 +42,9 @@ async function Health() {
     METRICS.map(m => [m.key, AnalyticsService.summarize(matrix, m.key, summaryFrom, today)])
   );
 
-  const training = matrix[today]?.['training.sessions'];
-  const sleep = matrix[today]?.['body.sleep_hours'];
-  const weight = matrix[today]?.['body.weight'];
+  const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
+  const training = cell('training.sessions');
+  const gridMetrics = METRICS.map(m => ({ ...m, sub: targetSub(cell(m.key), m.unit) }));
 
   return (
     <>
@@ -55,11 +57,12 @@ async function Health() {
         <MetricCard
           title="Training"
           source="manuell"
-          value={training?.value ?? null}
-          base={training?.base ?? null}
-          stretch={training?.stretch ?? null}
+          value={training.value}
+          base={training.base}
+          stretch={training.stretch}
           unit="count"
-          state={training?.state ?? 'ungemessen'}
+          state={training.state}
+          targetHint={training.targetHint}
           footLeft="inkl. Basketball"
           footRight={`Streak ${summaries['training.sessions']?.streak ?? 0}`}
         />
@@ -67,10 +70,9 @@ async function Health() {
         <div className="md:col-span-2">
           <BodyLogCard
             date={today}
-            sleepHours={sleep?.value ?? null}
-            weight={weight?.value ?? null}
-            calories={matrix[today]?.['body.calories']?.value ?? null}
-            caloriesConnected={matrix[today]?.['body.calories']?.source === 'health'}
+            sleep={cell('body.sleep_hours')}
+            weight={cell('body.weight')}
+            calories={cell('body.calories')}
             lastWeight={lastWeight}
           />
         </div>
@@ -79,7 +81,7 @@ async function Health() {
       <div className="mt-3">
         <ActivityGrid
           matrix={matrix}
-          metrics={METRICS}
+          metrics={gridMetrics}
           summaries={summaries}
           from={monthStart}
           to={monthEnd}
@@ -88,9 +90,11 @@ async function Health() {
       </div>
 
       <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-        Schlaf, Kalorien und Gewicht haben bewusst keinen Zielwert — der 6-Monats-Plan nennt
-        keinen. Sie erscheinen deshalb als <span className="text-foreground">erfasst</span> statt
-        als erfüllt oder verfehlt.
+        Ziele kommen von dort, wo sie hingehören: Schlaf ist dein eigener Wert und in den
+        Einstellungen änderbar, Kalorien- und Gewichtsziel liest Jarvis aus Cronometer, und
+        wie viel eine Routine ist, sagen ihre Pflichtschritte. Lässt sich eins davon gerade
+        nicht auflösen, steht dort <span className="text-foreground">Ziel fehlt</span> samt
+        Grund — nie eine erfundene Zahl.
       </p>
     </>
   );

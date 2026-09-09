@@ -7,10 +7,11 @@
  * lässt bestehende Intentionen und Ziele unangetastet (die sind in der UI
  * editierbar und dürfen nicht vom Seed zurückgesetzt werden).
  *
- * Grundsatz: **nur Ziele, die es wirklich gibt.** Der Plan nennt Tagesminima
- * für Calls, Training und Post — mehr nicht. Schlaf, Gewicht und Kalorien
- * bekommen deshalb bewusst kein Soll: sie werden erfasst, nicht bewertet.
- * `revenue.monthly` wird nicht angelegt, solange die Messphase läuft.
+ * Grundsatz: **nur Ziele, die es wirklich gibt.** Was der Plan nennt, steht
+ * als feste Zahl hier; was ein angeschlossenes System besser weiß (Kalorien-
+ * und Gewichtsziel aus Cronometer, die Schrittzahl einer Routine), wird
+ * abgeleitet und nie geraten. `revenue.monthly` wird nicht angelegt, solange
+ * die Messphase läuft.
  */
 import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
@@ -71,13 +72,51 @@ const SOURCES: Array<{
 ];
 
 /**
- * Tagesminima. Nur was im Plan bzw. im CRM steht:
- * 30 Calls Basis (Plan), 60 Soll (user_profiles.daily_call_goal), je 1× Training und Post.
+ * Tagesziele. Zwei Sorten:
+ *
+ * **Statisch** — die Zahl steht im Plan bzw. im CRM: 30 Calls Basis (Plan),
+ * 60 Soll (`user_profiles.daily_call_goal`), je 1× Training und Post. Schlaf
+ * ist Ricos eigener Wert (6 h Basis, 8 h Soll) und in den Einstellungen
+ * änderbar — er gehört ihm, nicht dem Plan.
+ *
+ * **Abgeleitet** — das Ziel kennt ein angeschlossenes System besser als wir:
+ * Kalorien- und Gewichtsziel stehen in Cronometer, wie viele Schritte eine
+ * Routine hat, weiß die Routine. Lässt sich so ein Ziel nicht auflösen, wird
+ * nichts erfunden: die Metrik steht auf „Ziel fehlt" und sagt, was fehlt.
  */
-const INTENTIONS = [
+const INTENTIONS: Array<{
+  metricKey: string;
+  baseValue?: number | null;
+  stretchValue?: number | null;
+  comparator?: string;
+  derivedKind?: string;
+  derivedConfig?: Record<string, string | number>;
+}> = [
   { metricKey: 'sales.calls_count', baseValue: 30, stretchValue: 60 },
   { metricKey: 'training.sessions', baseValue: 1,  stretchValue: null },
   { metricKey: 'content.posts',     baseValue: 1,  stretchValue: null },
+  { metricKey: 'body.sleep_hours',  baseValue: 6,  stretchValue: 8, comparator: '>=' },
+
+  // Basis = alle Pflichtschritte, Soll = alle Schritte. Solange kein Schritt
+  // als Pflicht markiert ist, gibt es bewusst keine Basis.
+  { metricKey: 'routine.morning', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Morgenroutine' } },
+  { metricKey: 'routine.evening', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Abendroutine' } },
+
+  // Soll = Kalorienziel, Basis = Ziel + 10 %. Vergleich `<=`: mehr ist schlechter.
+  {
+    metricKey: 'body.calories',
+    comparator: '<=',
+    derivedKind: 'health_target',
+    derivedConfig: { metric: 'body.calories', tolerancePct: 0.1 },
+  },
+
+  // Soll = das für heute interpolierte Zwischengewicht, Basis = 1,5 kg darüber.
+  {
+    metricKey: 'body.weight',
+    comparator: '<=',
+    derivedKind: 'weight_trajectory',
+    derivedConfig: { toleranceKg: 1.5 },
+  },
 ];
 
 const GOALS = [
@@ -120,7 +159,17 @@ async function main() {
       where: { metricKey: intention.metricKey, validTo: null },
     });
     if (existing) continue; // in der UI editierbar — nicht überschreiben
-    await prisma.coreIntention.create({ data: { ...intention, validFrom: VALID_FROM } });
+    await prisma.coreIntention.create({
+      data: {
+        metricKey: intention.metricKey,
+        baseValue: intention.baseValue ?? null,
+        stretchValue: intention.stretchValue ?? null,
+        comparator: intention.comparator ?? '>=',
+        derivedKind: intention.derivedKind ?? null,
+        derivedConfig: intention.derivedConfig ?? {},
+        validFrom: VALID_FROM,
+      },
+    });
     created++;
   }
   console.log(`✓ ${created} Intentionen neu (${INTENTIONS.length - created} bestanden bereits)`);

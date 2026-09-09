@@ -67,7 +67,17 @@ async function main() {
   const intentions = await AnalyticsService.getIntentions();
   console.log('\nSoll-Werte:');
   for (const i of intentions) {
-    console.log(`  ${i.metricKey.padEnd(20)} Basis ${i.baseValue}${i.stretchValue ? ` · Soll ${i.stretchValue}` : ''}`);
+    // Abgeleitete Ziele haben hier bewusst keine Zahl — sie entstehen erst
+    // beim Lesen aus Routine bzw. Health. Was dabei herauskommt, steht in der
+    // Zustandszeile oben, nicht hier.
+    const target = i.derivedKind
+      ? `abgeleitet: ${i.derivedKind}${
+          Object.keys((i.derivedConfig ?? {}) as object).length
+            ? ` ${JSON.stringify(i.derivedConfig)}`
+            : ''
+        }`
+      : `Basis ${i.baseValue}${i.stretchValue ? ` · Soll ${i.stretchValue}` : ''}`;
+    console.log(`  ${i.metricKey.padEnd(20)} ${target}${i.comparator === '<=' ? '  (weniger ist besser)' : ''}`);
   }
   console.log();
 }

@@ -15,11 +15,19 @@ import { blockInfo, dateRange, isOffDay, trackedDays, addDays } from '@/lib/bloc
  */
 
 /**
- * `erfasst` heißt: gemessen, aber ohne hinterlegtes Soll — es gibt kein Urteil,
- * nur den Wert. Genau der Fall bei Gewicht, Schlaf oder Kalorien, für die der
- * 6-Monats-Plan bewusst kein Ziel nennt.
+ * `erfasst` heißt: gemessen, aber **bewusst ohne Soll** — es gibt kein Urteil,
+ * nur den Wert. Genau der Fall bei einer Metrik, für die niemand ein Ziel
+ * hinterlegt hat.
+ *
+ * `zielfehlt` ist etwas anderes und der Unterschied ist wichtig: hier *ist* ein
+ * Ziel konfiguriert, es lässt sich nur gerade nicht auflösen — das Kalorienziel
+ * aus Cronometer kam nie an, oder in der Routine ist kein Pflichtschritt
+ * markiert. Der Wert steht da, das Maß fehlt. Beides als `erfasst` zu zeigen
+ * hieße, einen kaputten Anschluss wie eine Design-Entscheidung aussehen zu
+ * lassen.
  */
-export type MetricState = 'soll' | 'basis' | 'unter' | 'erfasst' | 'ungemessen' | 'offday';
+export type MetricState =
+  | 'soll' | 'basis' | 'unter' | 'erfasst' | 'zielfehlt' | 'ungemessen' | 'offday';
 
 export interface DayMetric {
   value: number | null;
@@ -28,6 +36,8 @@ export interface DayMetric {
   state: MetricState;
   /** `kind` der Quelle, die den Wert geliefert hat — für „auto aus CRM" / „manuell". */
   source: string | null;
+  /** Warum kein Ziel auflösbar war — nur gesetzt bei `zielfehlt`. */
+  targetHint?: string;
 }
 
 export type MetricMatrix = Record<string, Record<string, DayMetric>>;
@@ -72,6 +82,10 @@ type SemanticConfig = {
   definitions: Awaited<ReturnType<typeof prisma.coreMetricDefinition.findMany>>;
   sources: Awaited<ReturnType<typeof prisma.coreMetricSource.findMany>>;
   intentions: Awaited<ReturnType<typeof prisma.coreIntention.findMany>>;
+  /** Für `routine_completeness`: wie viele Schritte hat die Routine, wie viele davon sind Pflicht. */
+  routines: Array<{ name: string; total: number; required: number }>;
+  /** Zielwerte aus Health/Cronometer, für `health_target` und `weight_trajectory`. */
+  healthTargets: Awaited<ReturnType<typeof prisma.ingestHealthTarget.findMany>>;
 };
 
 let configCache: { at: number; value: SemanticConfig } | null = null;
@@ -85,15 +99,28 @@ export function invalidateSemanticConfig() {
 async function loadSemanticConfig(): Promise<SemanticConfig> {
   if (configCache && Date.now() - configCache.at < CONFIG_TTL_MS) return configCache.value;
 
-  // Gebündelt: $transaction schickt die drei Abfragen in einem Rutsch statt in
-  // drei Runden. Über den pgbouncer kostet jede Runde mehrere hundert Millisekunden.
-  const [definitions, sources, intentions] = await prisma.$transaction([
+  // Gebündelt: $transaction schickt die Abfragen in einem Rutsch statt in
+  // ebenso vielen Runden. Über den pgbouncer kostet jede Runde mehrere hundert
+  // Millisekunden.
+  const [definitions, sources, intentions, trackers, healthTargets] = await prisma.$transaction([
     prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
     prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
     prisma.coreIntention.findMany(),
+    prisma.tracker.findMany({ select: { name: true, items: { select: { required: true } } } }),
+    prisma.ingestHealthTarget.findMany(),
   ]);
 
-  const value = { definitions, sources, intentions };
+  const value = {
+    definitions,
+    sources,
+    intentions,
+    routines: trackers.map(t => ({
+      name: t.name,
+      total: t.items.length,
+      required: t.items.filter(i => i.required).length,
+    })),
+    healthTargets,
+  };
   configCache = { at: Date.now(), value };
   return value;
 }
@@ -131,12 +158,16 @@ export class AnalyticsService {
     const fromMs = Date.parse(`${from}T00:00:00.000Z`) - 2 * 86400000;
     const toMs = Date.parse(`${to}T00:00:00.000Z`) + 3 * 86400000;
 
+    // `flag` trägt je Zweig eine andere Ja/Nein-Information: beim Tracker, ob
+    // der Schritt ein Pflichtschritt ist; bei den Korrekturen von Hand, dass
+    // die Zeile überhaupt existiert (der Wert darf dort NULL sein und heißt
+    // dann „an dem Tag bewusst nicht gemessen").
     return prisma.$queryRaw<
-      Array<{ kind: string; k1: string; k2: string; d: string; value: number }>
+      Array<{ kind: string; k1: string; k2: string; d: string; value: number | null; flag: boolean }>
     >`
       SELECT 'crm_calls' AS kind, by_user_name AS k1, '' AS k2,
              to_char(to_timestamp(ts / 1000.0) AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD') AS d,
-             COUNT(*)::float8 AS value
+             COUNT(*)::float8 AS value, FALSE AS flag
         FROM crm_calls
        WHERE ts >= ${fromMs} AND ts < ${toMs} AND by_user_name IS NOT NULL
        GROUP BY 1, 2, 3, 4
@@ -144,7 +175,7 @@ export class AnalyticsService {
       UNION ALL
       SELECT 'tracker', t.name, i.title,
              to_char(l.date, 'YYYY-MM-DD'),
-             (l.status = 'completed')::int::float8
+             (l.status = 'completed')::int::float8, i.required
         FROM jarvis_tracker_logs l
         JOIN jarvis_tracker_items i ON i.id = l.item_id
         JOIN jarvis_trackers      t ON t.id = i.tracker_id
@@ -152,24 +183,24 @@ export class AnalyticsService {
          AND l.status <> 'skipped'
 
       UNION ALL
-      SELECT 'personal_log', 'sleep_hours', '', date, sleep_hours::float8
+      SELECT 'personal_log', 'sleep_hours', '', date, sleep_hours::float8, FALSE
         FROM jarvis_personal_logs
        WHERE date >= ${from} AND date <= ${to} AND coalesce(sleep_hours, 0) <> 0
 
       UNION ALL
-      SELECT 'personal_log', 'nutrition_calories', '', date, nutrition_calories::float8
+      SELECT 'personal_log', 'nutrition_calories', '', date, nutrition_calories::float8, FALSE
         FROM jarvis_personal_logs
        WHERE date >= ${from} AND date <= ${to} AND coalesce(nutrition_calories, 0) <> 0
 
       UNION ALL
-      SELECT 'personal_log', 'workout_completed', '', date, workout_completed::int::float8
+      SELECT 'personal_log', 'workout_completed', '', date, workout_completed::int::float8, FALSE
         FROM jarvis_personal_logs
        WHERE date >= ${from} AND date <= ${to} AND workout_completed IS TRUE
 
       UNION ALL
       -- DISTINCT ON in der Unterabfrage: mehrere Wiegungen am Tag, die letzte gilt.
       -- (ORDER BY darf in einem UNION-Zweig nicht direkt stehen.)
-      SELECT 'weight', '', '', w.d, w.value
+      SELECT 'weight', '', '', w.d, w.value, FALSE
         FROM (
           SELECT DISTINCT ON (to_char(date, 'YYYY-MM-DD'))
                  to_char(date, 'YYYY-MM-DD') AS d, weight::float8 AS value
@@ -179,22 +210,39 @@ export class AnalyticsService {
         ) w
 
       UNION ALL
-      SELECT 'health', metric_key, '', to_char(date, 'YYYY-MM-DD'), value::float8
+      SELECT 'health', metric_key, '', to_char(date, 'YYYY-MM-DD'), value::float8, FALSE
         FROM ingest_health_daily
+       WHERE date >= ${from}::date AND date <= ${to}::date
+
+      UNION ALL
+      SELECT 'manual', metric_key, '', to_char(date, 'YYYY-MM-DD'), value::float8, TRUE
+        FROM core_manual_values
        WHERE date >= ${from}::date AND date <= ${to}::date
     `;
   }
 
   /**
    * Löst alle aktiven Quellen auf. Ergebnis: kind → metricKey → date → value.
-   * Quellenarten ohne Ingest-Daten (health, reminders, gproject) liefern bewusst
+   * Quellenarten ohne Ingest-Daten (reminders, gproject) liefern bewusst
    * nichts, statt einen Platzhalter zu erfinden.
+   *
+   * Zwei Dinge fallen dabei zusätzlich ab:
+   * - `routineProgress`: wie viele Schritte einer Routine an dem Tag erledigt
+   *   waren und wie viele davon Pflicht — eine reine Zahl reicht nicht, weil
+   *   „4 von 6" nichts darüber sagt, ob die *richtigen* vier erledigt sind.
+   * - `manual`: Korrekturen von Hand. Sie stehen bewusst außerhalb der
+   *   Quellenliste — eine Korrektur ist kein weiteres angeschlossenes System,
+   *   sondern schlägt jedes.
    */
   private static async resolveSources(
     from: string,
     to: string,
     sources: ResolvedSource[]
-  ): Promise<Map<string, DayValues>> {
+  ): Promise<{
+    byKind: Map<string, DayValues>;
+    routineProgress: Map<string, Map<string, { done: number; requiredDone: number }>>;
+    manual: Map<string, Map<string, number | null>>;
+  }> {
     const byKind = new Map<string, DayValues>();
     const put = (kind: string, metricKey: string, date: string, value: number) => {
       if (!byKind.has(kind)) byKind.set(kind, new Map());
@@ -203,10 +251,22 @@ export class AnalyticsService {
       perMetric.get(metricKey)!.set(date, value);
     };
 
+    const routineProgress = new Map<string, Map<string, { done: number; requiredDone: number }>>();
+    const manual = new Map<string, Map<string, number | null>>();
+
     // Eine Abfrage für alles. Schlägt sie fehl — etwa weil das fremde CRM
     // gerade nicht da ist —, stehen die Metriken auf „nicht gemessen", statt
     // dass die Seite kippt.
     const rows = await safe('Sammelabfrage', () => this.loadAllRows(from, to), []);
+
+    // Korrekturen von Hand zuerst: sie hängen an keiner Quelle und gelten für
+    // jede Metrik. Eine vorhandene Zeile mit `value = null` heißt „an dem Tag
+    // bewusst nicht gemessen" und ist etwas anderes als „keine Zeile".
+    for (const r of rows) {
+      if (r.kind !== 'manual') continue;
+      if (!manual.has(r.k1)) manual.set(r.k1, new Map());
+      manual.get(r.k1)!.set(r.d, r.value === null ? null : Number(r.value));
+    }
 
     for (const s of sources) {
       switch (s.kind) {
@@ -238,23 +298,34 @@ export class AnalyticsService {
           // Ohne `item` zählt die Quelle die erledigten Schritte des Trackers
           // (Morgen-/Abendroutine); mit `item` ist sie ein einzelner Haken.
           const counting = !wantItem;
-          const tally = new Map<string, number>();
+          const tally = new Map<string, { done: number; requiredDone: number }>();
 
           for (const r of rows) {
             if (r.kind !== 'tracker') continue;
             if (wantTracker && r.k1.toLowerCase() !== wantTracker) continue;
             if (wantItem && r.k2.toLowerCase() !== wantItem) continue;
-            if (counting) tally.set(r.d, (tally.get(r.d) ?? 0) + Number(r.value));
-            else put('tracker', s.metricKey, r.d, Number(r.value));
+            const done = Number(r.value ?? 0);
+            if (counting) {
+              const acc = tally.get(r.d) ?? { done: 0, requiredDone: 0 };
+              acc.done += done;
+              if (r.flag) acc.requiredDone += done;
+              tally.set(r.d, acc);
+            } else {
+              put('tracker', s.metricKey, r.d, done);
+            }
           }
-          for (const [d, v] of tally) put('tracker', s.metricKey, d, v);
+
+          if (counting) {
+            for (const [d, acc] of tally) put('tracker', s.metricKey, d, acc.done);
+            routineProgress.set(s.metricKey, tally);
+          }
           break;
         }
 
         case 'personal_log': {
           const field = str(s.config.field);
           for (const r of rows) {
-            if (r.kind !== 'personal_log' || r.k1 !== field) continue;
+            if (r.kind !== 'personal_log' || r.k1 !== field || r.value === null) continue;
             put('personal_log', s.metricKey, r.d, Number(r.value));
           }
           break;
@@ -262,7 +333,7 @@ export class AnalyticsService {
 
         case 'weight':
           for (const r of rows) {
-            if (r.kind !== 'weight') continue;
+            if (r.kind !== 'weight' || r.value === null) continue;
             put('weight', s.metricKey, r.d, Number(r.value)); // spätere Wiegung gewinnt
           }
           break;
@@ -270,7 +341,7 @@ export class AnalyticsService {
         case 'health': {
           const wanted = str(s.config.metric) || s.metricKey;
           for (const r of rows) {
-            if (r.kind !== 'health' || r.k1 !== wanted) continue;
+            if (r.kind !== 'health' || r.k1 !== wanted || r.value === null) continue;
             put('health', s.metricKey, r.d, Number(r.value));
           }
           break;
@@ -280,7 +351,78 @@ export class AnalyticsService {
       }
     }
 
-    return byKind;
+    return { byKind, routineProgress, manual };
+  }
+
+  /**
+   * Rechnet ein abgeleitetes Ziel für einen Tag aus.
+   *
+   * Kommt nichts zurück (`resolved: false`), wird **nichts geraten** — die
+   * Metrik landet auf `zielfehlt` und der Hinweis sagt, was fehlt. Das ist die
+   * Zielwert-Seite derselben Regel, die für Werte schon gilt: NULL ≠ 0.
+   */
+  private static derivedTarget(
+    kind: string,
+    config: SourceConfig,
+    date: string,
+    ctx: SemanticConfig
+  ): { base: number | null; stretch: number | null; hint?: string } {
+    switch (kind) {
+      // Basis = alle Pflichtschritte, Soll = alle Schritte. Beide Zahlen kommen
+      // aus der Routine selbst und wandern mit, wenn Rico sie umbaut.
+      case 'routine_completeness': {
+        const name = str(config.tracker).toLowerCase();
+        const routine = ctx.routines.find(r => r.name.toLowerCase() === name);
+        if (!routine || routine.total === 0) {
+          return { base: null, stretch: null, hint: `Routine „${str(config.tracker)}" nicht gefunden` };
+        }
+        if (routine.required === 0) {
+          return { base: null, stretch: null, hint: 'kein Pflichtschritt markiert' };
+        }
+        return { base: routine.required, stretch: routine.total };
+      }
+
+      // Kalorienziel aus Cronometer/Health. Soll = das Ziel, Basis = Ziel plus
+      // Toleranz (Vergleich `<=`, also ist mehr schlechter).
+      case 'health_target': {
+        const key = str(config.metric) || 'body.calories';
+        const target = ctx.healthTargets.find(t => t.metricKey === key);
+        if (!target) return { base: null, stretch: null, hint: 'Ziel nicht aus Health angekommen' };
+        const tolerance = typeof config.tolerancePct === 'number' ? config.tolerancePct : 0.1;
+        return { base: target.targetValue * (1 + tolerance), stretch: target.targetValue };
+      }
+
+      // Gewicht: zwischen Start und Ziel linear interpoliert — das Soll für
+      // *heute*, nicht das Endziel. Ohne Startpunkt gilt schlicht das Endziel.
+      case 'weight_trajectory': {
+        const target = ctx.healthTargets.find(t => t.metricKey === 'body.weight');
+        if (!target) return { base: null, stretch: null, hint: 'Gewichtsziel nicht aus Health angekommen' };
+
+        const tolerance = typeof config.toleranceKg === 'number' ? config.toleranceKg : 1.5;
+        let goal = target.targetValue;
+
+        if (target.startValue !== null && target.startDate && target.targetDate) {
+          const start = target.startDate.getTime();
+          const end = target.targetDate.getTime();
+          const now = Date.parse(`${date}T00:00:00.000Z`);
+          if (end > start) {
+            const t = Math.min(1, Math.max(0, (now - start) / (end - start)));
+            goal = target.startValue + (target.targetValue - target.startValue) * t;
+          }
+        }
+
+        const round = (n: number) => Math.round(n * 10) / 10;
+        // Abnehmen heißt `<=`: Basis ist das großzügigere (höhere) der beiden.
+        const losing = target.startValue === null || target.targetValue <= target.startValue;
+        return {
+          stretch: round(goal),
+          base: round(losing ? goal + tolerance : goal - tolerance),
+        };
+      }
+
+      default:
+        return { base: null, stretch: null, hint: `unbekannte Ableitung „${kind}"` };
+    }
   }
 
   private static stateFor(
@@ -288,17 +430,38 @@ export class AnalyticsService {
     value: number | null,
     base: number | null,
     stretch: number | null,
-    comparator: string
+    comparator: string,
+    /** Ein Ziel *ist* konfiguriert, ließ sich aber nicht auflösen. */
+    targetMissing = false
   ): MetricState {
     if (isOffDay(dateStr)) return 'offday';
     if (value === null) return 'ungemessen';
-    if (base === null) return 'erfasst'; // gemessen, aber ohne Soll — kein Urteil möglich
+    if (targetMissing) return 'zielfehlt'; // Wert da, Maß fehlt — kein Design, ein Defekt
+    if (base === null) return 'erfasst'; // bewusst ohne Soll — kein Urteil gewollt
 
     const goal = stretch ?? base;
     const hits = (v: number, target: number) => (comparator === '<=' ? v <= target : v >= target);
 
     if (hits(value, goal)) return 'soll';
     if (hits(value, base)) return 'basis';
+    return 'unter';
+  }
+
+  /**
+   * Routinen werden nicht nach Anzahl beurteilt, sondern danach, *welche*
+   * Schritte erledigt sind: vier von sechs sagen nichts, solange nicht klar
+   * ist, ob die Pflichtschritte dabei waren.
+   */
+  private static routineStateFor(
+    dateStr: string,
+    progress: { done: number; requiredDone: number } | undefined,
+    requiredTotal: number,
+    total: number
+  ): MetricState {
+    if (isOffDay(dateStr)) return 'offday';
+    if (!progress || progress.done === 0) return 'ungemessen';
+    if (progress.done >= total) return 'soll';
+    if (progress.requiredDone >= requiredTotal) return 'basis';
     return 'unter';
   }
 
@@ -336,7 +499,7 @@ export class AnalyticsService {
         config: (s.config ?? {}) as SourceConfig,
         priority: s.priority,
       }));
-    const resolved = await this.resolveSources(from, to, relevantSources);
+    const { byKind, routineProgress, manual } = await this.resolveSources(from, to, relevantSources);
     const intentionOf = new Map(intentions.map(i => [i.metricKey, i]));
 
     const matrix: MetricMatrix = {};
@@ -345,31 +508,56 @@ export class AnalyticsService {
 
       for (const key of keys) {
         const intention = intentionOf.get(key);
-        const base = intention ? intention.baseValue : null;
-        const stretch = intention?.stretchValue ?? null;
-        const comparator = intention?.comparator ?? '>=';
+
+        // Ziel bestimmen: fest aus dem Plan oder aus einer Verbindung abgeleitet.
+        let base = intention?.baseValue ?? null;
+        let stretch = intention?.stretchValue ?? null;
+        let targetHint: string | undefined;
+        let targetMissing = false;
+
+        if (intention?.derivedKind) {
+          const derived = this.derivedTarget(
+            intention.derivedKind,
+            (intention.derivedConfig ?? {}) as SourceConfig,
+            date,
+            config
+          );
+          base = derived.base;
+          stretch = derived.stretch;
+          if (base === null) {
+            targetMissing = true;
+            targetHint = derived.hint;
+          }
+        }
 
         let value: number | null = null;
         let source: string | null = null;
 
-        // Quellen in Prioritätsreihenfolge — der erste Treffer gewinnt.
-        for (const s of relevantSources) {
-          if (s.metricKey !== key) continue;
-          const hit = resolved.get(s.kind)?.get(key)?.get(date);
-          if (hit !== undefined) {
-            value = hit;
-            source = s.kind;
-            break;
+        // Eine Korrektur von Hand schlägt jede Automatik — auch einen späteren
+        // Sync. Sie gilt, bis sie für den Tag gelöscht wird.
+        const override = manual.get(key);
+        if (override?.has(date)) {
+          value = override.get(date) ?? null;
+          source = 'manual';
+        } else {
+          // Sonst die Quellen in Prioritätsreihenfolge — erster Treffer gewinnt.
+          for (const s of relevantSources) {
+            if (s.metricKey !== key) continue;
+            const hit = byKind.get(s.kind)?.get(key)?.get(date);
+            if (hit !== undefined) {
+              value = hit;
+              source = s.kind;
+              break;
+            }
           }
         }
 
-        matrix[date][key] = {
-          value,
-          base,
-          stretch,
-          state: this.stateFor(date, value, base, stretch, comparator),
-          source,
-        };
+        const state =
+          intention?.derivedKind === 'routine_completeness' && !targetMissing
+            ? this.routineStateFor(date, routineProgress.get(key)?.get(date), base ?? 0, stretch ?? 0)
+            : this.stateFor(date, value, base, stretch, intention?.comparator ?? '>=', targetMissing);
+
+        matrix[date][key] = { value, base, stretch, state, source, targetHint };
       }
     }
 

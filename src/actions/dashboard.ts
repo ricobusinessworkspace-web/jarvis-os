@@ -95,40 +95,6 @@ export async function deleteTask(id: string) {
   }
 }
 
-// ─── CONTENT ───
-export async function createContentItem(data: any) {
-  try {
-    const created = await prisma.contentItem.create({ data });
-    revalidatePath('/content');
-    revalidatePath('/', 'layout');
-    return { success: true, data: created };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function updateContentItem(id: string, data: any) {
-  try {
-    const updated = await prisma.contentItem.update({ where: { id }, data });
-    revalidatePath('/content');
-    revalidatePath('/', 'layout');
-    return { success: true, data: updated };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-export async function deleteContentItem(id: string) {
-  try {
-    await prisma.contentItem.delete({ where: { id } });
-    revalidatePath('/content');
-    revalidatePath('/', 'layout');
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
 // ─── SETTINGS ───
 export async function updateSetting(key: string, value: string) {
   try {
