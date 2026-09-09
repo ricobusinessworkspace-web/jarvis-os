@@ -69,26 +69,72 @@ function berlinDay(value?: string): string | null {
   return Number.isNaN(d.getTime()) ? null : getBerlinDateStr(d);
 }
 
+/**
+ * Alle JSON-Objekte aus einem Text ziehen, per Klammerzählung.
+ *
+ * Kein `JSON.parse` auf den ganzen String und kein Zeilen-Split: Kurzbefehle
+ * hängen mehrere Objekte hintereinander (`{…}{…}`) und drucken sie dabei
+ * mehrzeilig-eingerückt. Beides bricht die einfacheren Verfahren.
+ * Anführungszeichen werden übersprungen, damit eine Klammer *im Titel* nicht
+ * mitzählt.
+ */
+function extractJsonObjects(text: string): unknown[] {
+  const found: unknown[] = [];
+  let depth = 0, start = -1, inString = false, escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+
+    if (c === '"') inString = true;
+    else if (c === '{') { if (depth === 0) start = i; depth++; }
+    else if (c === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        try { found.push(JSON.parse(text.slice(start, i + 1))); } catch { /* Fragment überspringen */ }
+        start = -1;
+      }
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Die Nutzlast auf eine flache Liste aus Objekten bzw. Titeln bringen.
+ *
+ * Kurzbefehle liefern je nach Feldtyp drei verschiedene Formen — und welche,
+ * sieht man dem Kurzbefehl nicht an:
+ *   1. `[{…}, {…}]`   — JSON-Feld vom Typ Array, sauber
+ *   2. `[[{…}, {…}]]` — Listen-Variable in ein Array-Feld gelegt, eine Ebene zu tief
+ *   3. `"{…}\n{…}"`   — Listen-Variable in ein *Text*-Feld gelegt: Shortcuts
+ *                       serialisiert die Objekte zu Text, und ohne Behandlung
+ *                       landet dieser JSON-Text als *Titel* einer einzigen
+ *                       Erinnerung in der Aufgaben-Karte.
+ * Reine Titelzeilen ohne JSON bleiben weiterhin gültig.
+ */
+function expandRaw(value: unknown): Array<RawReminder | string> {
+  if (Array.isArray(value)) return value.flatMap(expandRaw);
+  if (value && typeof value === 'object') return [value as RawReminder];
+  if (typeof value !== 'string') return [];
+
+  const objects = value.includes('{') ? extractJsonObjects(value) : [];
+  if (objects.length > 0) return objects.flatMap(expandRaw);
+
+  return value.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
 function parseReminders(input: unknown): Array<{
   id: string; title: string; listName: string; dueAt: Date | null;
   dueDate: string | null; completed: boolean; priority: number; notes: string;
 }> {
-  // Auch eine schlichte Titel-Liste als Text akzeptieren.
-  if (typeof input === 'string') {
-    return input
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean)
-      .map((title, i) => ({
-        id: `text-${i}-${title.slice(0, 40)}`,
-        title, listName: '', dueAt: null, dueDate: null,
-        completed: false, priority: 0, notes: '',
-      }));
-  }
-
-  if (!Array.isArray(input)) return [];
-
-  return input.flatMap((raw: RawReminder | string, i) => {
+  return expandRaw(input).flatMap((raw: RawReminder | string, i) => {
     if (typeof raw === 'string') {
       const title = raw.trim();
       if (!title) return [];
@@ -116,6 +162,73 @@ function parseReminders(input: unknown): Array<{
       notes: (raw.notes ?? '').toString(),
     }];
   });
+}
+
+interface ParsedTarget {
+  metricKey: string;
+  targetValue: number;
+  targetDate: Date | null;
+  startValue: number | null;
+  startDate: Date | null;
+}
+
+/** Nur ein Datum, kein Zeitpunkt — die Spalten sind DATE. */
+function dateOrNull(value: unknown): Date | null {
+  const day = berlinDay(value === undefined || value === null ? undefined : String(value));
+  return day ? new Date(`${day}T00:00:00.000Z`) : null;
+}
+
+/**
+ * Zielwerte aus dem Kurzbefehl. Wie beim Rest gilt: lieber eine Schreibweise
+ * mehr verstehen, als den Nutzer JSON debuggen lassen.
+ *
+ *   { "calorieTarget": 2100 }
+ *   { "weightTarget": 75, "weightTargetDate": "2027-03-01", "weightStart": 80 }
+ *   { "targets": [{ "metric": "body.calories", "value": 2100 }, …] }
+ */
+function parseTargets(body: Record<string, unknown>): ParsedTarget[] {
+  const out = new Map<string, ParsedTarget>();
+
+  const add = (t: ParsedTarget) => out.set(t.metricKey, t);
+
+  if (Array.isArray(body.targets)) {
+    for (const raw of body.targets as Array<Record<string, unknown>>) {
+      const metricKey = String(raw.metric ?? raw.metricKey ?? '').trim();
+      const targetValue = toNumber(raw.value ?? raw.target);
+      if (!metricKey || targetValue === null) continue;
+      add({
+        metricKey,
+        targetValue,
+        targetDate: dateOrNull(raw.targetDate ?? raw.date),
+        startValue: toNumber(raw.startValue ?? raw.start),
+        startDate: dateOrNull(raw.startDate),
+      });
+    }
+  }
+
+  const calorieTarget = toNumber(body.calorieTarget ?? body.caloriesTarget);
+  if (calorieTarget !== null) {
+    add({
+      metricKey: 'body.calories',
+      targetValue: calorieTarget,
+      targetDate: null, startValue: null, startDate: null,
+    });
+  }
+
+  const weightTarget = toNumber(body.weightTarget);
+  if (weightTarget !== null) {
+    // Ohne Startpunkt gilt schlicht das Endziel — der Semantic Layer
+    // interpoliert dann nicht, statt sich einen Startwert auszudenken.
+    add({
+      metricKey: 'body.weight',
+      targetValue: weightTarget,
+      targetDate: dateOrNull(body.weightTargetDate),
+      startValue: toNumber(body.weightStart),
+      startDate: dateOrNull(body.weightStartDate),
+    });
+  }
+
+  return [...out.values()];
 }
 
 export async function POST(req: Request) {
@@ -187,9 +300,29 @@ export async function POST(req: Request) {
       result.health = entries.length;
     }
 
+    // ── Zielwerte: was Cronometer über das Ziel weiß, nicht über den Tag ──
+    // Ändern sich selten, kommen deshalb getrennt und bleiben stehen, bis ein
+    // neuer Wert kommt. Ohne sie stehen Kalorien und Gewicht bewusst auf
+    // „Ziel fehlt", statt gegen eine erfundene Zahl gemessen zu werden.
+    const targets = parseTargets(body);
+    if (targets.length) {
+      for (const t of targets) {
+        await prisma.ingestHealthTarget.upsert({
+          where: { metricKey: t.metricKey },
+          update: { ...t, syncedAt: new Date() },
+          create: t,
+        });
+      }
+      result.targets = targets.length;
+    }
+
     if (Object.keys(result).length === 0) {
       return NextResponse.json(
-        { error: 'Nichts erkannt. Erwartet wird "reminders" und/oder "health" bzw. "calories".' },
+        {
+          error:
+            'Nichts erkannt. Erwartet wird "reminders", "health"/"calories" ' +
+            'und/oder "targets"/"calorieTarget"/"weightTarget".',
+        },
         { status: 400 }
       );
     }
