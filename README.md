@@ -41,6 +41,7 @@ npm run test:e2e       # Playwright-Rauchtest
 - `APPLE_INTEGRATION.md` — iOS-Kurzbefehle für Erinnerungen und Health
 - `MOBILE_WIDGET_HANDOVER.md` — iPhone-Widget über Scriptable
 - `N8N_FINANCE_WORKFLOW.md` — Bank-Sync
+- `DATENBANK_BRIEFING.md` — Messungen und offene Punkte zur Datenbankanbindung
 - `RICOS_WORKSPACE_GUIDE.md` — Arbeitsweise und Cockpit-Philosophie
 
 ## Warnung
