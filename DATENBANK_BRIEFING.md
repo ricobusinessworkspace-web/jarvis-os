@@ -25,7 +25,7 @@ run_pg.js · check_policies.js · check_rls.js
 run_bank_migration.js · create_weight_table.js
 ```
 
-Dazu das Vercel-Protection-Bypass-Token in `IOS_WIDGET.md`.
+Dazu das Vercel-Protection-Bypass-Token in `docs/ios-widget.md`.
 
 Die Dateien sind entfernt (Commit `962756e`), **aber die Werte stehen weiter in
 der Git-Historie** und sind über GitHub abrufbar. Löschen allein genügt nicht.
@@ -35,7 +35,7 @@ der Git-Historie** und sind über GitHub abrufbar. Löschen allein genügt nicht
 1. Supabase-Datenbankpasswort zurücksetzen, danach `DATABASE_URL` und
    `DIRECT_URL` in Vercel **und** in der lokalen `.env` aktualisieren.
 2. Vercel-Bypass-Token neu erzeugen; das iPhone-Widget in Scriptable
-   nachziehen (siehe `IOS_WIDGET.md`).
+   nachziehen (siehe `docs/ios-widget.md`).
 3. Repository auf privat stellen, falls nicht bewusst öffentlich.
 4. Optional: Historie bereinigen (`git filter-repo`). Nur sinnvoll **nach**
    der Rotation und mit Wissen, dass alle Klone ungültig werden. Die Rotation

@@ -31,19 +31,17 @@ npm run core:migrate   # Tabellen anlegen (idempotent)
 npm run core:seed      # Semantic Layer befüllen (idempotent)
 npm run core:check     # Daten gegen die Datenbank nachrechnen
 npm run build          # Produktionsbuild inkl. Typprüfung
-npm run test:e2e       # Playwright-Rauchtest
+npm run test:e2e       # Playwright-Rauchtest (einzige Testsuite)
 ```
 
 ## Dokumente
 
-- **`HANDOVER.md`** — Projektstand, gelöste Probleme, offene Entscheidungen. **Erster Anlaufpunkt für jeden Agenten.**
-- `AGENTS.md` — Regeln für KI-Agenten in diesem Repo
-- `~/dev/coding-workflow-standards.md` — projektübergreifender Arbeitsablauf
-- `APPLE_INTEGRATION.md` — iOS-Kurzbefehle für Erinnerungen und Health
-- `IOS_WIDGET.md` — iPhone-Widget über Scriptable
-- `N8N_FINANCE_WORKFLOW.md` — Bank-Sync
-- `DATENBANK_BRIEFING.md` — Messungen und offene Punkte zur Datenbankanbindung
-- `RICOS_WORKSPACE_GUIDE.md` — Arbeitsweise und Cockpit-Philosophie
+- **`HANDOVER.md`** — Projektstand, gelöste Probleme, offene Entscheidungen.
+  **Erster Anlaufpunkt für jeden Agenten**, enthält eine vollständige Doku-Übersicht.
+- `AGENTS.md` — Regeln für KI-Agenten + Arbeitsablauf
+- `DATENBANK_BRIEFING.md` — Datenbank-Performance, Messungen, offene Punkte
+- `docs/` — Runbooks für einzelne Integrationen (Apple-Kurzbefehle, iOS-Widget, Bank-Sync)
+- `~/dev/coding-workflow-standards.md` — projektübergreifend, außerhalb des Repos
 
 ## Warnung
 

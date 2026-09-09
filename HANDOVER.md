@@ -1,8 +1,13 @@
 ---
 last_updated: 2026-09-09
-last_agent: Claude Opus 5 — Command Center, Semantic Layer, Performance
+last_agent: Claude Sonnet 5 — Doku-Aufräumen
 status: In Progress
 ---
+
+> **SSOT-Regel:** Dieses Dokument ist die Wahrheit über den *Stand* — was fertig
+> ist, was kaputt war, was offen ist. Es wird nach jeder Prompt fortgeschrieben
+> (nur Deltas, schlank halten). Schritt-für-Schritt-Anleitungen für einzelne
+> Integrationen gehören **nicht** hierher, sondern nach `docs/`.
 
 ## Projekt-Snapshot
 
@@ -22,7 +27,7 @@ Pipeline sind nur Folgen.
 - **Routinen bearbeitbar**: fertig — umbenennen, verschieben, löschen, ergänzen.
 - **Apple-Anbindung** (Erinnerungen + Health-Kalorien): Endpunkt und Datenbank
   stehen und sind getestet. **Offen: Rico muss die iOS-Kurzbefehle einrichten**
-  (`APPLE_INTEGRATION.md`) und `INGEST_SECRET` in Vercel setzen. Bis dahin
+  (`docs/apple-shortcuts.md`) und `INGEST_SECRET` in Vercel setzen. Bis dahin
   bleiben beide Karten leer.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
@@ -115,6 +120,15 @@ Finanzen) hängt daran, nie umgekehrt. Externe Systeme (CRM, Apple, G-Projekt)
 liefern Daten, definieren aber nie die Wahrheit im Dashboard — die steht im
 Semantic Layer.
 
+**Ricos Arbeitsweise, die das System spiegeln soll** (früher `RICOS_WORKSPACE_GUIDE.md`):
+
+- **Konsistenz vor Perfektion.** Jeden Tag auftauchen und tun, was ansteht. Die
+  Tagesklammer sind Morgen- und Abendroutine.
+- **Priorisierung nach Hebel:** umsatzgenerierend (Energievertrieb) und harte
+  Deadlines zuerst. Keine künstlichen Überforderungsregeln.
+- **Fernziel Proaktivität:** Jarvis soll die Tagesphase verstehen und von selbst
+  handeln — z.B. bei der Abendroutine den Kalender für die Tagesplanung öffnen.
+
 ## Für nächsten Agent
 
 1. **Zuerst `AGENTS.md`** — Next.js 16 verhält sich anders als du denkst.
@@ -125,10 +139,21 @@ Semantic Layer.
    sind gekapselt: fällt das CRM aus, stehen Metriken auf „nicht gemessen".
 4. **Bei Performance-Fragen zuerst `DATENBANK_BRIEFING.md`** — enthält Messungen
    samt Methode. Nicht nochmal von vorn messen.
-5. **`/routines` nicht kaputtmachen** — Ziel des iPhone-Widgets (`IOS_WIDGET.md`).
+5. **`/routines` nicht kaputtmachen** — Ziel des iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm run test:e2e`.
+   `npm run build` (prüft auch Typen), `npm run test:e2e` (Playwright-Rauchtest —
+   die einzige Testsuite; `npm run test` läuft leer, es gibt keine Unit-Tests).
 
-**Weitere Dokumente:** `DATENBANK_BRIEFING.md` · `APPLE_INTEGRATION.md` ·
-`IOS_WIDGET.md` · `N8N_FINANCE_WORKFLOW.md` · `TESTING_GUIDE.md` ·
-`RICOS_WORKSPACE_GUIDE.md`
+## Dokumente
+
+| Datei | Zweck | Lesen wann |
+|---|---|---|
+| `HANDOVER.md` | dieser — Stand, gelöste Probleme, offene Fragen | vor jeder Prompt |
+| `README.md` | Einstieg für Menschen, Befehlsübersicht | einmal |
+| `AGENTS.md` | Next.js-16-Warnung + Arbeitsablauf | Session-Start (via `CLAUDE.md`) |
+| `DATENBANK_BRIEFING.md` | Performance-Analyse mit Messungen, Übergabe an DB-Agent | bei Performance-Fragen; danach archivierbar |
+| `docs/apple-shortcuts.md` | iOS-Kurzbefehle für Erinnerungen + Health | beim Einrichten der Apple-Anbindung |
+| `docs/ios-widget.md` | Scriptable-Widget, Technik | beim Anfassen des Widgets / `/routines` |
+| `docs/bank-sync.md` | Bank-Sync über n8n | beim Anfassen des Bank-Imports |
+
+`~/dev/coding-workflow-standards.md` (außerhalb des Repos) gilt projektübergreifend.

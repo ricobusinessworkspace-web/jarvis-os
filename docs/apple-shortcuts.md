@@ -4,7 +4,7 @@ Apple Erinnerungen und Apple Health haben **keine Cloud-API**. Vercel kommt dort
 direkt heran. Beides muss deshalb vom iPhone aus geschoben werden: zwei
 Kurzbefehl-Automationen sammeln die Daten und schicken sie an Jarvis.
 
-Dieselbe Schiene nutzt schon das Scriptable-Widget (siehe `IOS_WIDGET.md`).
+Dieselbe Schiene nutzt schon das Scriptable-Widget (siehe `ios-widget.md`).
 
 **Endpunkt:** `POST https://jarvis-os-wardogs.vercel.app/api/ingest/apple`
 
