@@ -45,6 +45,30 @@ export class CrmService {
   }
 
   /**
+   * Bestandszahlen aus `crm_stock_metrics` — wie es **jetzt** aussieht.
+   *
+   * Bewusst getrennt von den Tageskennzahlen: „wie viele Leads liegen in der
+   * Kaltkartei" ist eine Frage an jetzt und hat keinen Tag, an dem sie
+   * stattgefunden hat. Sie mit einem Datum zu versehen würde eine Historie
+   * vortäuschen, die es nicht gibt.
+   *
+   * Fällt das CRM aus, kommt eine leere Map zurück — die Oberfläche zeigt dann
+   * „nicht verfügbar" statt einer veralteten Zahl.
+   */
+  static async getStockMetrics(): Promise<Map<string, number>> {
+    try {
+      const rows = await prisma.$queryRaw<Array<{ metricKey: string; wert: number }>>`
+        SELECT metric_key AS "metricKey", wert::float8 AS "wert"
+          FROM crm_stock_metrics
+      `;
+      return new Map(rows.map(r => [r.metricKey, Number(r.wert)]));
+    } catch (error) {
+      console.error('[CrmService] Bestandszahlen nicht verfügbar:', error);
+      return new Map();
+    }
+  }
+
+  /**
    * Kennzahlen für den Kontext-Export.
    *
    * Calls kommen aus `crm_calls`, nicht aus `crm_events`: letztere ist leer

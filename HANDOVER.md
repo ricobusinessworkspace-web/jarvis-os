@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-10
-last_agent: Claude Opus 5 — Abgeleitete Ziele, Shell aufgeräumt
+last_updated: 2026-09-12
+last_agent: Claude Opus 5 — CRM-Lesevertrag angebunden, Vertriebs-Reiter neu
 status: In Progress
 ---
 
@@ -48,6 +48,22 @@ Pipeline sind nur Folgen.
   seit 2026-09-10. Beide Kurzbefehle stehen auf Ricos iPhone, vier Automationen
   laufen (Reminders/Cronometer je `Is Closed`, plus 08:00 und 23:00). Sync gegen
   Production verifiziert. Aufbau und alle Fallstricke: `docs/apple-shortcuts.md`.
+- **CRM-Lesevertrag angebunden** (12.09.): Vertriebskennzahlen und -ziele kommen
+  aus dem CRM, nicht mehr aus `core_intentions`. Quelle ist die Sicht
+  `crm_daily_metrics` statt der Rohtabelle `crm_calls`, das Tagesziel steht
+  damit auf **30/100** statt 30/60. Die Teilziele 40/40/20 sind neu sichtbar.
+  Vertrag: `~/dev/Lightning CRM/docs/lesevertrag-jarvis.md`.
+- **Vertriebs-Reiter neu** (12.09.): Aufteilung des Tages (Cold Groß · Cold
+  Tarif · Nachgreifen), Trichter aus Stufenwechseln, Bestandszahlen aus
+  `crm_stock_metrics`, Umsatzkarte gegen die 10.000 € bis 01.03.2027
+  (`sales.closed_value_eur`, kumulativ ab Planbeginn). **Offen: 55 von 55
+  Abschlüssen haben keinen Wert** — die Karte sagt das und zeigt bewusst keine
+  0 €; sobald der erste Wert im CRM steht, rechnet sie von selbst.
+- **Was Jarvis am CRM festhält** (für den CRM-Agenten wichtig): gelesen werden
+  `crm_daily_metrics`, `crm_stock_metrics` und `crm_metric_targets`. Eine
+  Umbenennung eines `metric_key` bricht Jarvis **still**. Zusätzlich hängt die
+  implizite Null der `sales.stage_*`-Kennzahlen am Datum **2026-09-12**
+  (`config.zeroFrom`) — dem Tag, seit dem Stufenwechsel strukturiert ankommen.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -71,6 +87,18 @@ Pipeline sind nur Folgen.
 - **Routinen zählen nicht, sie prüfen.** „4 von 6" sagt nichts darüber, ob die
   *richtigen* vier erledigt sind. Basis = alle Pflichtschritte, Soll = alle
   Schritte; beides wandert mit, wenn Rico die Routine umbaut.
+- **Das CRM besitzt die Vertriebsziele, Jarvis spiegelt sie.** `crm_metric_targets`
+  ist historisiert: es gilt die Zeile mit dem größten `valid_from`, das nicht
+  nach dem Stichtag liegt. Sonst würde eine Zielerhöhung die Vergangenheit
+  rückwirkend schlechter aussehen lassen. Gelesen über `derived_kind: 'crm_target'`.
+- **Implizite Null braucht ein Anfangsdatum** (`config.zeroFrom` an der Quelle).
+  Für Anrufe gilt sie ab Blockbeginn — das CRM protokolliert jeden gewählten
+  Anruf. Für Stufenwechsel erst ab dem 12.09., seit sie strukturiert festgehalten
+  werden. Ohne das zeigte der Trichter für jeden Tag davor eine lückenlose
+  Null-Reihe: „kein Angebot rausgeschickt" statt „wurde nicht erfasst".
+- **Aggregate nennen ihre Abdeckung.** Der Trichter schreibt dazu, an wie vielen
+  Tagen des Blocks überhaupt gemessen wurde. Eine 0 über 12 Tage, von denen einer
+  gemessen ist, liest sich sonst wie ein Ergebnis.
 - **Beschriftungen kommen aus den Daten.** `targetSub()` bildet „Basis 30 · Soll
   60" aus der Matrix. Vorher stand der Text zweimal fest in den Seiten und wäre
   beim nächsten Zielwechsel im CRM still falsch geworden.
@@ -79,8 +107,10 @@ Pipeline sind nur Folgen.
   eine Zeile in der Tabelle, kein neuer Code-Pfad.
 - **Keine erfundenen Zahlen.** Kein Platzhalter-Ziel, kein 0 % für ein Ziel, das
   nicht existiert. Das Umsatzziel steht bewusst auf `pending`.
-- **Ziele kommen aus der Quelle, die sie besitzt.** Das Call-Ziel liest Jarvis aus
-  `user_profiles.daily_call_goal` im CRM (60), die Basis 30 stammt aus dem Plan.
+- **Ziele kommen aus der Quelle, die sie besitzt.** Die Vertriebsziele liest
+  Jarvis seit dem 12.09. aus `crm_metric_targets` im CRM — dort werden sie
+  bearbeitet, dort gehören sie hin. `user_profiles.daily_call_goal` (60) wird
+  **nicht mehr gelesen** und ist damit verwaist.
 - **`useOptimistic`** für alle Klick- und Eingabe-Rückmeldungen.
 - **Metrik-Zustände sind monochrom** (Apple-minimal). Erfüllungsgrad ist eine
   Helligkeitsrampe auf `foreground` (`soll` = weiß → `basis` = 40 % → `erfasst` =
@@ -95,6 +125,18 @@ Pipeline sind nur Folgen.
   bei jedem Datenzweifel.
 
 ## Gelöste Probleme (nicht wiederholen)
+
+- **Problem:** Das veröffentlichte Dashboard zeigte „ohne Zielwert" bei Calls,
+  obwohl lokal alles stimmte.
+  **Lösung:** Code veröffentlichen — die Hälften waren auseinandergelaufen.
+  **Warum wichtig:** **Dev und Production teilen sich dieselbe Datenbank.** Eine
+  Änderung an `core_*` ist in dem Moment live, in dem das Skript durchläuft —
+  der Code dazu erst nach dem Deploy. Dazwischen liest Production neue Daten mit
+  altem Code. Hier: `core_intentions.base_value` stand auf `null` mit
+  `derived_kind = 'crm_target'`, das die veröffentlichte Fassung nicht kannte.
+  **Regel: Schema- und Seed-Änderungen an `core_*` gehören zusammen mit dem Code
+  veröffentlicht, nie vorher.** Wer nur lokal testen will, ändert keine Zeile in
+  der geteilten Datenbank.
 
 - **Problem:** Der Kurzbefehl baute sichtbar korrekte Objekte, in der Aufgaben-Karte
   stand aber **eine** Erinnerung mit `{"dueAt":"","title":"…","list":"WICHTIG",…}`
@@ -199,6 +241,10 @@ Pipeline sind nur Folgen.
   neuen `g_*`-Tabellen warten? Rico entscheidet, wenn die Migration steht.
 - **Elektron-Shell:** `package.json` verweist auf `electron/main.js`, das einen
   statischen Export lädt, den es nicht gibt. Behalten oder entfernen?
+- **`CrmService.getPipeline()` und `crm_stock_metrics` überschneiden sich.** Die
+  Sicht kennt `pipeline_count` (nur `offer`), die eigene Abfrage die volle
+  Stufenverteilung. Beide bleiben vorerst: die Balken braucht die Sicht nicht zu
+  liefern. Zusammenlegen, wenn das CRM die Verteilung mit anbietet.
 - **Einstellungs-Oberfläche für Intentionen** fehlt noch. `AnalyticsService
   .getIntentions()` liefert die Daten, es gibt aber keine Seite, auf der Rico das
   Schlafziel (6/8) oder die Toleranzen (`tolerancePct` 10 %, `toleranceKg` 1,5)

@@ -86,6 +86,19 @@ type SemanticConfig = {
   routines: Array<{ name: string; total: number; required: number }>;
   /** Zielwerte aus Health/Cronometer, für `health_target` und `weight_trajectory`. */
   healthTargets: Awaited<ReturnType<typeof prisma.ingestHealthTarget.findMany>>;
+  /**
+   * Vertriebsziele aus dem CRM, für `crm_target`. Historisiert: je Metrik gilt
+   * die Zeile mit dem größten `validFrom`, das nicht nach dem Stichtag liegt.
+   * Ohne das würde eine Zielerhöhung die Vergangenheit rückwirkend schlechter
+   * aussehen lassen. Aufsteigend sortiert, die Auswahl verlässt sich darauf.
+   */
+  crmTargets: Array<{
+    metricKey: string;
+    base: number;
+    target: number | null;
+    comparator: string;
+    validFrom: string;
+  }>;
 };
 
 let configCache: { at: number; value: SemanticConfig } | null = null;
@@ -102,13 +115,28 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
   // Gebündelt: $transaction schickt die Abfragen in einem Rutsch statt in
   // ebenso vielen Runden. Über den pgbouncer kostet jede Runde mehrere hundert
   // Millisekunden.
-  const [definitions, sources, intentions, trackers, healthTargets] = await prisma.$transaction([
-    prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
-    prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
-    prisma.coreIntention.findMany(),
-    prisma.tracker.findMany({ select: { name: true, items: { select: { required: true } } } }),
-    prisma.ingestHealthTarget.findMany(),
-  ]);
+  // `crm_metric_targets` gehört dem CRM — nur lesen, und über rohes SQL, weil
+  // die Spalten `numeric` sind: der Treiber gäbe sie sonst als Zeichenketten
+  // zurück, und `base + 1` ergäbe „301". Ebenso `to_char` für `valid_from` —
+  // eine `date`-Spalte käme sonst als Berliner Mitternacht und läge nach
+  // `toISOString()` einen Tag zu früh.
+  const [definitions, sources, intentions, trackers, healthTargets, crmTargets] =
+    await prisma.$transaction([
+      prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
+      prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
+      prisma.coreIntention.findMany(),
+      prisma.tracker.findMany({ select: { name: true, items: { select: { required: true } } } }),
+      prisma.ingestHealthTarget.findMany(),
+      prisma.$queryRaw<SemanticConfig['crmTargets']>`
+        SELECT metric_key                        AS "metricKey",
+               base_value::float8                AS "base",
+               target_value::float8              AS "target",
+               comparator,
+               to_char(valid_from, 'YYYY-MM-DD') AS "validFrom"
+          FROM crm_metric_targets
+         ORDER BY metric_key, valid_from
+      `,
+    ]);
 
   const value = {
     definitions,
@@ -120,6 +148,7 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
       required: t.items.filter(i => i.required).length,
     })),
     healthTargets,
+    crmTargets,
   };
   configCache = { at: Date.now(), value };
   return value;
@@ -218,6 +247,15 @@ export class AnalyticsService {
       SELECT 'manual', metric_key, '', to_char(date, 'YYYY-MM-DD'), value::float8, TRUE
         FROM core_manual_values
        WHERE date >= ${from}::date AND date <= ${to}::date
+
+      UNION ALL
+      -- Vertriebskennzahlen aus dem CRM. to_char statt der Spalte selbst:
+      -- tag ist eine date-Spalte, der Treiber macht daraus Berliner
+      -- Mitternacht, und ein naives toISOString() läge einen Tag zu früh.
+      -- wert ist numeric und käme ohne Cast als Zeichenkette zurück.
+      SELECT 'crm_metrics', metric_key, '', to_char(tag, 'YYYY-MM-DD'), wert::float8, FALSE
+        FROM crm_daily_metrics
+       WHERE tag >= ${from}::date AND tag <= ${to}::date
     `;
   }
 
@@ -347,6 +385,36 @@ export class AnalyticsService {
           break;
         }
 
+        case 'crm_metrics': {
+          const wanted = str(s.config.metric) || s.metricKey;
+          const seen = new Set<string>();
+          for (const r of rows) {
+            if (r.kind !== 'crm_metrics' || r.k1 !== wanted || r.value === null) continue;
+            put('crm_metrics', s.metricKey, r.d, Number(r.value));
+            seen.add(r.d);
+          }
+
+          /**
+           * Implizite Null — aber erst ab `zeroFrom`.
+           *
+           * Für Anrufe stimmt „keine Zeile heißt null": das CRM protokolliert
+           * jeden gewählten Anruf. Für Stufenwechsel stimmt es erst, seit sie
+           * strukturiert festgehalten werden. Ohne dieses Datum zeigte Jarvis
+           * für jeden Tag davor eine lückenlose Null-Reihe — „kein einziges
+           * Angebot rausgeschickt" statt „wurde damals nicht erfasst". Genau
+           * der Fehler, den NULL ≠ 0 verhindern soll.
+           */
+          const zeroFrom = str(s.config.zeroFrom);
+          if (zeroFrom) {
+            const today = getBerlinDateStr();
+            for (const d of dateRange(from, to)) {
+              if (d < zeroFrom || d > today || isOffDay(d) || seen.has(d)) continue;
+              put('crm_metrics', s.metricKey, d, 0);
+            }
+          }
+          break;
+        }
+
         // reminders und gproject liefern noch nichts — bewusst kein Platzhalter.
       }
     }
@@ -418,6 +486,30 @@ export class AnalyticsService {
           stretch: round(goal),
           base: round(losing ? goal + tolerance : goal - tolerance),
         };
+      }
+
+      /**
+       * Vertriebsziele kommen aus dem CRM, nicht aus dem Plan — dort werden sie
+       * bearbeitet, dort gehören sie hin. Jarvis spiegelt sie nur.
+       *
+       * Es gilt die Zeile mit dem größten `validFrom`, das nicht nach dem
+       * Stichtag liegt. Eine Zielerhöhung legt im CRM eine neue Zeile an, statt
+       * die alte zu überschreiben; würde Jarvis immer die neueste nehmen, sähe
+       * jeder vergangene Tag rückwirkend schlechter aus.
+       */
+      case 'crm_target': {
+        const key = str(config.metric);
+        if (!key) return { base: null, stretch: null, hint: 'keine Metrik angegeben' };
+
+        // Aufsteigend sortiert geladen — der letzte Treffer ist der jüngste gültige.
+        let treffer: SemanticConfig['crmTargets'][number] | null = null;
+        for (const t of ctx.crmTargets) {
+          if (t.metricKey === key && t.validFrom <= date) treffer = t;
+        }
+        if (!treffer) return { base: null, stretch: null, hint: 'kein Ziel im CRM hinterlegt' };
+
+        // CRM nennt es `target_value`, Jarvis `stretch_value` — gleiche Bedeutung.
+        return { base: treffer.base, stretch: treffer.target };
       }
 
       default:
