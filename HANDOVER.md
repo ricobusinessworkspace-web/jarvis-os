@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-12
-last_agent: Claude Opus 5 — CRM-Lesevertrag angebunden, Vertriebs-Reiter neu
+last_updated: 2026-09-15
+last_agent: Claude Opus 5 — iPhone-Widgets „Calls heute" und Routine, im Betrieb
 status: In Progress
 ---
 
@@ -64,6 +64,21 @@ Pipeline sind nur Folgen.
   Umbenennung eines `metric_key` bricht Jarvis **still**. Zusätzlich hängt die
   implizite Null der `sales.stage_*`-Kennzahlen am Datum **2026-09-12**
   (`config.zeroFrom`) — dem Tag, seit dem Stufenwechsel strukturiert ankommen.
+- **iPhone-Widget „Calls heute"** (15.09.): **fertig und ausgerollt.**
+  `GET /api/widgets/calls` + `scriptable/jarvis-calls.js`. Aufbau wie das
+  Apple-Wetter-Widget: Zahl, Zustand im Klartext, Schiene von 0 bis Soll mit
+  Kerbe an der Basis, darunter „Basis 30 · Soll 100". Klein und mittel auf dem
+  Homescreen, rechteckig auf dem Sperrbildschirm; ein Tipp öffnet `/vertrieb`.
+  `WIDGET_SECRET_TOKEN` steht in Vercel (Production + Preview) und in
+  `.env.local`. Beide Skripte liegen mit eingetragenem Token in
+  `~/Library/Mobile Documents/iCloud~dk~simonbs~Scriptable/Documents/` und
+  erscheinen über iCloud von selbst in der iPhone-App. **Offen: Rico muss die
+  Widgets nur noch platzieren.** Einrichtung: `docs/ios-widget.md`.
+- **Widget-Zugang vereinheitlicht** (15.09.): beide Widget-Endpunkte hängen an
+  `checkWidgetAuth()` (`src/lib/widgetAuth.ts`) — ein Secret, kein Standardwert
+  im Code, `Authorization`-Kopfzeile mit `?token=` als Rückfalltür. Der alte
+  fest eingebaute Token von `/api/widgets/routines` ist damit weg, ebenso die
+  falsche Produktions-URL im Routine-Skript.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -99,6 +114,20 @@ Pipeline sind nur Folgen.
 - **Aggregate nennen ihre Abdeckung.** Der Trichter schreibt dazu, an wie vielen
   Tagen des Blocks überhaupt gemessen wurde. Eine 0 über 12 Tage, von denen einer
   gemessen ist, liest sich sonst wie ein Ergebnis.
+- **Ein Widget darf nicht urteilen, solange der Tag läuft.** Im Semantic Layer
+  ist 3 von 30 Calls `unter` — auf dem Dashboard stimmt das, dort steht die Zahl
+  neben der Uhrzeit in einer Tabelle. Ein Widget steht ab Mitternacht auf dem
+  Homescreen; ein roter Balken um 08:00 Uhr behauptet „Tag verfehlt", obwohl der
+  Tag noch läuft. `/api/widgets/calls` gibt deshalb **zwei** Felder zurück:
+  `state` (unverändert aus der Matrix) und `verdict`, das vor 18:00 Uhr
+  (`FEIERABEND_HOUR`) `laeuft` statt `unter` sagt. Der **Wert** wird nie
+  geschönt, nur das Urteil zurückgehalten.
+- **Widget-Skripte rechnen und formulieren nicht.** `/api/widgets/calls` liefert
+  `verdictLabel`, `bounds` und `display` fertig aus `metricState.ts` — derselben
+  Quelle wie die Dashboard-Beschriftungen. Im Scriptable-Skript steht deshalb
+  kein Zielwert und kein deutscher Satz. Sonst stünde das Ziel ein zweites Mal
+  im Code, diesmal auf Ricos Telefon, und wäre beim nächsten Zielwechsel im CRM
+  still falsch — mit dem Unterschied, dass es dort niemand nachrechnet.
 - **Beschriftungen kommen aus den Daten.** `targetSub()` bildet „Basis 30 · Soll
   60" aus der Matrix. Vorher stand der Text zweimal fest in den Seiten und wäre
   beim nächsten Zielwechsel im CRM still falsch geworden.
@@ -167,10 +196,19 @@ Pipeline sind nur Folgen.
   `{"error":{"message":"Protected deployment"}}` oder ein `302` auf `vercel.com/sso-api`
   = die Anfrage kam nie an, also stimmt die **Adresse** nicht. Bei jedem neuen
   Endpunkt zuerst `vercel projects ls` und die echte Production-URL prüfen.
-  **Noch offen:** dieselbe falsche URL steht in `docs/ios-widget.md` (Zeile 71/73)
-  und — kritischer — in `src/app/api/auth/google/route.ts:28` und
+  In `docs/ios-widget.md` ist sie am 15.09. korrigiert. **Noch offen:** dieselbe
+  falsche URL steht in `src/app/api/auth/google/route.ts:28` und
   `callback/route.ts:29` als OAuth-Redirect. Dort **nicht blind ändern**: die URL
   muss mit dem übereinstimmen, was in der Google Cloud Console registriert ist.
+
+- **Problem:** Das Routine-Widget auf dem iPhone zeigte auf
+  `jarvis-os-wardogs.vercel.app` und kam nur über einen Vercel-Bypass-Token
+  durch — also an alten Code, während das Dashboard längst woanders lief.
+  **Lösung:** Skript auf die echte Produktions-URL umgestellt, Bypass entfernt,
+  Zugang auf `WIDGET_SECRET_TOKEN` gehoben. Neue Fassung über iCloud aufs Gerät.
+  **Warum wichtig:** Ein Bypass-Token verdeckt genau den Fehler, den er umgeht.
+  Solange er im Skript stand, *sah* das Widget funktionierend aus, las aber ein
+  totes Deployment. Wo ein Bypass nötig scheint, zuerst die Adresse prüfen.
 
 - **Problem:** Jeder Klick hing sekundenlang.
   **Lösung:** `revalidatePath('/', 'layout')` durch `revalidateTracking()` ersetzt.
@@ -245,6 +283,12 @@ Pipeline sind nur Folgen.
   Sicht kennt `pipeline_count` (nur `offer`), die eigene Abfrage die volle
   Stufenverteilung. Beide bleiben vorerst: die Balken braucht die Sicht nicht zu
   liefern. Zusammenlegen, wenn das CRM die Verteilung mit anbietet.
+- **`.env.example` liegt außerhalb von Git.** `.gitignore` schließt mit `.env*`
+  auch die Vorlage aus, die eigentlich mitgehen soll. Wer dort eine Variable
+  ergänzt, ergänzt sie nur lokal — beim nächsten Klon fehlt sie. Entweder
+  `!.env.example` in die `.gitignore` und die Datei einchecken (sie enthält nur
+  leere Platzhalter), oder die Datei löschen und die Variablenliste allein hier
+  führen. Bis dahin: **neue Variablen immer auch im Handover nennen.**
 - **Einstellungs-Oberfläche für Intentionen** fehlt noch. `AnalyticsService
   .getIntentions()` liefert die Daten, es gibt aber keine Seite, auf der Rico das
   Schlafziel (6/8) oder die Toleranzen (`tolerancePct` 10 %, `toleranceKg` 1,5)
@@ -274,7 +318,8 @@ Anbindung frei.
   `DashboardService`). Einstellungen werden serverseitig direkt gelesen.
 - **Vercel** — Deployment vom `main`-Branch
 - Konfiguration: `DATABASE_URL` mit `pgbouncer=true&connection_limit=1`,
-  `DIRECT_URL` für Migrationen, `INGEST_SECRET` für die Apple-Kurzbefehle
+  `DIRECT_URL` für Migrationen, `INGEST_SECRET` für die Apple-Kurzbefehle,
+  `WIDGET_SECRET_TOKEN` für die iPhone-Widgets
 
 ## Vision & Langziel
 
@@ -309,7 +354,8 @@ Semantic Layer.
    sind gekapselt: fällt das CRM aus, stehen Metriken auf „nicht gemessen".
 4. **Bei Performance-Fragen zuerst `DATENBANK_BRIEFING.md`** — enthält Messungen
    samt Methode. Nicht nochmal von vorn messen.
-5. **`/routines` nicht kaputtmachen** — Ziel des iPhone-Widgets (`docs/ios-widget.md`).
+5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
+   iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
    `npm run build` (prüft auch Typen), `npm run test:e2e` (Playwright-Rauchtest —
    die einzige Testsuite; `npm run test` läuft leer, es gibt keine Unit-Tests).
@@ -323,7 +369,7 @@ Semantic Layer.
 | `AGENTS.md` | Next.js-16-Warnung + Arbeitsablauf | Session-Start (via `CLAUDE.md`) |
 | `DATENBANK_BRIEFING.md` | Performance-Analyse mit Messungen, Übergabe an DB-Agent | bei Performance-Fragen; danach archivierbar |
 | `docs/apple-shortcuts.md` | iOS-Kurzbefehle für Erinnerungen, Health **und Zielwerte**; Sync-Zeitpunkte; nachträglich korrigieren | beim Einrichten der Apple-Anbindung |
-| `docs/ios-widget.md` | Scriptable-Widget, Technik | beim Anfassen des Widgets / `/routines` |
+| `docs/ios-widget.md` | beide iPhone-Widgets (Calls, Routine): Einrichtung und Technik | beim Anfassen der Widgets / `/routines` / `/vertrieb` |
 | `docs/bank-sync.md` | Bank-Sync über n8n | beim Anfassen des Bank-Imports |
 
 `~/dev/coding-workflow-standards.md` (außerhalb des Repos) gilt projektübergreifend.

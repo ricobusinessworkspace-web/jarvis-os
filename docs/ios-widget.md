@@ -1,174 +1,232 @@
-# iOS Routine Widget (Scriptable)
+# iPhone-Widgets (Scriptable)
 
-> Referenzdokument, kein Handover. Das Projekt-Handover ist `HANDOVER.md`.
+> Referenzdokument, kein Handover. Der Stand des Projekts steht in `HANDOVER.md`.
 
-Technische Details zum Warten und Erweitern des iOS-Routine-Widgets für Jarvis OS. The widget is currently implemented using the third-party iOS app **Scriptable**, which executes JavaScript to render native iOS UI components.
+Zwei Widgets, beide über die App **Scriptable** (App Store, kostenlos). Scriptable
+führt JavaScript aus und baut daraus echte iOS-Widgets — kein eigener App-Build,
+keine Xcode-Kette, kein Apple-Developer-Account.
 
-## Architecture Overview
-The widget connects to a dedicated Next.js API route to fetch the user's daily habits (routines). 
+| Widget | Zeigt | Skript | Endpunkt |
+|---|---|---|---|
+| **Calls heute** | Tages-Calls gegen Basis und Soll | `scriptable/jarvis-calls.js` | `GET /api/widgets/calls` |
+| **Routine** | Morgen- bzw. Abendroutine | `scriptable/jarvis-routines.js` | `GET /api/widgets/routines` |
 
-1. **Backend:** Next.js API Route (`src/app/api/widgets/routines/route.ts`)
-2. **Frontend (Widget):** Scriptable JavaScript (running natively on iOS)
-3. **Authentication:** Vercel SSO Bypass Token + App-level query token
+**Produktion ist `https://jarvis-os-indol.vercel.app`.** Nicht
+`jarvis-os-wardogs.vercel.app` — die Adresse zeigt auf ein altes, SSO-geschütztes
+Deployment und beantwortet keine Widget-Anfragen. Bei Zweifeln `vercel projects ls`.
 
-## 1. The Backend API
+---
 
-**Endpoint:** `GET /api/widgets/routines`
-**File:** `src/app/api/widgets/routines/route.ts`
+# 1. Calls heute
 
-### Parameters
-- `token`: (Required) A hardcoded secret used to prevent unauthorized access.
-  - Default: `jarvis-scriptable-secret-123`
-  - In production, this should ideally be moved to an environment variable (`WIDGET_SECRET_TOKEN`).
+## Was es zeigt
 
-### Data Source
-The API relies on `RoutineService.getTodayRoutines()` from `src/core/services/RoutineService.ts`. It returns all tracker items for the current day, along with their status (`completed`, `not_done`, or `skipped`).
+Aufgebaut wie das Apple-Wetter-Widget, Zeile für Zeile dieselbe Ordnung:
 
-### Response Format
-```json
-{
-  "success": true,
-  "data": {
-    "total": 12,
-    "completed": 0,
-    "pending": 12,
-    "items": [
-      {
-        "id": "7b6ca8ea...",
-        "name": "Bett machen ☑️",
-        "category": "Morgenroutine",
-        "status": "not_done"
-      }
-    ]
-  }
-}
+| Wetter | Calls |
+|---|---|
+| `18°` | `47` — Calls heute |
+| `Mostly Cloudy` | `Basis erreicht` — der Zustand im Klartext |
+| — | die Schiene: Balken von 0 bis Soll, Kerbe an der Basis |
+| `H:24° L:11°` | `Basis 30 · Soll 100` |
+
+Die **Schiene** ist das Kernstück: eine Spur von 0 bis zum Tagesziel, gefüllt bis
+zum aktuellen Stand. Die Basis sitzt darin als echte Lücke im Balken, nicht als
+aufgemalter Strich — eine Lücke stimmt auf jedem Hintergrund, ein Strich müsste
+die Hintergrundfarbe kennen, und auf dem Sperrbildschirm ist das das Wallpaper.
+Solange der Füllstand die Basis noch nicht erreicht hat, markiert sie ein feiner
+Strich auf der leeren Spur.
+
+Unterstützte Größen: **klein** und **mittel** auf dem Homescreen (mittel zeigt
+rechts zusätzlich die Tagesaufteilung Cold Groß / Cold Tarif / Nachgreifen),
+**rechteckig** auf dem Sperrbildschirm. Ein Tipp öffnet `/vertrieb`.
+
+Farben folgen dem Dashboard: monochrome Helligkeitsrampe, einzige Farbe ist Rot
+für „unter Basis". Hell- und Dunkelmodus über `Color.dynamic`, auf dem
+Sperrbildschirm färbt iOS ohnehin selbst ein.
+
+## Die Feierabend-Regel
+
+Im Semantic Layer ist ein Tag mit 3 von 30 Calls `unter` — verfehlt. Auf dem
+Dashboard stimmt das den ganzen Tag, dort steht die Zahl in einer Tabelle neben
+der Uhrzeit. Ein Widget steht dagegen ab Mitternacht auf dem Homescreen: ein
+roter Balken um 08:00 Uhr behauptet „Tag verfehlt", obwohl der Tag noch läuft.
+
+Der Endpunkt gibt deshalb zwei Felder zurück:
+
+- `state` — der echte Zustand aus dem Semantic Layer, unverändert
+- `verdict` — derselbe Zustand fürs Widget, mit `laeuft` statt `unter`, solange
+  es vor `FEIERABEND_HOUR` (18:00 Berliner Zeit) ist
+
+Der **Wert** wird dabei nie geschönt, nur das Urteil zurückgehalten. Andere
+Stunde gewünscht: `FEIERABEND_HOUR` in `src/app/api/widgets/calls/route.ts`.
+
+## Wie aktuell die Zahl ist
+
+**Woher die Calls kommen, ist egal.** Mac-App, iPhone-PWA und das Lightning CRM
+hängen an derselben Supabase-Datenbank; das Widget liest denselben Semantic Layer
+wie der Vertriebs-Reiter. Ein Anruf, der irgendwo protokolliert wird, ist im
+selben Moment in der Antwort — es gibt keinen zweiten Datenstand, der nachziehen
+müsste.
+
+**Wie oft iOS nachfragt, entscheidet iOS.** Das Skript setzt `refreshAfterDate`,
+aber das ist ein Wunsch, kein Befehl: das System deckelt Widget-Aktualisierungen
+auf grob 40–70 pro Tag und Widget, in der Praxis sind das ~15 Minuten. Der
+Endpunkt hält den Takt deshalb dort kurz, wo sich die Zahl bewegt
+(`refreshAfterSeconds`): 5 Minuten zwischen 07:00 und 20:00, sonst 30, am Off-Day
+60. Echte Push-Aktualisierung bräuchte ein natives WidgetKit-Target mit APNs —
+ein eigener App-Build mit Developer-Account, nicht mit Scriptable machbar.
+
+**Sofort frisch: antippen.** Der Tipp öffnet `/vertrieb`, und die Seite lädt live.
+
+Ohne Netz zeigt das Widget die zuletzt geholte Zahl und schreibt `Stand 14:03 ·
+offline` an die Stelle der Grenzen — nie eine alte Zahl ohne diesen Hinweis.
+
+## Einrichten
+
+> **Am 15.09. bereits erledigt:** `WIDGET_SECRET_TOKEN` steht in Vercel
+> (Production + Preview) und in `.env.local`; beide Skripte liegen mit
+> eingetragenem Token in Ricos Scriptable-iCloud-Ordner. Die folgenden Schritte
+> stehen hier für den Fall, dass das Secret gewechselt oder ein neues Gerät
+> eingerichtet wird.
+
+**1. Secret in Vercel setzen.** Einen Zufallswert erzeugen:
+
+```bash
+openssl rand -hex 24
 ```
 
-## 2. Authentication & Vercel Bypass
+Vercel → Projekt `jarvis-os` → Settings → Environment Variables →
+`WIDGET_SECRET_TOKEN` = der erzeugte Wert, für alle Umgebungen. Danach einmal neu
+deployen, sonst kennt die laufende Instanz die Variable nicht.
 
-Since the application is hosted on Vercel and deployed under an organization (`wardogs`) with **Vercel Authentication (SSO)** enabled, the API route is blocked at the Edge network layer by default.
+> Ohne gesetzte Variable antwortet der Endpunkt bewusst mit `503` statt mit
+> Daten. Einen fest eingebauten Standardwert gibt es nicht — das Repository ist
+> öffentlich.
 
-To bypass this without disabling Vercel Authentication for the entire project:
-1. In the Vercel Dashboard, enable **Protection Bypass for Automation**.
-2. Copy the generated secret.
-3. Pass the secret in the HTTP request headers from the widget.
+**2. Lokal dasselbe.** In `.env.local` dieselbe Zeile, wenn das Widget gegen den
+Dev-Server getestet werden soll.
 
-**Header:** `x-vercel-protection-bypass: <SECRET_TOKEN>`
+**3. Prüfen, ob der Endpunkt antwortet:**
 
-> Das Token gehört **nicht** in dieses Dokument. Es steht in den Vercel-Einstellungen.
+```bash
+curl -s -H "Authorization: Bearer $WIDGET_SECRET_TOKEN" https://jarvis-os-indol.vercel.app/api/widgets/calls
+```
 
-## 3. The Scriptable Code
+Erwartet wird JSON mit `"ok":true`. Zu den beiden Sorten `401` siehe unten.
 
-This is the production-ready Scriptable code currently used by the user.
+**4. Skript aufs iPhone bringen.** Zwei Wege:
 
-> **Key Features:**
-> - **Time-based filtering:** Shows "Morgenroutine" before 15:00 and "Abendroutine" after 15:00.
-> - **Emoji stripping:** Emojis are stripped from the task names via Regex to ensure a clean UI next to the SF Symbols.
-> - **Deep Linking:** Tapping the widget opens the dedicated mobile PWA route `/routines`.
+*Über iCloud (schneller, kein Tippen am Telefon).* Scriptable legt seine Skripte
+in `~/Library/Mobile Documents/iCloud~dk~simonbs~Scriptable/Documents/`. Eine
+Datei, die dort auf dem Mac landet, erscheint in der iPhone-App von selbst.
+Wichtig: Scriptables eigener Kopf muss **als erstes** in der Datei stehen, sonst
+bekommt das Skript kein Symbol und keine Zuordnung:
 
 ```javascript
-// ====== CONFIGURATION ======
-const API_URL = "https://jarvis-os-wardogs.vercel.app/api/widgets/routines?token=jarvis-scriptable-secret-123";
-const VERCEL_BYPASS_TOKEN = "DEIN_BYPASS_TOKEN"; // Vercel → Settings → Deployment Protection 
-const DASHBOARD_URL = "https://jarvis-os-wardogs.vercel.app/routines";
-// ===========================
-
-async function fetchRoutines() {
-  try {
-    let req = new Request(API_URL);
-    if (VERCEL_BYPASS_TOKEN) {
-      req.headers = { "x-vercel-protection-bypass": VERCEL_BYPASS_TOKEN };
-    }
-    let res = await req.loadJSON();
-    return res.data;
-  } catch(e) {
-    return null;
-  }
-}
-
-let data = await fetchRoutines();
-let widget = new ListWidget();
-widget.backgroundColor = new Color("#0a0a0f");
-
-// Deep Link to PWA
-widget.url = DASHBOARD_URL;
-
-// Time Check: Morning routine before 15:00, Evening routine after
-let hour = new Date().getHours();
-let isMorning = hour < 15;
-let targetCategory = isMorning ? "Morgenroutine" : "Abendroutine";
-
-// Top-Bar
-let topStack = widget.addStack();
-topStack.centerAlignContent();
-let title = topStack.addText(isMorning ? "☀️ MORGEN" : "🌙 ABEND");
-title.font = Font.blackSystemFont(11);
-title.textColor = new Color(isMorning ? "#fbbf24" : "#818cf8"); 
-topStack.addSpacer();
-
-let sym = SFSymbol.named("checkmark.circle.fill");
-let symImg = topStack.addImage(sym.image);
-symImg.imageSize = new Size(12, 12);
-symImg.tintColor = new Color("#34d399");
-
-widget.addSpacer(6);
-
-if (!data || !data.items) {
-  let err = widget.addText("Daten-Fehler!");
-  err.font = Font.systemFont(10);
-  err.textColor = Color.red();
-} else {
-  let activeItems = data.items.filter(i => i.category === targetCategory);
-  let completed = activeItems.filter(i => i.status === 'completed').length;
-  
-  let stats = widget.addText(`${completed} von ${activeItems.length} erledigt`);
-  stats.font = Font.boldSystemFont(10);
-  stats.textColor = new Color("#888888");
-  widget.addSpacer(6);
-
-  let count = 0;
-  for (let item of activeItems) {
-    if (count >= 4) {
-      if (activeItems.length > 4 && count === 4) {
-        let more = widget.addText(`+ ${activeItems.length - 4} weitere...`);
-        more.font = Font.systemFont(9);
-        more.textColor = new Color("#666666");
-      }
-      count++;
-      continue;
-    }
-    
-    let row = widget.addStack();
-    row.centerAlignContent();
-    let isDone = item.status === 'completed';
-    
-    let checkSym = SFSymbol.named(isDone ? "checkmark.circle.fill" : "circle");
-    let checkImg = row.addImage(checkSym.image);
-    checkImg.imageSize = new Size(10, 10);
-    checkImg.tintColor = isDone ? new Color("#34d399") : new Color("#444444");
-    
-    row.addSpacer(6);
-    
-    // Strip Emojis
-    let cleanName = item.name.replace(/[\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E0}-\u{1F1FF}]/gu, '').trim();
-    
-    let name = row.addText(cleanName);
-    name.font = Font.systemFont(11);
-    name.textColor = isDone ? new Color("#666666") : new Color("#ffffff");
-    name.lineLimit = 1;
-    
-    widget.addSpacer(4);
-    count++;
-  }
-}
-
-Script.setWidget(widget);
-Script.complete();
-widget.presentSmall();
+// Variables used by Scriptable.
+// These must be at the very top of the file. Do not edit.
+// icon-color: deep-blue; icon-glyph: phone-alt;
 ```
 
-## Future Recommendations for Mobile Devs
-If migrating to a native Swift iOS Widget (WidgetKit) in the future:
-1. Re-use the existing `/api/widgets/routines` endpoint.
-2. Implement the `x-vercel-protection-bypass` header in `URLSession`.
-3. Use iOS 17 App Intents if interactive checkbox toggling (without opening the PWA) is required. This will necessitate creating a `POST /api/widgets/routines/complete` endpoint in Next.js to handle the background API calls.
+Der Kopf steht **nicht** in den Repo-Fassungen unter `scriptable/` — dort wäre er
+nur Beiwerk. Er kommt beim Kopieren nach iCloud davor, zusammen mit dem echten
+`TOKEN`. Deshalb liegen die Dateien im Repo mit Platzhalter: **kein Secret im
+öffentlichen Repository.**
+
+*Von Hand.* Scriptable öffnen → **+** → Inhalt von `scriptable/jarvis-calls.js`
+einfügen → oben rechts umbenennen in `Jarvis Calls` → im Kopf `TOKEN` durch das
+Secret ersetzen. `HOST` steht bereits richtig.
+
+**5. Widget aufs Homescreen.** Lange auf den Homescreen tippen → **+** →
+Scriptable → Größe wählen → platzieren → auf das Widget tippen →
+Script = `Jarvis Calls`, **When Interacting = Run Script**.
+
+Für den Sperrbildschirm dasselbe über Sperrbildschirm → Anpassen → Widget unter
+der Uhr → Scriptable → die rechteckige Variante.
+
+## Antwort des Endpunkts
+
+```
+GET /api/widgets/calls
+Authorization: Bearer <WIDGET_SECRET_TOKEN>
+```
+
+Alternativ `?token=…`, weil Scriptable sich in manchen Zusammenhängen mit
+Kopfzeilen schwertut. Die Kopfzeile ist vorzuziehen: Query-Parameter landen in
+Server-Logs.
+
+```json
+{
+  "ok": true,
+  "date": "2026-09-15",
+  "generatedAt": "2026-09-15T20:53:19.402Z",
+  "offDay": false,
+  "dayOver": true,
+  "calls": {
+    "key": "sales.calls_count",
+    "label": "Calls",
+    "value": 47, "base": 30, "stretch": 100,
+    "state": "basis", "verdict": "basis", "verdictLabel": "Basis erreicht",
+    "bounds": "Basis 30 · Soll 100", "display": "47",
+    "source": "crm_metrics", "targetHint": null,
+    "progress": 0.47, "basePoint": 0.3
+  },
+  "teile": [ … dieselbe Form für die drei Tagesanteile … ],
+  "refreshAfterSeconds": 300
+}
+```
+
+Wichtig für Änderungen: **alle Anzeigetexte kommen fertig aus der Antwort.**
+`verdictLabel` und `bounds` werden aus `src/lib/metricState.ts` gebildet, also aus
+derselben Quelle wie die Beschriftungen im Dashboard. Im Skript steht deshalb
+kein einziger Zielwert und keine deutsche Formulierung — sonst stünde das Ziel
+ein zweites Mal im Code und wäre beim nächsten Zielwechsel im CRM still falsch.
+
+`value: null` heißt **nicht gemessen**, nicht null. Das Widget zeigt dann `–` und
+eine leere Spur, nie eine 0. Ebenso `progress: null`, wenn kein Soll auflösbar
+ist — eine Schiene ohne Maß wäre eine erfundene Zahl.
+
+---
+
+# 2. Routine
+
+Zeigt vor 15:00 Uhr die Morgen-, danach die Abendroutine — vier Schritte, darunter
+„+ n weitere". Ein Tipp öffnet `/routines`. Skript: `scriptable/jarvis-routines.js`,
+Endpunkt `GET /api/widgets/routines`, Datenquelle `RoutineService.getTodayRoutines()`.
+
+Einrichtung wie beim Calls-Widget: Skript in Scriptable anlegen, `TOKEN` eintragen,
+Widget platzieren. Beide Endpunkte nutzen **dasselbe** `WIDGET_SECRET_TOKEN`.
+
+> **Geändert am 15.09.:** Dieses Widget hatte einen fest eingebauten Token
+> (`jarvis-scriptable-secret-123`) im Query-String und zeigte auf
+> `jarvis-os-wardogs.vercel.app` — also auf das alte, SSO-geschützte Deployment,
+> erreichbar nur über einen Bypass-Token. Beides ist raus: `Authorization`-Kopfzeile
+> mit `WIDGET_SECRET_TOKEN`, richtige Produktions-URL, kein Bypass mehr nötig.
+> Wer noch eine alte Fassung des Skripts auf dem Telefon hat, bekommt `401`.
+
+# 3. Wenn etwas nicht geht
+
+**Zwei Sorten `401` unterscheiden** — das kostet sonst Stunden:
+
+| Antwort | Bedeutung | Zu tun |
+|---|---|---|
+| `{"error":"Unauthorized"}`, Kopfzeile `x-matched-path` | Die App hat geantwortet, das Secret stimmt nicht | Token im Skript gegen `WIDGET_SECRET_TOKEN` in Vercel prüfen |
+| `{"error":{"message":"Protected deployment"}}` oder `302` auf `vercel.com/sso-api` | Die Anfrage kam nie an, die **Adresse** stimmt nicht | Produktions-URL prüfen (`vercel projects ls`) |
+
+**`503 "WIDGET_SECRET_TOKEN ist nicht gesetzt"`** — Variable in Vercel fehlt oder
+es wurde nach dem Setzen nicht neu deployt.
+
+**Widget zeigt `nicht gemessen`** — der Endpunkt antwortet, aber der Semantic
+Layer hat für heute keinen Wert. `npm run core:check` rechnet nach, woran es
+liegt. Das ist kein Widget-Fehler.
+
+**Widget aktualisiert gefühlt nie** — iOS deckelt Aktualisierungen pro Widget.
+Weniger Scriptable-Widgets gleichzeitig hilft, weil sie sich das Kontingent
+teilen. Antippen holt immer frisch.
+
+**Zum nativen Widget wechseln (WidgetKit, Swift):** Endpunkt bleibt wie er ist,
+`Authorization`-Kopfzeile in `URLSession` setzen, `verdict`/`progress`/`basePoint`
+direkt verwenden. Für Abhaken direkt im Widget braucht es App Intents (iOS 17)
+plus einen `POST`-Endpunkt — für Calls gibt es nichts abzuhaken, die kommen aus
+dem CRM.
