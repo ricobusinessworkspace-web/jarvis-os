@@ -276,3 +276,157 @@ body {
     @apply text-[10px] font-black bg-accent/15 text-accent px-2.5 py-1 rounded-full tracking-wider uppercase;
   }
 }
+
+/* ============================================================
+   Startsequenz — der Drahtgitter-Ball aus dem App-Icon
+
+   Regeln, die hier nicht verhandelbar sind (siehe HANDOVER, Abschnitt
+   „EcosystemLoader"):
+
+   1. **Kein JavaScript.** Rein CSS, serverseitig im HTML. Damit malt die
+      Sequenz mit dem ersten Frame und endet nach fester Zeit — sie kann
+      nicht auf Hydration warten und den Start verlängern.
+   2. **`pointer-events: none`.** Die Seite ist die ganze Zeit bedienbar,
+      auch während der Schleier noch liegt. Es wird nichts blockiert,
+      nur etwas darübergelegt.
+   3. **Der Schleier geht früh weg** (ab 40 %, frei ab 72 %), der Ball
+      verglüht danach. So ist der Inhalt nach gut einer Drittelsekunde
+      sichtbar und die Animation nur noch Zierde darüber.
+   4. Am Ende `visibility: hidden` — raus aus Paint und Vorlesereihenfolge.
+
+   Läuft je Dokument-Aufruf einmal: das Root-Layout rendert bei Client-
+   Navigation nicht neu, nur bei echtem Laden und beim Neuladen.
+   ============================================================ */
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: var(--color-bg-base);
+  animation: boot-veil 980ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes boot-veil {
+  0%,
+  40% { opacity: 1; }
+  72% { opacity: 0; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+/* Schein hinter dem Ball — ein einzelner Puls, kein Dauerleuchten. */
+.boot-glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(168, 85, 247, 0.38) 0%,
+    rgba(168, 85, 247, 0.12) 42%,
+    transparent 68%
+  );
+  animation: boot-glow 980ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes boot-glow {
+  0% { opacity: 0; transform: scale(0.6); }
+  38% { opacity: 1; transform: scale(1.04); }
+  62% { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+.boot-sphere {
+  width: 264px;
+  height: 264px;
+  overflow: visible;
+  animation: boot-sphere 980ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes boot-sphere {
+  0% { opacity: 0; transform: scale(0.74) rotate(-12deg); filter: blur(7px); }
+  26% { opacity: 1; }
+  58% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.1) rotate(4deg); filter: blur(3px); }
+}
+
+/* Die Ringe zeichnen sich nacheinander — Versatz kommt als inline-Delay. */
+/* Der Leuchtsaum sitzt auf der Gruppe, nicht auf dem <svg>: dort animiert
+   `boot-sphere` bereits `filter`, und zwei filter-Angaben am selben Element
+   überschreiben einander. */
+.boot-lines {
+  filter:
+    drop-shadow(0 0 2px rgba(199, 125, 255, 0.9))
+    drop-shadow(0 0 7px rgba(168, 85, 247, 0.65))
+    drop-shadow(0 0 16px rgba(168, 85, 247, 0.35));
+}
+
+.boot-ring {
+  fill: none;
+  stroke: #b96bff;
+  stroke-width: 1.05;
+  stroke-dasharray: 470;
+  stroke-dashoffset: 470;
+  animation: boot-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.boot-ring--rim {
+  stroke: #d9a4ff;
+  stroke-width: 1.7;
+}
+
+@keyframes boot-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Die hellen Eckpunkte sind das Kennzeichen des Icons — reines Weiss mit
+   eigenem Saum, damit sie sich gegen die violetten Linien durchsetzen. Der
+   eigene Filter am Kind wird vor dem Gruppenfilter angewandt, sie addieren
+   sich also, statt sich zu ersetzen. */
+.boot-node {
+  fill: #ffffff;
+  opacity: 0;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.85));
+  animation: boot-node 380ms ease-out forwards;
+}
+
+@keyframes boot-node {
+  0% { opacity: 0; }
+  100% { opacity: 0.95; }
+}
+
+.boot-word {
+  position: absolute;
+  bottom: calc(50% - 205px);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #c77dff;
+  opacity: 0;
+  animation: boot-word 980ms ease-out forwards;
+}
+
+@keyframes boot-word {
+  0% { opacity: 0; letter-spacing: 0.72em; }
+  46% { opacity: 0.6; letter-spacing: 0.42em; }
+  70% { opacity: 0; letter-spacing: 0.38em; }
+  100% { opacity: 0; }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt einen kurzen Abblender statt nichts —
+   ein harter Schnitt auf die fertige Seite wirkt sonst wie ein Fehler. */
+@media (prefers-reduced-motion: reduce) {
+  .boot { animation: boot-veil-plain 260ms linear forwards; }
+  .boot-glow,
+  .boot-sphere,
+  .boot-word { animation: none; opacity: 0; }
+  .boot-ring { animation: none; stroke-dashoffset: 0; }
+  .boot-node { animation: none; }
+}
+
+@keyframes boot-veil-plain {
+  0% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}

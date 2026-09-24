@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { BootSplash } from "@/components/layout/BootSplash";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -28,13 +29,20 @@ export default function RootLayout({
   return (
     <html lang="de" className={`${inter.variable} h-full antialiased dark`}>
       {/*
-        Kein Lade-Overlay mehr: der EcosystemLoader legte einen schwarzen
-        Vollbild-Layer über die App und nahm ihn erst per useEffect weg — also
-        erst nach vollständiger Hydration. Der Inhalt ist serverseitig längst
-        gerendert; das Overlay hat ihn nur versteckt und den Start künstlich
-        verlängert.
+        Die Startsequenz liegt bewusst **über** dem Inhalt, nicht davor:
+        `children` steht zuerst im DOM und rendert serverseitig wie immer.
+
+        Der EcosystemLoader, der hier früher stand, verschwand per useEffect —
+        also erst nach vollständiger Hydration — und hat den Start dadurch
+        künstlich verlängert. `BootSplash` enthält kein JavaScript, endet nach
+        fester Zeit und lässt mit `pointer-events: none` jeden Klick durch.
+        Wer hier wieder etwas mit useState/useEffect einbaut, baut den alten
+        Fehler nach.
       */}
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        <BootSplash />
+      </body>
     </html>
   );
 }

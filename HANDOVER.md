@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-15
-last_agent: Claude Opus 5 — iPhone-Widgets „Calls heute" und Routine, im Betrieb
+last_updated: 2026-09-24
+last_agent: Claude Opus 5 — Startsequenz (Drahtgitter-Ball aus dem App-Icon)
 status: In Progress
 ---
 
@@ -79,6 +79,23 @@ Pipeline sind nur Folgen.
   im Code, `Authorization`-Kopfzeile mit `?token=` als Rückfalltür. Der alte
   fest eingebaute Token von `/api/widgets/routines` ist damit weg, ebenso die
   falsche Produktions-URL im Routine-Skript.
+- **Anschreiben, Stufe 1** (21.09.): **fertig, lokal geprüft.** Seite `/mail`.
+  Die Warteschlange ist **abgeleitet**: offene CRM-Aufgaben am Lead, deren Text
+  mit „Mail" beginnt (`MAIL_MARKER` in `MailService`). Im CRM war dafür **nichts
+  zu bauen** — Rico benutzt diese Schreibweise bereits, drei Vorgänge standen
+  beim ersten Aufruf sofort drin. Jarvis hält nur, was das CRM nicht kennt: den
+  Entwurf (`mail_drafts`) und die Vorlagen (`mail_templates`).
+  Kontextfelder pro Entwurf: Gesprächsdatum, gesprochen mit, Thema, Empfänger.
+  Zustände `offen → entwurf → freigegeben → gesendet`, keiner wird übersprungen.
+  Freigeben ist gesperrt ohne Betreff, Text und Empfängeradresse.
+  **Offen: alle drei Vorgänge haben „keine Adresse im CRM"** — die Karte sagt
+  das in Rot, statt eine leere Mail zuzulassen.
+- **Startsequenz** (24.09.): **fertig.** Der Drahtgitter-Ball aus dem App-Icon
+  zeichnet sich einmal je Dokument-Aufruf (`BootSplash`, im Root-Layout).
+  **Reines CSS, kein JavaScript** — genau deshalb, siehe unten. 980 ms gesamt,
+  der Schleier ist ab 706 ms weg, danach verglüht nur noch der Ball über der
+  fertigen Seite. Bei Client-Navigation spielt sie **nicht** erneut (das
+  Root-Layout rendert dabei nicht neu) — geprüft.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -136,6 +153,25 @@ Pipeline sind nur Folgen.
   eine Zeile in der Tabelle, kein neuer Code-Pfad.
 - **Keine erfundenen Zahlen.** Kein Platzhalter-Ziel, kein 0 % für ein Ziel, das
   nicht existiert. Das Umsatzziel steht bewusst auf `pending`.
+- **Ein Overlay über der App darf niemals auf JavaScript warten.** Die
+  Startsequenz ist eine Server-Komponente ohne `useState`/`useEffect`: sie malt
+  mit dem ersten Frame, endet nach fester Zeit und lässt mit
+  `pointer-events: none` jeden Klick durch. Der alte `EcosystemLoader` verschwand
+  per `useEffect`, also erst nach vollständiger Hydration, und hat den Start
+  dadurch künstlich verlängert. Wer hier wieder einen Zustand einbaut, baut den
+  alten Fehler nach — der Kommentar im Root-Layout sagt das auch dort.
+- **Die Mail-Warteschlange wird abgeleitet, nicht gespiegelt.** Was ansteht,
+  steht im CRM als Aufgabe. Jarvis führt keine zweite Liste, die auseinander-
+  laufen könnte; ein im CRM abgehakter Punkt verschwindet in Jarvis von selbst.
+  Dieselbe Regel wie bei den Zielen: die Quelle, die es besitzt, behält es.
+- **Ein fehlender Platzhalter wird sichtbar, nicht leer.** `{{ansprechpartner}}`
+  ohne Wert wird zu `[Ansprechpartner fehlt]` im Text, nicht zu `""`. Sonst
+  entstünde „Guten Tag ," und niemand merkt es vor dem Absenden — dieselbe
+  Trennung wie `NULL ≠ 0`, nur in Prosa. Gemessen wird am **gespeicherten
+  Text**, nicht an der Vorlage: nach dem Anwenden stehen dort keine `{{…}}`
+  mehr, sondern die Marker.
+- **Aus dem Vornamen wird kein Herr/Frau geraten.** Ohne Ansprechpartner die
+  neutrale Anrede. Eine falsche Anrede trifft den Kunden, nicht das Dashboard.
 - **Ziele kommen aus der Quelle, die sie besitzt.** Die Vertriebsziele liest
   Jarvis seit dem 12.09. aus `crm_metric_targets` im CRM — dort werden sie
   bearbeitet, dort gehören sie hin. `user_profiles.daily_call_goal` (60) wird
@@ -200,6 +236,9 @@ Pipeline sind nur Folgen.
   falsche URL steht in `src/app/api/auth/google/route.ts:28` und
   `callback/route.ts:29` als OAuth-Redirect. Dort **nicht blind ändern**: die URL
   muss mit dem übereinstimmen, was in der Google Cloud Console registriert ist.
+  **Korrektur vom 21.09.:** das betrifft nur noch Kalender/Tasks. Ricos Postfach
+  läuft über SMTP/IMAP, nicht über Google — die Mail-Anbindung hängt **nicht**
+  daran.
 
 - **Problem:** Das Routine-Widget auf dem iPhone zeigte auf
   `jarvis-os-wardogs.vercel.app` und kam nur über einen Vercel-Bypass-Token
@@ -297,6 +336,63 @@ Pipeline sind nur Folgen.
   `weightStart`/`weightStartDate`, misst Jarvis ab Tag eins gegen das Endgewicht,
   statt ein Zwischenziel zu interpolieren. Bewusst so — soll das lieber
   „Ziel fehlt" sein, bis der Startpunkt da ist?
+- **E-Mail: wann wird entworfen?** Empfehlung aus dem Review ist Warteschlange
+  statt Sofort-Entwurf (Begründung unten). Rico hat sich noch nicht festgelegt.
+- **E-Mail: wie weit darf Jarvis autonom senden?** Vorschlag: gar nicht ohne
+  Freigabe, ausgenommen eine ausdrücklich freigeschaltete Klasse. Offen.
+- **Private Mails ins Modell?** Geschäftlich und privat von Anfang an getrennte
+  Konten; ob private Inhalte je in einen Prompt gehen, entscheidet Rico.
+
+## Für nächsten Agent — Anschreiben
+
+Rico will, dass **Jarvis** Mails schreibt und sendet, bewusst **nicht** das CRM.
+Stufe 1 steht; hier die Leiter und die Entscheidungen, die schon gefallen sind.
+
+**Drei Korrekturen am Review vom selben Tag — nicht in die alte Fassung zurückfallen:**
+
+1. **Kein `ANTHROPIC_API_KEY`, und das ist nicht verhandelbar** (Rico, 21.09.).
+   Die Richtung dreht sich um: **Claude ruft Jarvis**, nicht Jarvis eine API.
+   Rico benutzt sein normales Abo, Jarvis wird über einen MCP-Server zum
+   Werkzeug — genau wie das CRM es heute schon ist. Kein Modellaufruf im
+   Jarvis-Code, keine laufenden Kosten. Fernziel ist eine Sprach-Kaskade auf
+   derselben Grundlage.
+2. **Das Postfach ist SMTP/IMAP, kein Google-Konto.** Damit ist das ganze
+   OAuth-Thema für Mail vom Tisch. Zugangsdaten stehen noch aus.
+3. **Vorlagen sind Gerüste, keine fertigen Mails.** Rico will individualisierte
+   Anschreiben mit Ansprechpartner, Firma, Gesprächsdatum, Gesprächspartner und
+   Thema als Kontext. Deshalb hat eine Vorlage **zwei** Hälften: `body` (Gerüst
+   mit Platzhaltern, Weg ohne Modell) und `guidance` (Anweisung an Claude, vor
+   allem: was *nicht* erfunden werden darf).
+
+**Leiter:**
+
+| Stufe | Inhalt | Stand |
+|---|---|---|
+| 1 | Warteschlange aus CRM-Aufgaben, Kontextfelder, Vorlagen, Kopieren/`mailto` | **fertig** (21.09.) |
+| 2 | MCP-Server für Jarvis — Claude liest die Warteschlange und schreibt Entwürfe zurück | offen |
+| 3 | SMTP senden / IMAP lesen | wartet auf Ricos Postfach-Daten |
+| 4 | Rückmeldung ans CRM über `nachricht_festhalten` (MCP) | offen |
+
+**Der Arbeitsablauf, auf den das zuläuft** (Rico, 21.09.): im Gespräch im CRM
+festhalten, dass eine Mail rausgehen muss → Jarvis zeigt sie abends in der
+Warteschlange → Rico gibt frei → Jarvis sendet → das CRM bekommt den Eintrag.
+Bewusst **nicht** mitten im Call-Block schreiben.
+
+**Was Stufe 1 gebaut hat:** `scripts/mail-layer.sql` (läuft über
+`npm run core:migrate` mit), Modelle `MailTemplate`/`MailDraft`,
+`src/lib/mailTemplate.ts` (Platzhalter, rein — Server und Oberfläche teilen
+sie), `MailService`, `CrmService.getLeadsForMail`, `src/actions/mail.ts`,
+Seite `/mail`, Komponenten unter `src/components/mail/`.
+
+**Der Lesevertrag bleibt unverletzt.** Stufe 4 schreibt über den MCP-Server des
+CRM (`nachricht_festhalten`), nicht in `crm_*`. Das gehört in
+`~/dev/Lightning CRM/docs/lesevertrag-jarvis.md`, sobald Stufe 4 steht — sonst
+hält der nächste CRM-Agent den Vertrag für gebrochen.
+
+**Die Adressen fehlen weiter** (gemessen 21.09.): 16 von 207 aktiven Leads haben
+eine E-Mail, in `pitch`/`data`/`offer` 4 von 63. Alle drei Vorgänge in der
+Warteschlange stehen ohne Adresse da. Das Nachziehen gehört ins CRM und ist
+unabhängig von allen weiteren Stufen.
 
 ## Für nächsten Agent — Claude-Code-Anbindung
 
@@ -304,6 +400,19 @@ Claude Code wird später **direkt** in Jarvis OS integriert (Rico, 2026-09-09).
 Der KI-Export-Button ist deshalb am 2026-09-10 entfernt worden. Keine Arbeit mehr
 in einen Export-Flow stecken; die Fläche in der Shell bleibt für die echte
 Anbindung frei.
+
+**Festgelegt am 21.09.:** Der Weg ist **ein MCP-Server für Jarvis**, wie ihn das
+CRM bereits hat — und *nur* der. Rico benutzt sein normales Claude-Abo; Claude
+ruft Jarvis als Werkzeug auf. Ein Modellaufruf aus dem Jarvis-Code heraus
+(`ANTHROPIC_API_KEY`) ist **ausdrücklich abgelehnt** und keine Rückfalloption.
+Jarvis hat heute keine KI-Abhängigkeit im `package.json`, und das bleibt so.
+Claude Code selbst wird nicht eingebettet — es ist ein Entwickler-Werkzeug,
+keine Laufzeit. Auf derselben Grundlage soll später die Sprach-Kaskade laufen.
+
+**Achtung, verwaister Code:** `src/lib/voice.ts`, `src/hooks/useTTS.ts` und
+`src/hooks/useSpeechRecognition.ts` rufen `/api/jarvis/tts` auf — **diese Route
+existiert im Repo nicht.** Die ElevenLabs-Anbindung sieht halb fertig aus, ist
+aber tot. Vor jeder Sprach-Arbeit entweder wiederherstellen oder entfernen.
 
 ## Tech Stack & Key Dependencies
 
