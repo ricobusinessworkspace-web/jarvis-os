@@ -306,6 +306,20 @@ body {
   display: grid;
   place-items: center;
   flex: none;
+
+  /* Aufbau des Balls. Der grosse Auftritt darf sich Zeit nehmen; der kleine
+     im Inhaltsbereich ist oft nach 300 ms schon wieder weg und wirkte dann
+     zu klein, weil er noch mitten im Hochskalieren war. */
+  --orb-in-dur: 860ms;
+  --orb-in-scale: 0.7;
+  --orb-in-blur: 8px;
+}
+
+.route .orb,
+.nav-orb .orb {
+  --orb-in-dur: 260ms;
+  --orb-in-scale: 0.93;
+  --orb-in-blur: 3px;
 }
 
 .orb-svg {
@@ -313,11 +327,15 @@ body {
   width: 100%;
   height: 100%;
   overflow: visible;
-  animation: orb-in 860ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: orb-in var(--orb-in-dur) cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes orb-in {
-  0% { opacity: 0; transform: scale(0.7) rotate(-14deg); filter: blur(8px); }
+  0% {
+    opacity: 0;
+    transform: scale(var(--orb-in-scale)) rotate(-14deg);
+    filter: blur(var(--orb-in-blur));
+  }
   100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
 }
 
@@ -427,8 +445,12 @@ body {
   stroke: #b96bff;
   vector-effect: non-scaling-stroke;
   stroke-width: 1.25;
-  stroke-dasharray: 470;
-  stroke-dashoffset: 470;
+  /* In pathLength-Einheiten (die Elemente tragen pathLength="1"): ein Umlauf
+     ist genau 1, egal wie gross der Orb angezeigt wird. Eine feste Zahl in
+     Koordinaten wäre bei `non-scaling-stroke` falsch — das Muster rechnet
+     dann in Bildschirmpixeln. */
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   animation: orb-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -484,23 +506,23 @@ body {
   50% { opacity: 1; }
 }
 
-/* Ein kurzer heller Abschnitt wandert am Rand entlang. Der Umfang ist
-   2π·70 ≈ 440 — Strich plus Lücke ergeben genau das, sonst stottert der Lauf
-   bei jeder Runde. */
+/* Ein kurzer heller Abschnitt wandert am Rand entlang. Strich plus Lücke
+   ergeben zusammen 1, also genau einen Umlauf — sonst stottert der Lauf bei
+   jeder Runde. */
 .orb-pulse {
   fill: none;
   stroke: #ffffff;
   vector-effect: non-scaling-stroke;
   stroke-width: 2.4;
   stroke-linecap: round;
-  stroke-dasharray: 30 410;
+  stroke-dasharray: 0.07 0.93;
   filter: drop-shadow(0 0 6px rgba(240, 217, 255, 0.95));
   opacity: 0.9;
   animation: orb-pulse 2600ms 700ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
 
 @keyframes orb-pulse {
-  0% { stroke-dashoffset: 440; opacity: 0; }
+  0% { stroke-dashoffset: 1; opacity: 0; }
   12% { opacity: 0.9; }
   78% { opacity: 0.9; }
   100% { stroke-dashoffset: 0; opacity: 0; }
@@ -566,6 +588,30 @@ html[data-booted] .boot-word {
 }
 
 /* ── Auftritt 2: Reiter-Wechsel im Inhaltsbereich ─────────── */
+
+/* Die verlässliche Schicht (`NavOrb`). Deckend, damit ein gleichzeitig
+   gerendertes `loading.tsx` dahinter nicht als zweiter Ball durchscheint.
+   `top: 3.5rem` lässt die Kopfzeile frei (h-14). */
+.nav-orb {
+  position: absolute;
+  top: 3.5rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: var(--color-bg-base);
+  animation: nav-orb-in 160ms ease-out;
+}
+
+@keyframes nav-orb-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .route {
   display: flex;

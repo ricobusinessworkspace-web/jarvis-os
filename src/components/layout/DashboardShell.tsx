@@ -5,6 +5,7 @@ import { useSidebar } from '@/components/layout/SidebarContext';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
 import PullToRefresh from '@/components/PullToRefresh';
+import { NavOrb } from '@/components/layout/NavOrb';
 import { cn } from '@/lib/utils';
 
 export function DashboardShell({
@@ -23,7 +24,7 @@ export function DashboardShell({
 
       <main
         className={cn(
-          "flex flex-1 flex-col transition-[margin-left] duration-250 w-full md:w-auto",
+          "relative flex flex-1 flex-col transition-[margin-left] duration-250 w-full md:w-auto",
           isCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"
         )}
       >
@@ -34,6 +35,11 @@ export function DashboardShell({
             {children}
           </PullToRefresh>
         </div>
+
+        {/* Deckt den Inhaltsbereich beim Reiter-Wechsel — Seitenleiste und
+            Kopfzeile bleiben stehen. Liegt über dem Scroll-Bereich, damit es
+            beim Scrollen nicht mitwandert. */}
+        <NavOrb />
       </main>
     </div>
   );

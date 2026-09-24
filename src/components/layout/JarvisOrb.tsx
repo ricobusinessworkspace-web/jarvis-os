@@ -15,6 +15,12 @@
  * Drehung ein gültiger Punkt der Kugel, einer auf dem Schnittpunkt mit einem
  * Längenkreis nicht — sonst bräche das Gitter beim Drehen auf.
  *
+ * Jede Linie mit Strichmuster trägt `pathLength={1}`. Ohne das rechnet
+ * `vector-effect: non-scaling-stroke` das Muster in **Bildschirm**pixeln, die
+ * `stroke-dasharray` im CSS aber in Koordinaten — bei 300 px Anzeige fehlten
+ * so 29 % des Randkreises, sichtbar als Lücke oben rechts. Mit `pathLength=1`
+ * ist „ein Umlauf" immer genau 1, unabhängig von der Anzeigegröße.
+ *
  * Bewusst **ohne `<defs>`/Verläufe mit `id`**: Startsequenz und Ladezustand
  * können gleichzeitig im Dokument stehen, doppelte IDs wären die Folge. Die
  * Masse im Inneren kommt deshalb aus zwei weichgezeichneten Kreisen.
@@ -98,8 +104,8 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
 
         <g className="orb-lines">
           {/* Rand zuerst: er gibt dem Auge die Form, bevor das Gitter kommt. */}
-          <circle className="orb-ring orb-ring--halo" cx={CX} cy={CY} r={R} />
-          <circle className="orb-ring orb-ring--rim" cx={CX} cy={CY} r={R} />
+          <circle className="orb-ring orb-ring--halo" cx={CX} cy={CY} r={R} pathLength={1} />
+          <circle className="orb-ring orb-ring--rim" cx={CX} cy={CY} r={R} pathLength={1} />
 
           {latRings.map((ring, i) => (
             <ellipse
@@ -109,6 +115,7 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
               cy={ring.cy}
               rx={ring.rx}
               ry={ring.ry}
+              pathLength={1}
               style={{ animationDelay: `${60 + i * 34}ms` }}
             />
           ))}
@@ -121,6 +128,7 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
               cy={CY}
               rx={R}
               ry={R}
+              pathLength={1}
               style={{
                 // Aufbau versetzt, Drehung phasenversetzt — zusammen ergibt das
                 // die durchlaufende Bewegung.
@@ -143,7 +151,7 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
           ))}
 
           {/* Ein Lichtpuls läuft am Rand entlang — der Herzschlag des Balls. */}
-          <circle className="orb-pulse" cx={CX} cy={CY} r={R} />
+          <circle className="orb-pulse" cx={CX} cy={CY} r={R} pathLength={1} />
         </g>
       </svg>
     </div>

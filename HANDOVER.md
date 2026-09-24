@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-09-25
-last_agent: Claude Opus 5 — Orb ausgebaut, Sprung in der TopBar behoben
+last_agent: Claude Opus 5 — Orb: Lücke im Rand, Größe und Verlässlichkeit behoben
 status: In Progress
 ---
 
@@ -210,6 +210,39 @@ Pipeline sind nur Folgen.
   bei jedem Datenzweifel.
 
 ## Gelöste Probleme (nicht wiederholen)
+
+- **Problem:** Am Rand des Orbs fehlte oben rechts ein Stück Kreis — er sah
+  unfertig aus, aber nur beim großen Auftritt.
+  **Lösung:** Alle Linien mit Strichmuster tragen jetzt `pathLength={1}`, die
+  `stroke-dasharray` rechnet damit in Umläufen statt in Koordinaten.
+  **Warum wichtig:** **`vector-effect: non-scaling-stroke` rechnet das
+  Strichmuster in Bildschirmpixeln**, die `stroke-dasharray` im CSS aber in
+  Koordinaten des viewBox. Bei 300 px Anzeige ist der Umfang 660 px, die feste
+  `470` deckte davon nur 71 % — die fehlenden 29 % liegen von 1 Uhr bis 3 Uhr,
+  weil ein `<circle>` bei 3 Uhr beginnt. Beim kleinen Orb fiel es nicht auf,
+  dort reichte die Zahl. Merksatz: **`non-scaling-stroke` und eine feste
+  `stroke-dasharray` vertragen sich nicht** — `pathLength` macht es
+  größenunabhängig.
+
+- **Problem:** Beim Reiter-Wechsel war der Ball mal kleiner als sonst.
+  **Lösung:** Der Aufbau ist über CSS-Variablen je Auftritt einstellbar; im
+  Inhaltsbereich dauert er 260 ms und beginnt bei 93 % statt 70 %.
+  **Warum wichtig:** Der Aufbau lief 860 ms. Ein kurzer Wechsel tauschte den
+  Ball mitten im Hochskalieren wieder aus — man sah nie die Endgröße. Ein
+  Aufbau darf nie länger dauern als der kürzeste Auftritt, den er haben kann.
+
+- **Problem:** Der Ladezustand erschien mal, blitzte mal nur auf und fehlte
+  einmal ganz (zurück aufs Dashboard).
+  **Lösung:** `NavOrb` — eine eigene Schicht, die am **Klick** startet und am
+  **Pfadwechsel** endet, mindestens 480 ms zeigt und eine Notbremse bei 8 s hat.
+  **Warum wichtig:** `loading.tsx` allein kann das prinzipbedingt nicht
+  leisten. Die Next-Doku sagt: ist die Zielseite vorgeladen, wird der
+  Wartezustand **übersprungen**, und Vor/Zurück nutzt bewusst den
+  Verlaufsspeicher (`staleTimes` ändert daran nichts). Ob der Ball erscheint,
+  hing also davon ab, was Next gerade im Speicher hatte. Klick und Pfadwechsel
+  treten dagegen immer ein. `loading.tsx` bleibt daneben für alles ohne Klick
+  (Befehlspalette, Vor/Zurück, direkter Aufruf); weil `NavOrb` deckend ist,
+  sieht man nie zwei Bälle.
 
 - **Problem:** Oben rechts ruckelte es bei jedem Neuladen — erst eine Lücke,
   dann sprang das Datum herein und schob den ⌘K-Knopf zur Seite.
