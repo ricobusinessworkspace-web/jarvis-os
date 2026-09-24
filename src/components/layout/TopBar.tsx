@@ -21,21 +21,25 @@ function pageNameFromPath(pathname: string): string {
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
-export default function TopBar() {
+const CLOCK_FORMAT: Intl.DateTimeFormatOptions = {
+  weekday: 'short', day: 'numeric', month: 'short',
+  hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin',
+};
+
+export default function TopBar({ initialClock }: { initialClock: string }) {
   const pathname = usePathname();
   const pageName = pageNameFromPath(pathname);
   const { toggleSidebar } = useSidebar();
 
-  // Erst nach der Hydration setzen: die Serverzeit weicht sonst von der des
-  // Browsers ab und React meckert über den Unterschied.
-  const [now, setNow] = useState<Date | null>(null);
+  // Startwert kommt aus dem Layout, also serverseitig — die Uhrzeit steht
+  // damit schon im ersten Frame und nichts springt mehr nach. Beide Seiten
+  // formatieren mit `Europe/Berlin`, die Zeichenketten stimmen überein.
+  const [clock, setClock] = useState(initialClock);
   useEffect(() => {
-    const timeout = setTimeout(() => setNow(new Date()), 0);
-    const interval = setInterval(() => setNow(new Date()), 30_000);
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
+    const tick = () => setClock(new Date().toLocaleDateString('de-DE', CLOCK_FORMAT));
+    tick();
+    const interval = setInterval(tick, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -56,25 +60,22 @@ export default function TopBar() {
       </div>
 
       <div className="electron-no-drag flex items-center gap-3">
-        {now && (
-          <span className="hidden whitespace-nowrap font-mono text-[11.5px] tabular-nums text-muted md:block">
-            {now.toLocaleDateString('de-DE', {
-              weekday: 'short', day: 'numeric', month: 'short',
-              hour: '2-digit', minute: '2-digit',
-            })}
-          </span>
-        )}
+        <span className="hidden whitespace-nowrap font-mono text-[11.5px] tabular-nums text-muted md:block">
+          {clock}
+        </span>
 
         <button
           onClick={() => window.dispatchEvent(new Event('jarvis:command-palette'))}
           aria-label="Befehle öffnen"
           className={cn(
-            'press flex items-center gap-2 rounded-lg border border-border/60 px-2 py-1 text-muted transition-colors',
-            'hover:border-border-hover hover:text-foreground'
+            'press flex h-7 items-center gap-1.5 rounded-lg border border-border/60 bg-overlay/40 pl-2 pr-1.5 text-muted transition-colors',
+            'hover:border-border-hover hover:bg-overlay hover:text-foreground'
           )}
         >
           <Search size={13} />
-          <kbd className="hidden font-mono text-[10px] tracking-wide sm:inline">⌘K</kbd>
+          <kbd className="hidden rounded border border-border/50 px-1 py-px font-mono text-[10px] leading-none tracking-wide sm:inline">
+            ⌘K
+          </kbd>
         </button>
       </div>
 

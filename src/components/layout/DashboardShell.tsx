@@ -7,7 +7,14 @@ import TopBar from '@/components/layout/TopBar';
 import PullToRefresh from '@/components/PullToRefresh';
 import { cn } from '@/lib/utils';
 
-export function DashboardShell({ children }: { children: ReactNode }) {
+export function DashboardShell({
+  children,
+  initialClock,
+}: {
+  children: ReactNode;
+  /** Serverseitig gebildet — verhindert den Sprung oben rechts. */
+  initialClock: string;
+}) {
   const { isCollapsed } = useSidebar();
 
   return (
@@ -20,7 +27,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           isCollapsed ? "md:ml-[72px]" : "md:ml-[260px]"
         )}
       >
-        <TopBar />
+        <TopBar initialClock={initialClock} />
 
         <div className="flex-1 overflow-y-auto p-4 select-none">
           <PullToRefresh>

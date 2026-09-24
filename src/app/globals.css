@@ -289,16 +289,17 @@ body {
    <html>, gesetzt von einem Inline-Skript im Layout); der Reiter-Wechsel,
    wenn React die fertige Seite einsetzt und `loading.tsx` verschwindet.
 
-   Was das hier vom alten `EcosystemLoader` unterscheidet (siehe HANDOVER):
+   Was das vom alten `EcosystemLoader` unterscheidet (siehe HANDOVER):
+   `pointer-events: none` auf dem Schleier, eine harte Obergrenze von 4 s im
+   Skript, und kein React im Schleier — ein Fehler im Bundle darf ihn nicht
+   stehen lassen.
 
-   1. **`pointer-events: none`** auf dem Schleier — die Seite bleibt bedienbar.
-   2. **Harte Obergrenze im Skript** (4 s). Bleibt `load` aus, geht der
-      Schleier trotzdem weg. Genau diese Rückfalltür fehlte dem alten Loader.
-   3. **Kein React im Schleier.** Ein Fehler im Bundle kann ihn nicht
-      stehen lassen.
+   Animiert werden fast nur `transform` und `opacity`; die Ausnahmen `rx` und
+   `stroke-dashoffset` sind genau die zwei, die sich nicht ersetzen lassen,
+   ohne die Geometrie zu verfälschen.
    ============================================================ */
 
-/* ── Der Ball ─────────────────────────────────────────────── */
+/* ── Gerüst ───────────────────────────────────────────────── */
 
 .orb {
   position: relative;
@@ -312,13 +313,15 @@ body {
   width: 100%;
   height: 100%;
   overflow: visible;
-  animation: orb-in 760ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation: orb-in 860ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes orb-in {
-  0% { opacity: 0; transform: scale(0.74) rotate(-12deg); filter: blur(7px); }
+  0% { opacity: 0; transform: scale(0.7) rotate(-14deg); filter: blur(8px); }
   100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
 }
+
+/* ── Schein und Masse ─────────────────────────────────────── */
 
 .orb-glow {
   position: absolute;
@@ -339,23 +342,78 @@ body {
   50% { opacity: 1; transform: scale(1.07); }
 }
 
-/* Der kreisende Lichtfleck — er verrät, in welche Richtung sich der Ball
-   dreht. Ohne ihn liest das Auge die Sweep-Bewegung mehrdeutig. */
-.orb-sweep {
-  position: absolute;
-  width: 44%;
-  height: 44%;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(236, 190, 255, 0.5) 0%, transparent 70%);
-  transform-origin: 50% 50%;
-  animation: orb-sweep 7200ms linear infinite;
+/* Der Ball hat Körper, nicht nur Kanten: ein weicher Kern und ein Glanzpunkt
+   links oben. Weichgezeichnete Kreise statt eines Verlaufs mit `id` — zwei
+   Orbs im selben Dokument hätten sonst doppelte IDs. */
+.orb-mass {
+  fill: rgba(124, 58, 237, 0.34);
+  filter: blur(13px);
+  animation: orb-breathe 3400ms ease-in-out infinite;
 }
 
-@keyframes orb-sweep {
-  0% { transform: rotate(0deg) translateX(34%) rotate(0deg); opacity: 0.35; }
-  50% { opacity: 0.85; }
-  100% { transform: rotate(360deg) translateX(34%) rotate(-360deg); opacity: 0.35; }
+.orb-shine {
+  fill: rgba(216, 180, 254, 0.26);
+  filter: blur(11px);
+  animation: orb-breathe 3400ms 600ms ease-in-out infinite;
 }
+
+/* Wellen, die nach aussen laufen. Drei Stueck, um ein Drittel der Laufzeit
+   versetzt — so ist immer eine unterwegs und es entsteht keine Pause. */
+.orb-wave {
+  fill: none;
+  stroke: #c77dff;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.2;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  animation: orb-wave 3900ms cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+}
+
+@keyframes orb-wave {
+  0% { transform: scale(0.96); opacity: 0; }
+  14% { opacity: 0.42; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+/* ── Orbitalringe ─────────────────────────────────────────── */
+/* `transform-box: view-box` + `transform-origin: 50% 50%` dreht um die Mitte
+   des viewBox — in Prozent, damit es bei jeder Anzeigegröße stimmt. */
+
+.orb-orbit {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+
+.orb-orbit--a { animation: orb-orbit-cw 11000ms linear infinite; }
+.orb-orbit--b { animation: orb-orbit-ccw 15000ms linear infinite; }
+
+@keyframes orb-orbit-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orb-orbit-ccw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.orb-orbit-path {
+  fill: none;
+  stroke: #a78bfa;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+  opacity: 0.5;
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.55));
+}
+
+.orb-particle {
+  fill: #f0d9ff;
+  filter: drop-shadow(0 0 4px rgba(217, 164, 255, 0.95));
+  animation: orb-twinkle 2200ms ease-in-out infinite;
+}
+
+/* ── Gitter ───────────────────────────────────────────────── */
 
 .orb-lines {
   filter:
@@ -383,8 +441,8 @@ body {
   stroke-width: 2;
 }
 
-/* Ein zweiter Rand in Magenta, minimal versetzt — das gibt der Kante die
-   Tiefe, die das Icon hat, ohne einen echten Farbverlauf zu brauchen. */
+/* Ein zweiter Rand in Magenta, weichgezeichnet — das gibt der Kante die Tiefe,
+   die das Icon hat, ohne einen echten Farbverlauf zu brauchen. */
 .orb-ring--halo {
   stroke: #ff6ad5;
   stroke-width: 4;
@@ -426,6 +484,28 @@ body {
   50% { opacity: 1; }
 }
 
+/* Ein kurzer heller Abschnitt wandert am Rand entlang. Der Umfang ist
+   2π·70 ≈ 440 — Strich plus Lücke ergeben genau das, sonst stottert der Lauf
+   bei jeder Runde. */
+.orb-pulse {
+  fill: none;
+  stroke: #ffffff;
+  vector-effect: non-scaling-stroke;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 30 410;
+  filter: drop-shadow(0 0 6px rgba(240, 217, 255, 0.95));
+  opacity: 0.9;
+  animation: orb-pulse 2600ms 700ms cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@keyframes orb-pulse {
+  0% { stroke-dashoffset: 440; opacity: 0; }
+  12% { opacity: 0.9; }
+  78% { opacity: 0.9; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+
 /* ── Auftritt 1: Startsequenz über der ganzen Seite ───────── */
 
 .boot {
@@ -442,12 +522,33 @@ body {
 }
 
 html[data-booted] .boot {
-  animation: boot-out 460ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: boot-out 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 @keyframes boot-out {
   0% { opacity: 1; }
   100% { opacity: 0; visibility: hidden; }
+}
+
+/* Der Abgang ist ein Aufblitzen, kein Ausblenden: der Ball zieht kurz an,
+   wird heller und löst sich auf. Das liest sich als „fertig", während ein
+   flaches Verschwinden wie ein Abbruch wirkt. */
+html[data-booted] .boot .orb {
+  animation: orb-exit 620ms cubic-bezier(0.32, 0, 0.2, 1) forwards;
+}
+
+@keyframes orb-exit {
+  0% { transform: scale(1); filter: brightness(1) blur(0); }
+  32% { transform: scale(1.07); filter: brightness(1.85) blur(0); }
+  100% { transform: scale(1.3); filter: brightness(1.1) blur(5px); opacity: 0; }
+}
+
+html[data-booted] .boot-word {
+  animation: boot-word-out 420ms ease-in forwards;
+}
+
+@keyframes boot-word-out {
+  to { opacity: 0; letter-spacing: 0.62em; }
 }
 
 .boot-word {
@@ -495,15 +596,22 @@ html[data-booted] .boot {
 @media (prefers-reduced-motion: reduce) {
   .orb-svg,
   .orb-glow,
-  .orb-sweep,
+  .orb-mass,
+  .orb-shine,
+  .orb-orbit,
+  .orb-wave,
+  .orb-particle,
   .orb-mer,
   .orb-node,
+  .orb-pulse,
   .route-label { animation: none; }
   .orb-svg { opacity: 1; }
   .orb-glow { opacity: 0.8; }
-  .orb-sweep { opacity: 0; }
+  .orb-pulse,
+  .orb-wave { opacity: 0; }
   .orb-ring { animation: none; stroke-dashoffset: 0; }
   .orb-node { opacity: 0.95; }
   .boot-word { animation: none; opacity: 0.55; letter-spacing: 0.4em; }
   html[data-booted] .boot { animation-duration: 200ms; }
+  html[data-booted] .boot .orb { animation: none; }
 }

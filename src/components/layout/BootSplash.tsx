@@ -17,7 +17,7 @@ import { JarvisOrb } from './JarvisOrb';
 export function BootSplash() {
   return (
     <div className="boot" aria-hidden="true">
-      <JarvisOrb size={264} />
+      <JarvisOrb size={300} />
       <span className="boot-word">Jarvis OS</span>
     </div>
   );

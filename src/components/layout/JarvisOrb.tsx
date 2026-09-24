@@ -1,7 +1,6 @@
 /**
- * Der Drahtgitter-Ball aus dem App-Icon — als Bauteil, weil ihn zwei Stellen
- * brauchen: die Startsequenz über der ganzen Seite und die Reiter-Wechsel im
- * Inhaltsbereich.
+ * Der Drahtgitter-Ball aus dem App-Icon — ein Bauteil, zwei Auftritte:
+ * die Startsequenz über der ganzen Seite und der Ladezustand der Reiter.
  *
  * **Kein JavaScript.** Alles läuft über CSS, damit der Ball mit dem ersten
  * Frame malt und niemals auf Hydration wartet.
@@ -9,14 +8,16 @@
  * Die Drehung ist gerechnet, nicht vorgetäuscht: Ein Längenkreis erscheint in
  * der Aufsicht als Ellipse, deren halbe Breite `R · cos(φ)` beträgt. Dreht sich
  * die Kugel, läuft φ durch — die Ellipse wird schmal, zur Linie, wieder breit.
- * Deshalb animiert das CSS die Eigenschaft `rx` der Längenkreise statt das Bild
- * zu kippen: ein gedrehtes flaches SVG würde gestaucht aussehen, das hier sieht
- * aus wie ein Globus.
+ * Deshalb animiert das CSS die Eigenschaft `rx` statt das Bild zu kippen: ein
+ * gedrehtes flaches SVG würde stauchen, das hier sieht aus wie ein Globus.
  *
- * Die Knoten sitzen nur auf den Breitenkreisen. Das ist Absicht — ein Punkt auf
- * einem Breitenkreis bleibt bei jeder Drehung ein gültiger Punkt der Kugel,
- * einer auf einem Schnittpunkt mit einem Längenkreis nicht. Sonst müsste man
- * sie mitwandern lassen, und das Gitter bräche beim ersten Rundungsfehler auf.
+ * Die Knoten sitzen nur auf den Breitenkreisen. Ein Punkt dort bleibt bei jeder
+ * Drehung ein gültiger Punkt der Kugel, einer auf dem Schnittpunkt mit einem
+ * Längenkreis nicht — sonst bräche das Gitter beim Drehen auf.
+ *
+ * Bewusst **ohne `<defs>`/Verläufe mit `id`**: Startsequenz und Ladezustand
+ * können gleichzeitig im Dokument stehen, doppelte IDs wären die Folge. Die
+ * Masse im Inneren kommt deshalb aus zwei weichgezeichneten Kreisen.
  */
 
 const R = 70;
@@ -57,15 +58,44 @@ for (const ring of latRings) {
 }
 nodes.push({ x: CX, y: CY - R }, { x: CX, y: CY + R }); // Pole
 
+/** Ringe, die den Ball umkreisen — gegenläufig, das gibt Tiefe. */
+const ORBITS = [
+  { rx: 93, ry: 27, cls: 'orb-orbit--a', dot: 2.4 },
+  { rx: 82, ry: 20, cls: 'orb-orbit--b', dot: 1.9 },
+];
+
 export function JarvisOrb({ size = 264 }: { size?: number }) {
   return (
     <div className="orb" style={{ width: size, height: size }}>
-      {/* Der Schein liegt hinter dem Gitter und atmet eigenständig. */}
       <span className="orb-glow" />
-      {/* Ein Lichtfleck kreist — er verrät die Drehrichtung. */}
-      <span className="orb-sweep" />
 
       <svg className="orb-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        {/* Wellen laufen nach aussen — ganz hinten, damit sie nichts verdecken. */}
+        {[0, 1300, 2600].map(delay => (
+          <circle
+            key={`wave-${delay}`}
+            className="orb-wave"
+            cx={CX}
+            cy={CY}
+            r={R}
+            style={{ animationDelay: `${delay}ms` }}
+          />
+        ))}
+
+        {/* Die Orbitalringe liegen hinter dem Ball. */}
+        <g className="orb-orbits">
+          {ORBITS.map(o => (
+            <g key={o.cls} className={`orb-orbit ${o.cls}`}>
+              <ellipse className="orb-orbit-path" cx={CX} cy={CY} rx={o.rx} ry={o.ry} />
+              <circle className="orb-particle" cx={CX + o.rx} cy={CY} r={o.dot} />
+            </g>
+          ))}
+        </g>
+
+        {/* Masse: ein weicher Kern und ein Glanzpunkt links oben. */}
+        <circle className="orb-mass" cx={CX} cy={CY} r={58} />
+        <circle className="orb-shine" cx={CX - 20} cy={CY - 22} r={26} />
+
         <g className="orb-lines">
           {/* Rand zuerst: er gibt dem Auge die Form, bevor das Gitter kommt. */}
           <circle className="orb-ring orb-ring--halo" cx={CX} cy={CY} r={R} />
@@ -74,7 +104,7 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
           {latRings.map((ring, i) => (
             <ellipse
               key={`lat-${i}`}
-              className="orb-ring orb-lat"
+              className="orb-ring"
               cx={CX}
               cy={ring.cy}
               rx={ring.rx}
@@ -111,6 +141,9 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
               }}
             />
           ))}
+
+          {/* Ein Lichtpuls läuft am Rand entlang — der Herzschlag des Balls. */}
+          <circle className="orb-pulse" cx={CX} cy={CY} r={R} />
         </g>
       </svg>
     </div>

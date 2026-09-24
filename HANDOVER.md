@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-24
-last_agent: Claude Opus 5 — Jarvis-Orb: Startsequenz + Ladezustand aller Reiter
+last_updated: 2026-09-25
+last_agent: Claude Opus 5 — Orb ausgebaut, Sprung in der TopBar behoben
 status: In Progress
 ---
 
@@ -104,6 +104,9 @@ Pipeline sind nur Folgen.
   stauchen statt zu rotieren. Knoten sitzen nur auf Breitenkreisen, weil die
   bei jeder Drehung gültig bleiben. `vector-effect: non-scaling-stroke`, sonst
   ist derselbe Strich beim kleinen Orb halb so dick und verschwindet im Schein.
+  Dazu (25.09.): Masse im Inneren, zwei gegenläufige Orbitalringe mit
+  Partikeln, drei nach außen laufende Wellen, ein Lichtpuls am Rand und ein
+  Abgang, der kurz anzieht und heller wird statt flach auszublenden.
   **Kein JavaScript im Orb selbst.**
   *Ersetzt das frühere Skelett-`loading.tsx`* (graue Platzhalterkästen, aus dem
   Electron→Next-Umzug); es liegt in der Historie unter `54f08a4`.
@@ -207,6 +210,21 @@ Pipeline sind nur Folgen.
   bei jedem Datenzweifel.
 
 ## Gelöste Probleme (nicht wiederholen)
+
+- **Problem:** Oben rechts ruckelte es bei jedem Neuladen — erst eine Lücke,
+  dann sprang das Datum herein und schob den ⌘K-Knopf zur Seite.
+  **Lösung:** Die Uhrzeit wird im Dashboard-Layout **serverseitig** gebildet
+  (`berlinClock()`) und als `initialClock` durchgereicht; die TopBar nimmt sie
+  als Startwert und aktualisiert erst danach im Effekt.
+  **Warum wichtig:** Sie hing vorher hinter `now && …` und erschien erst nach
+  der Hydration — aus Angst vor einem Unterschied zwischen Server- und
+  Browserzeit. Der Unterschied verschwindet aber, wenn **beide Seiten mit
+  `timeZone: 'Europe/Berlin'` formatieren**; dann stimmen die Zeichenketten
+  überein und React hat nichts zu meckern. Springt die Minute dazwischen um,
+  rendert der Browser trotzdem zuerst den gelieferten Wert und korrigiert im
+  Effekt. Merksatz: **eine Zeitanzeige hinter einem Hydration-Wächter zu
+  verstecken tauscht eine Warnung gegen einen sichtbaren Sprung** — die Zeitzone
+  festzunageln löst beides.
 
 - **Problem:** Das veröffentlichte Dashboard zeigte „ohne Zielwert" bei Calls,
   obwohl lokal alles stimmte.
