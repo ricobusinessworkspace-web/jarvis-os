@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-09-24
-last_agent: Claude Opus 5 — Startsequenz (Drahtgitter-Ball aus dem App-Icon)
+last_agent: Claude Opus 5 — Jarvis-Orb: Startsequenz + Ladezustand aller Reiter
 status: In Progress
 ---
 
@@ -90,12 +90,23 @@ Pipeline sind nur Folgen.
   Freigeben ist gesperrt ohne Betreff, Text und Empfängeradresse.
   **Offen: alle drei Vorgänge haben „keine Adresse im CRM"** — die Karte sagt
   das in Rot, statt eine leere Mail zuzulassen.
-- **Startsequenz** (24.09.): **fertig.** Der Drahtgitter-Ball aus dem App-Icon
-  zeichnet sich einmal je Dokument-Aufruf (`BootSplash`, im Root-Layout).
-  **Reines CSS, kein JavaScript** — genau deshalb, siehe unten. 980 ms gesamt,
-  der Schleier ist ab 706 ms weg, danach verglüht nur noch der Ball über der
-  fertigen Seite. Bei Client-Navigation spielt sie **nicht** erneut (das
-  Root-Layout rendert dabei nicht neu) — geprüft.
+- **Jarvis-Orb** (24.09.): **fertig.** Der Drahtgitter-Ball aus dem App-Icon
+  als ein Bauteil (`JarvisOrb`) mit zwei Auftritten:
+  **Startsequenz** (`BootSplash` im Root-Layout) beim Laden und Neuladen, und
+  **Ladezustand** (`(dashboard)/loading.tsx`) beim Reiter-Wechsel — eine Datei
+  für alle sechs Reiter, die Seitenleiste bleibt dabei stehen.
+  Beide enden an einem **echten Ereignis**, nicht nach Stoppuhr: die
+  Startsequenz, wenn das Dokument fertig ist (`load` → `data-booted`, gesetzt
+  von einem Inline-Skript im Layout, mit harter Obergrenze 4 s); der
+  Ladezustand, wenn React die fertige Seite einsetzt.
+  Die Drehung ist gerechnet: CSS animiert `rx` der Längenkreise
+  (`R · cos φ`) statt das Bild zu kippen — ein gedrehtes flaches SVG würde
+  stauchen statt zu rotieren. Knoten sitzen nur auf Breitenkreisen, weil die
+  bei jeder Drehung gültig bleiben. `vector-effect: non-scaling-stroke`, sonst
+  ist derselbe Strich beim kleinen Orb halb so dick und verschwindet im Schein.
+  **Kein JavaScript im Orb selbst.**
+  *Ersetzt das frühere Skelett-`loading.tsx`* (graue Platzhalterkästen, aus dem
+  Electron→Next-Umzug); es liegt in der Historie unter `54f08a4`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -153,13 +164,19 @@ Pipeline sind nur Folgen.
   eine Zeile in der Tabelle, kein neuer Code-Pfad.
 - **Keine erfundenen Zahlen.** Kein Platzhalter-Ziel, kein 0 % für ein Ziel, das
   nicht existiert. Das Umsatzziel steht bewusst auf `pending`.
-- **Ein Overlay über der App darf niemals auf JavaScript warten.** Die
-  Startsequenz ist eine Server-Komponente ohne `useState`/`useEffect`: sie malt
-  mit dem ersten Frame, endet nach fester Zeit und lässt mit
-  `pointer-events: none` jeden Klick durch. Der alte `EcosystemLoader` verschwand
-  per `useEffect`, also erst nach vollständiger Hydration, und hat den Start
-  dadurch künstlich verlängert. Wer hier wieder einen Zustand einbaut, baut den
-  alten Fehler nach — der Kommentar im Root-Layout sagt das auch dort.
+- **Ein Overlay über der App braucht eine Rückfalltür.** Die Startsequenz
+  hängt am Ereignis `load`, damit sie so lange läuft wie das Laden dauert — aber
+  das Inline-Skript nimmt sie nach spätestens 4 s auf jeden Fall weg, und der
+  Schleier hat `pointer-events: none`, ist also nie im Weg. Der alte
+  `EcosystemLoader` verschwand per `useEffect` (also erst nach vollständiger
+  Hydration) und hatte **keine** solche Sicherung — deshalb konnte er die App
+  verdecken. Kein React im Schleier: ein Fehler im Bundle darf ihn nicht stehen
+  lassen. Wer hier wieder einen Zustand einbaut, baut den alten Fehler nach.
+- **Den Teil vor dem ersten Frame kann keine Animation abdecken.** Beim
+  Neuladen wartet der Browser auf die Server-Antwort und zeigt dabei noch die
+  alte Seite; erst danach kann in Jarvis überhaupt etwas malen. Die Startsequenz
+  deckt ab dem ersten Frame ab, nicht davor. Beim *Reiter-Wechsel* greift
+  dagegen `loading.tsx` — dort ist genau diese Wartezeit sichtbar.
 - **Die Mail-Warteschlange wird abgeleitet, nicht gespiegelt.** Was ansteht,
   steht im CRM als Aufgabe. Jarvis führt keine zweite Liste, die auseinander-
   laufen könnte; ein im CRM abgehakter Punkt verschwindet in Jarvis von selbst.
