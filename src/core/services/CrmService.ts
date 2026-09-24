@@ -121,4 +121,50 @@ export class CrmService {
       return { error: error instanceof Error ? error.message : 'CRM nicht erreichbar' };
     }
   }
+
+  /**
+   * Die Felder, die ein Anschreiben braucht — für mehrere Leads auf einmal.
+   *
+   * `legal_company_name` schlägt `name`: im Impressum steht der Name, unter dem
+   * die Firma angeschrieben werden will, in `name` oft nur das Maps-Schild.
+   * Leere Strings werden zu leeren Strings, nicht zu Platzhaltern — was fehlt,
+   * entscheidet die Vorlagen-Schicht, nicht das CRM.
+   *
+   * Fällt das CRM aus, kommt eine leere Map zurück; die Warteschlange zeigt
+   * dann Namen ohne Adresse statt zu kippen.
+   */
+  static async getLeadsForMail(ids: string[]): Promise<Map<string, {
+    email: string; ansprechpartner: string; firma: string; ort: string;
+  }>> {
+    const out = new Map<string, { email: string; ansprechpartner: string; firma: string; ort: string }>();
+    if (ids.length === 0) return out;
+
+    try {
+      const rows = await prisma.$queryRaw<Array<{
+        id: string; email: string; director_name: string;
+        firma: string; maps_city: string;
+      }>>`
+        SELECT id::text                                            AS id,
+               coalesce(email, '')                                 AS email,
+               coalesce(director_name, '')                         AS director_name,
+               coalesce(nullif(legal_company_name, ''), name, '')  AS firma,
+               coalesce(maps_city, '')                             AS maps_city
+        FROM crm_leads
+        WHERE id = ANY(${ids.map(Number)}::bigint[])
+      `;
+
+      for (const r of rows) {
+        out.set(r.id, {
+          email: r.email,
+          ansprechpartner: r.director_name,
+          firma: r.firma,
+          ort: r.maps_city,
+        });
+      }
+    } catch (error) {
+      console.error('[CrmService] Lead-Daten für Mail nicht verfügbar:', error);
+    }
+
+    return out;
+  }
 }

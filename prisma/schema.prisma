@@ -532,3 +532,57 @@ model CoreGoal {
   @@map("core_goals")
   @@schema("public")
 }
+
+// ============================================
+// Mail-Layer — Anschreiben an Leads
+// Tabellen kommen aus scripts/mail-layer.sql, nie aus `prisma db push`.
+// ============================================
+
+model MailTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String   @default("")
+  /// Gerüst mit Platzhaltern ({{anrede}}, {{firma}}, …) für den Weg ohne Modell.
+  body      String   @default("")
+  /// Anweisung an Claude, wenn die Mail individuell geschrieben wird.
+  guidance  String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  drafts MailDraft[]
+
+  @@map("mail_templates")
+  @@schema("public")
+}
+
+model MailDraft {
+  id         String  @id @default(uuid())
+  /// Kein Fremdschlüssel auf crm_leads — fremde Anwendung, nur lesend.
+  leadId     BigInt  @map("lead_id")
+  /// Die CRM-Aufgabe, aus der das kam. NULL = in Jarvis von Hand angelegt.
+  taskKey    String? @map("task_key")
+  templateId String? @map("template_id")
+
+  toEmail String @default("") @map("to_email")
+  subject String @default("")
+  body    String @default("")
+
+  gespraechAm   DateTime? @map("gespraech_am") @db.Date
+  gesprochenMit String    @default("") @map("gesprochen_mit")
+  thema         String    @default("")
+
+  /// offen | entwurf | freigegeben | gesendet — kein Zustand wird übersprungen.
+  status    String    @default("offen")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  sentAt    DateTime? @map("sent_at")
+
+  template MailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@unique([taskKey])
+  @@index([status, updatedAt])
+  @@map("mail_drafts")
+  @@schema("public")
+}

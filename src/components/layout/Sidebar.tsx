@@ -10,7 +10,8 @@ import {
   Sun,
   CalendarDays,
   PhoneCall,
-  HeartPulse
+  HeartPulse,
+  Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { label: 'Heute', href: '/', icon: Sun },
   { label: 'Verlauf', href: '/verlauf', icon: CalendarDays },
   { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall },
+  { label: 'Anschreiben', href: '/mail', icon: Mail },
   { label: 'Health', href: '/health', icon: HeartPulse },
   { label: 'Finanzen', href: '/finance', icon: Wallet },
 ] as const;

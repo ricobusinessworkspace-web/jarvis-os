@@ -1,5 +1,6 @@
 /**
- * Legt die Tabellen des Core Semantic Layer an (idempotent).
+ * Legt die Tabellen von Jarvis an (idempotent): Core Semantic Layer
+ * (core-layer.sql) und Mail-Layer (mail-layer.sql).
  *
  *   npm run core:migrate
  *
@@ -19,18 +20,23 @@ async function main() {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DIRECT_URL / DATABASE_URL fehlt in .env');
 
-  const sql = readFileSync(join(here, 'core-layer.sql'), 'utf8');
+  // Reihenfolge zählt: mail-layer.sql verweist nicht auf core_*, aber neue
+  // Dateien könnten es. Immer von unten nach oben anlegen.
+  const files = ['core-layer.sql', 'mail-layer.sql'];
   const client = new Client({ connectionString });
 
   await client.connect();
   try {
-    await client.query(sql);
+    for (const file of files) {
+      await client.query(readFileSync(join(here, file), 'utf8'));
+    }
     const { rows } = await client.query(
       `SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name LIKE 'core_%'
+        WHERE table_schema = 'public'
+          AND (table_name LIKE 'core_%' OR table_name LIKE 'mail_%')
         ORDER BY table_name`
     );
-    console.log('✓ Core Layer migriert:', rows.map(r => r.table_name).join(', '));
+    console.log('✓ Migriert:', rows.map(r => r.table_name).join(', '));
   } finally {
     await client.end();
   }
