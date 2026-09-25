@@ -12,6 +12,7 @@ import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { RoutineCard } from '@/components/today/RoutineCard';
 import { BodyLogCard } from '@/components/today/BodyLogCard';
 import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
+import { RouteLoading } from '@/components/layout/RouteLoading';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,6 @@ const URSACHEN = [
 function lastDayOfMonth(dateStr: string): string {
   const [y, m] = dateStr.split('-').map(Number);
   return `${y}-${String(m).padStart(2, '0')}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`;
-}
-
-function CardSkeleton({ className = '' }: { className?: string }) {
-  return <div className={`min-h-[150px] animate-pulse rounded-2xl border border-border/30 bg-elevated/30 ${className}`} />;
 }
 
 async function Today() {
@@ -156,25 +153,14 @@ async function Today() {
   );
 }
 
+// Die Grenze liegt außen: der Ladezustand ersetzt den ganzen Inhaltsbereich
+// und steht damit an derselben Stelle wie der Ball beim Reiter-Wechsel.
 export default function DashboardPage() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
-      <Suspense
-        fallback={
-          <div className="space-y-3">
-            <CardSkeleton className="h-16 min-h-0" />
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <CardSkeleton />
-              <CardSkeleton />
-              <CardSkeleton />
-            </div>
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        }
-      >
+    <Suspense fallback={<RouteLoading />}>
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
         <Today />
-      </Suspense>
-    </div>
+      </div>
+    </Suspense>
   );
 }

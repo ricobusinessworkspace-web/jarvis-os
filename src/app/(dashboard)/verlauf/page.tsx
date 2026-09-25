@@ -9,6 +9,7 @@ import { DaySheet, type DaySheetData } from '@/components/verlauf/DaySheet';
 import { ScrollToSelected } from '@/components/verlauf/ScrollToSelected';
 import { STATE_CELL } from '@/lib/metricState';
 import { cn } from '@/lib/utils';
+import { RouteLoading } from '@/components/layout/RouteLoading';
 
 export const dynamic = 'force-dynamic';
 
@@ -132,14 +133,13 @@ export default async function VerlaufPage({
   const { d } = await searchParams;
   const selected = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : getBerlinDateStr();
 
+  // Grenze außen, siehe Dashboard. `key`: ein anderer Tag lädt neu und zeigt
+  // dabei den Ladezustand, statt den alten Tag stehen zu lassen.
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 md:px-8">
-      <Suspense
-        key={selected}
-        fallback={<div className="h-96 animate-pulse rounded-2xl border border-border/30 bg-elevated/30" />}
-      >
+    <Suspense key={selected} fallback={<RouteLoading />}>
+      <div className="mx-auto w-full max-w-4xl px-4 pb-16 pt-6 md:px-8">
         <Verlauf selected={selected} />
-      </Suspense>
-    </div>
+      </div>
+    </Suspense>
   );
 }

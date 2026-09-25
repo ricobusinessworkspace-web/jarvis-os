@@ -15,16 +15,29 @@
  * Drehung ein gültiger Punkt der Kugel, einer auf dem Schnittpunkt mit einem
  * Längenkreis nicht — sonst bräche das Gitter beim Drehen auf.
  *
- * Jede Linie mit Strichmuster trägt `pathLength={1}`. Ohne das rechnet
- * `vector-effect: non-scaling-stroke` das Muster in **Bildschirm**pixeln, die
- * `stroke-dasharray` im CSS aber in Koordinaten — bei 300 px Anzeige fehlten
- * so 29 % des Randkreises, sichtbar als Lücke oben rechts. Mit `pathLength=1`
- * ist „ein Umlauf" immer genau 1, unabhängig von der Anzeigegröße.
+ * Jede Linie mit Strichmuster trägt `pathLength={1}` — „ein Umlauf" ist damit
+ * genau 1 — und **kein** `vector-effect: non-scaling-stroke`. Die beiden
+ * vertragen sich nicht: der Browser zeichnet das Muster dann in Bildschirm-
+ * pixeln, rechnet `pathLength` aber in Koordinaten. Beim 300-px-Orb ist der
+ * Rand auf dem Schirm 1,5-mal so lang wie in Koordinaten, das Muster deckte
+ * nur zwei Drittel — sichtbar als Lücke oben rechts. Gleich dicke Striche bei
+ * jeder Größe kommen stattdessen aus `--orb-u` (Koordinaten je Bildschirm-
+ * pixel), mit dem das CSS die Strichbreiten multipliziert.
+ *
+ * **Eine Größe für alle Auftritte** (`ORB_SIZE`). Unterschiedliche Größen je
+ * Auftritt lasen sich als „mal ist er kleiner".
+ *
+ * **Eingezeichnet wird nur mit `intro`** (Startsequenz). Beim Reiter-Wechsel
+ * steht der Ball oft nur eine halbe Sekunde — ein Aufbau, der länger dauert,
+ * zeigt dann nie den fertigen Ball, sondern immer einen mit Lücke. Ohne
+ * `intro` ist das Gitter vom ersten Bild an geschlossen und blendet nur ein.
  *
  * Bewusst **ohne `<defs>`/Verläufe mit `id`**: Startsequenz und Ladezustand
  * können gleichzeitig im Dokument stehen, doppelte IDs wären die Folge. Die
  * Masse im Inneren kommt deshalb aus zwei weichgezeichneten Kreisen.
  */
+
+import type { CSSProperties } from 'react';
 
 const R = 70;
 const CX = 100;
@@ -70,12 +83,28 @@ const ORBITS = [
   { rx: 82, ry: 20, cls: 'orb-orbit--b', dot: 1.9 },
 ];
 
-export function JarvisOrb({ size = 264 }: { size?: number }) {
+/** Kantenlänge des viewBox — Bezug für `--orb-u`. */
+const VIEWBOX = 200;
+/** Anzeigegröße in px — für jeden Auftritt dieselbe. */
+const ORB_SIZE = 300;
+
+const ORB_STYLE = {
+  width: ORB_SIZE,
+  height: ORB_SIZE,
+  '--orb-u': r2(VIEWBOX / ORB_SIZE),
+} as CSSProperties;
+
+/** Verzögerungen als Variablen: das CSS entscheidet je Auftritt, welche
+ *  Animationen laufen, und setzt die passenden Verzögerungen dazu. */
+const delays = (vars: Record<string, number>) =>
+  Object.fromEntries(Object.entries(vars).map(([k, ms]) => [k, `${ms}ms`])) as CSSProperties;
+
+export function JarvisOrb({ intro = false }: { intro?: boolean }) {
   return (
-    <div className="orb" style={{ width: size, height: size }}>
+    <div className={intro ? 'orb orb--intro' : 'orb'} style={ORB_STYLE}>
       <span className="orb-glow" />
 
-      <svg className="orb-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <svg className="orb-svg" viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} xmlns="http://www.w3.org/2000/svg">
         {/* Wellen laufen nach aussen — ganz hinten, damit sie nichts verdecken. */}
         {[0, 1300, 2600].map(delay => (
           <circle
@@ -116,7 +145,7 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
               rx={ring.rx}
               ry={ring.ry}
               pathLength={1}
-              style={{ animationDelay: `${60 + i * 34}ms` }}
+              style={delays({ '--draw-delay': 60 + i * 34 })}
             />
           ))}
 
@@ -129,26 +158,27 @@ export function JarvisOrb({ size = 264 }: { size?: number }) {
               rx={R}
               ry={R}
               pathLength={1}
-              style={{
-                // Aufbau versetzt, Drehung phasenversetzt — zusammen ergibt das
-                // die durchlaufende Bewegung.
-                animationDelay: `${120 + i * 30}ms, ${(-SPIN_MS / MERIDIAN_COUNT) * i}ms`,
-              }}
+              // Aufbau versetzt, Drehung phasenversetzt — zusammen ergibt das
+              // die durchlaufende Bewegung.
+              style={delays({
+                '--draw-delay': 120 + i * 30,
+                '--spin-delay': (-SPIN_MS / MERIDIAN_COUNT) * i,
+              })}
             />
           ))}
 
-          {nodes.map((n, i) => (
-            <circle
-              key={`node-${i}`}
-              className="orb-node"
-              cx={n.x}
-              cy={n.y}
-              r={2.1}
-              style={{
-                animationDelay: `${300 + (i % 11) * 26}ms, ${(i % 7) * 380}ms`,
-              }}
-            />
-          ))}
+          <g className="orb-nodes">
+            {nodes.map((n, i) => (
+              <circle
+                key={`node-${i}`}
+                className="orb-node"
+                cx={n.x}
+                cy={n.y}
+                r={2.1}
+                style={delays({ '--twinkle-delay': (i % 7) * 380 })}
+              />
+            ))}
+          </g>
 
           {/* Ein Lichtpuls läuft am Rand entlang — der Herzschlag des Balls. */}
           <circle className="orb-pulse" cx={CX} cy={CY} r={R} pathLength={1} />

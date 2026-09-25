@@ -1,4 +1,4 @@
-import { JarvisOrb } from '@/components/layout/JarvisOrb';
+import { RouteLoading } from '@/components/layout/RouteLoading';
 
 /**
  * Reiter-Wechsel.
@@ -14,10 +14,5 @@ import { JarvisOrb } from '@/components/layout/JarvisOrb';
  * Kein Zeitgeber: das Ende bestimmt React, indem es die fertige Seite einsetzt.
  */
 export default function DashboardLoading() {
-  return (
-    <div className="route" aria-busy="true" aria-live="polite">
-      <JarvisOrb size={168} />
-      <span className="route-label">lädt</span>
-    </div>
-  );
+  return <RouteLoading />;
 }

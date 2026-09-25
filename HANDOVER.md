@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-09-25
-last_agent: Claude Opus 5 — Orb: Lücke im Rand, Größe und Verlässlichkeit behoben
+last_agent: Claude Opus 5.5 — Orb finalisiert: eine Größe, immer geschlossen, steht bis der Inhalt da ist
 status: In Progress
 ---
 
@@ -90,24 +90,37 @@ Pipeline sind nur Folgen.
   Freigeben ist gesperrt ohne Betreff, Text und Empfängeradresse.
   **Offen: alle drei Vorgänge haben „keine Adresse im CRM"** — die Karte sagt
   das in Rot, statt eine leere Mail zuzulassen.
-- **Jarvis-Orb** (24.09.): **fertig.** Der Drahtgitter-Ball aus dem App-Icon
-  als ein Bauteil (`JarvisOrb`) mit zwei Auftritten:
-  **Startsequenz** (`BootSplash` im Root-Layout) beim Laden und Neuladen, und
-  **Ladezustand** (`(dashboard)/loading.tsx`) beim Reiter-Wechsel — eine Datei
-  für alle sechs Reiter, die Seitenleiste bleibt dabei stehen.
+- **Jarvis-Orb** (24.09., finalisiert 25.09., **lokal geprüft, noch nicht
+  veröffentlicht**): Der Drahtgitter-Ball aus dem App-Icon als ein Bauteil
+  (`JarvisOrb`), **eine Größe (300 px) für alle Auftritte**:
+  **Startsequenz** (`BootSplash` im Root-Layout, `intro`: wird eingezeichnet)
+  beim Laden und Neuladen, und **Ladezustand im Inhaltsbereich** beim
+  Reiter-Wechsel — ohne `intro`, also vom ersten Bild an geschlossen. Der
+  Ladezustand ist **ein** Bauteil, `RouteLoading`: in `loading.tsx` *und* als
+  `fallback` jeder Suspense-Grenze der Reiter (die grauen Platzhalterkästen
+  sind raus). `NavOrb` (Klick) und `RouteLoading` stehen pixelgenau an
+  derselben Stelle, der Übergang ist unsichtbar.
   Beide enden an einem **echten Ereignis**, nicht nach Stoppuhr: die
   Startsequenz, wenn das Dokument fertig ist (`load` → `data-booted`, gesetzt
-  von einem Inline-Skript im Layout, mit harter Obergrenze 4 s); der
-  Ladezustand, wenn React die fertige Seite einsetzt.
+  von einem Inline-Skript im Layout, mindestens 1 s = voller Aufbau des
+  Balls; Rückfalltüren 1,5 s nach `DOMContentLoaded` und 15 s absolut); der
+  Ladezustand, wenn kein **sichtbares** `[data-route-loading]` mehr im
+  Dokument steht. **Am 25.09. in Production nachgemessen:** das Dashboard
+  streamt 2–4,2 s — die alte feste Obergrenze von 4 s lag mitten darin; beim
+  Reiter-Wechsel kam der Inhalt nach 1–2,4 s, der Ball ging nach 0,5 s.
   Die Drehung ist gerechnet: CSS animiert `rx` der Längenkreise
   (`R · cos φ`) statt das Bild zu kippen — ein gedrehtes flaches SVG würde
   stauchen statt zu rotieren. Knoten sitzen nur auf Breitenkreisen, weil die
-  bei jeder Drehung gültig bleiben. `vector-effect: non-scaling-stroke`, sonst
-  ist derselbe Strich beim kleinen Orb halb so dick und verschwindet im Schein.
+  bei jeder Drehung gültig bleiben. Strichbreiten × `--orb-u` (200 / Größe),
+  sonst ist derselbe Strich beim kleinen Orb halb so dick und verschwindet im
+  Schein; `non-scaling-stroke` nur auf Linien ohne Strichmuster (Wellen,
+  Orbitalringe).
   Dazu (25.09.): Masse im Inneren, zwei gegenläufige Orbitalringe mit
   Partikeln, drei nach außen laufende Wellen, ein Lichtpuls am Rand und ein
   Abgang, der kurz anzieht und heller wird statt flach auszublenden.
-  **Kein JavaScript im Orb selbst.**
+  **Kein JavaScript im Orb selbst.** Verzögerungen stehen als CSS-Variablen
+  (`--draw-delay`, `--spin-delay`, `--twinkle-delay`) am Element; welche
+  Animation läuft, entscheidet das CSS je Auftritt (`.orb--intro`).
   *Ersetzt das frühere Skelett-`loading.tsx`* (graue Platzhalterkästen, aus dem
   Electron→Next-Umzug); es liegt in der Historie unter `54f08a4`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
@@ -169,8 +182,12 @@ Pipeline sind nur Folgen.
   nicht existiert. Das Umsatzziel steht bewusst auf `pending`.
 - **Ein Overlay über der App braucht eine Rückfalltür.** Die Startsequenz
   hängt am Ereignis `load`, damit sie so lange läuft wie das Laden dauert — aber
-  das Inline-Skript nimmt sie nach spätestens 4 s auf jeden Fall weg, und der
-  Schleier hat `pointer-events: none`, ist also nie im Weg. Der alte
+  das Inline-Skript nimmt sie auf jeden Fall weg: 1,5 s nachdem das Dokument
+  durch ist (`DOMContentLoaded`, falls ein Bild/eine Schrift `load` aufhält),
+  spätestens nach 15 s (falls der Server im Strom hängt). Der Schleier hat
+  `pointer-events: none`, ist also nie im Weg. **Die Rückfalltür darf nicht
+  kürzer sein als die echte Ladezeit** — sonst ist sie keine Tür, sondern der
+  Normalfall (siehe Gelöste Probleme). Der alte
   `EcosystemLoader` verschwand per `useEffect` (also erst nach vollständiger
   Hydration) und hatte **keine** solche Sicherung — deshalb konnte er die App
   verdecken. Kein React im Schleier: ein Fehler im Bundle darf ihn nicht stehen
@@ -212,29 +229,67 @@ Pipeline sind nur Folgen.
 ## Gelöste Probleme (nicht wiederholen)
 
 - **Problem:** Am Rand des Orbs fehlte oben rechts ein Stück Kreis — er sah
-  unfertig aus, aber nur beim großen Auftritt.
-  **Lösung:** Alle Linien mit Strichmuster tragen jetzt `pathLength={1}`, die
-  `stroke-dasharray` rechnet damit in Umläufen statt in Koordinaten.
-  **Warum wichtig:** **`vector-effect: non-scaling-stroke` rechnet das
-  Strichmuster in Bildschirmpixeln**, die `stroke-dasharray` im CSS aber in
-  Koordinaten des viewBox. Bei 300 px Anzeige ist der Umfang 660 px, die feste
-  `470` deckte davon nur 71 % — die fehlenden 29 % liegen von 1 Uhr bis 3 Uhr,
-  weil ein `<circle>` bei 3 Uhr beginnt. Beim kleinen Orb fiel es nicht auf,
-  dort reichte die Zahl. Merksatz: **`non-scaling-stroke` und eine feste
-  `stroke-dasharray` vertragen sich nicht** — `pathLength` macht es
-  größenunabhängig.
+  unfertig aus, aber nur beim großen Auftritt (Startsequenz, 300 px).
+  **Erster Versuch (24./25.09., wirkungslos):** `pathLength={1}` auf alle
+  Linien. In Chrome nachgemessen: die Lücke blieb, jetzt ein Drittel.
+  **Lösung (25.09.):** `vector-effect: non-scaling-stroke` **raus** aus allen
+  Linien mit Strichmuster (Gitter, Rand, Puls). Gleich dicke Striche bei jeder
+  Größe kommen stattdessen aus `--orb-u` = 200 / Größe, das `JarvisOrb` setzt
+  und das CSS mit den Strichbreiten multipliziert. Zusätzlich endet das
+  Einzeichnen auf `stroke-dasharray: 1 0` (Strich ohne Lücke), der Ring ist
+  am Ende also geschlossen, egal wie ein Browser die Länge misst.
+  **Warum wichtig:** Mit `non-scaling-stroke` zeichnet der Browser das Muster
+  in **Bildschirm**pixeln, `pathLength` skaliert es aber auf die Länge in
+  **Koordinaten** (440). Auf dem Schirm ist der Rand beim 300-px-Orb 660 px
+  lang, das Muster deckte zwei Drittel; weil ein `<circle>` bei 3 Uhr beginnt
+  und im Uhrzeigersinn läuft, fehlt das Ende — oben rechts. Beim 168-px-Orb
+  ist der Schirm-Umfang *kürzer* als 440, deshalb fiel es dort nie auf.
+  Merksatz: **`non-scaling-stroke` und Strichmuster gar nicht kombinieren —
+  auch nicht mit `pathLength`.** Und: einen Grafikfehler erst als behoben
+  eintragen, wenn er im Browser gegengeprüft ist.
 
-- **Problem:** Beim Reiter-Wechsel war der Ball mal kleiner als sonst.
-  **Lösung:** Der Aufbau ist über CSS-Variablen je Auftritt einstellbar; im
-  Inhaltsbereich dauert er 260 ms und beginnt bei 93 % statt 70 %.
-  **Warum wichtig:** Der Aufbau lief 860 ms. Ein kurzer Wechsel tauschte den
-  Ball mitten im Hochskalieren wieder aus — man sah nie die Endgröße. Ein
-  Aufbau darf nie länger dauern als der kürzeste Auftritt, den er haben kann.
+- **Problem:** Die Startsequenz verschwand manchmal mitten im Laden, und an
+  ihrer Stelle stand der kleine Ball aus `loading.tsx` — „mal kürzer, mal
+  kleiner".
+  **Lösung:** Feste Obergrenze 4 s ersetzt durch Rückfalltüren, die am
+  Ladezustand hängen (1,5 s nach `DOMContentLoaded`, absolut 15 s).
+  Mindestdauer 700 ms → 1000 ms, so lang wie der Aufbau des Balls. Der
+  Schleier steht jetzt **vor** dem Inhalt im DOM, damit er in jedem ersten
+  Bild dabei ist.
+  **Warum wichtig:** Gemessen in Production: `/` streamt 2,1–4,2 s, weil der
+  Inhalt erst nach den Datenbankabfragen kommt. Bei 4 s wurde der Schleier
+  weggenommen, der Inhaltsbereich zeigte noch den Ladezustand. Und bei
+  schnellem Laden (< 860 ms) ging der Ball, bevor er fertig hochskaliert war —
+  daher „mal kleiner".
+
+- **Problem:** Der Ball war „mal kleiner" und beim Reiter-Wechsel „nicht
+  komplett".
+  **Erster Versuch (24./25.09., reichte nicht):** Aufbau im Inhaltsbereich auf
+  260 ms ab 93 % verkürzt — die Größe blieb aber 168 px statt 300 px, und das
+  Einzeichnen (560 ms + Versatz) lief weiter.
+  **Lösung (25.09.):** Eine Größe für alle (`ORB_SIZE`, keine `size`-Prop
+  mehr). Eingezeichnet und hochskaliert wird nur in der Startsequenz
+  (`intro`), die mindestens so lange steht wie der Aufbau. Im Inhaltsbereich
+  ist das Gitter sofort geschlossen und blendet nur 200 ms ein.
+  **Warum wichtig:** Der Ball beim Reiter-Wechsel stand gemessen ~0,5 s. Das
+  Einzeichnen läuft im Uhrzeigersinn ab 3 Uhr, das letzte Stück ist also oben
+  rechts — ein Ball, der vor Ende des Aufbaus verschwindet, zeigt **immer**
+  eine Lücke oben rechts, ganz ohne Grafikfehler. Ein Aufbau darf nie länger
+  dauern als der kürzeste Auftritt, den er haben kann.
 
 - **Problem:** Der Ladezustand erschien mal, blitzte mal nur auf und fehlte
   einmal ganz (zurück aufs Dashboard).
-  **Lösung:** `NavOrb` — eine eigene Schicht, die am **Klick** startet und am
-  **Pfadwechsel** endet, mindestens 480 ms zeigt und eine Notbremse bei 8 s hat.
+  **Lösung:** `NavOrb` — eine eigene Schicht, die am **Klick** startet und
+  endet, wenn der Pfad gewechselt hat **und** kein sichtbarer Ladezustand
+  (`[data-route-loading]`) mehr im Dokument steht; mindestens 480 ms,
+  Notbremse bei 8 s.
+  **Korrektur 25.09.:** Der Pfadwechsel allein war das falsche Ende. Die
+  Reiter haben eine eigene Suspense-Grenze, Next schaltet den Pfad deshalb
+  nach ~200 ms um, sobald die Hülle steht — der Inhalt kam erst nach
+  1–2,4 s, dazwischen standen graue Kästen. Außerdem zählen nur **sichtbare**
+  Ladezustände: React lässt beim Streamen versteckte Behälter
+  (`<div hidden id="S:0">`) mit dem alten Platzhalter liegen; ohne
+  `getClientRects()`-Prüfung blieb der Ball über fertigem Inhalt stehen.
   **Warum wichtig:** `loading.tsx` allein kann das prinzipbedingt nicht
   leisten. Die Next-Doku sagt: ist die Zielseite vorgeladen, wird der
   Wartezustand **übersprungen**, und Vor/Zurück nutzt bewusst den

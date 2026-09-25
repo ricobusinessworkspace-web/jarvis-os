@@ -8,6 +8,7 @@ import { MetricCard } from '@/components/today/MetricCard';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { EMPTY_METRIC, STATE_TEXT, targetSub, formatValue } from '@/lib/metricState';
 import { cn } from '@/lib/utils';
+import { RouteLoading } from '@/components/layout/RouteLoading';
 
 export const dynamic = 'force-dynamic';
 
@@ -394,13 +395,12 @@ async function Vertrieb() {
 }
 
 export default function VertriebPage() {
+  // Grenze außen, siehe Dashboard.
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
-      <Suspense
-        fallback={<div className="h-64 animate-pulse rounded-2xl border border-border/30 bg-elevated/30" />}
-      >
+    <Suspense fallback={<RouteLoading />}>
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
         <Vertrieb />
-      </Suspense>
-    </div>
+      </div>
+    </Suspense>
   );
 }

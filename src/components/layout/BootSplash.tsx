@@ -11,13 +11,13 @@ import { JarvisOrb } from './JarvisOrb';
  * einmal ein Overlay (`EcosystemLoader`), das per `useEffect` verschwand — also
  * erst nach vollständiger Hydration — und den Start künstlich verlängert hat.
  * Diese Fassung hängt an einem Ereignis des Browsers, lässt mit
- * `pointer-events: none` jeden Klick durch und hat im Skript eine harte
- * Obergrenze, damit ein ausbleibendes `load` sie nicht stehen lassen kann.
+ * `pointer-events: none` jeden Klick durch und hat im Skript Rückfalltüren,
+ * damit ein ausbleibendes `load` sie nicht stehen lassen kann.
  */
 export function BootSplash() {
   return (
     <div className="boot" aria-hidden="true">
-      <JarvisOrb size={300} />
+      <JarvisOrb intro />
       <span className="boot-word">Jarvis OS</span>
     </div>
   );

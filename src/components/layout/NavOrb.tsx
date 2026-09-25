@@ -18,16 +18,18 @@ import { JarvisOrb } from './JarvisOrb';
  *
  * - Start: ein Klick auf einen app-internen Link, in der Erfassungsphase
  *   abgegriffen, also bevor Next die Navigation beginnt.
- * - Ende: `usePathname()` meldet den neuen Pfad — das passiert erst, wenn die
- *   neue Seite steht. Danach bleibt der Ball noch bis `MIN_MS`, damit ein
- *   schneller Wechsel nicht als Zucken erscheint.
+ * - Ende: der neue Pfad steht **und** kein Ladezustand (`data-route-loading`,
+ *   siehe `RouteLoading`) ist mehr im Dokument. Der Pfad allein reicht nicht:
+ *   Next schaltet ihn um, sobald die Hülle der neuen Seite da ist — gemessen
+ *   nach ~200 ms, der Inhalt kam aber erst nach 1–2,4 s. Danach bleibt der
+ *   Ball noch bis `MIN_MS`, damit ein schneller Wechsel nicht zuckt.
  * - Notbremse: nach `MAX_MS` ist Schluss, egal was war. Ein Overlay ohne
  *   Rückfalltür ist genau der Fehler, der hier mit dem EcosystemLoader schon
  *   einmal drinsteckte (siehe HANDOVER).
  *
- * `loading.tsx` bleibt daneben bestehen und deckt ab, was ohne Klick passiert
- * (Befehlspalette, Vor/Zurück, direkter Aufruf). Weil diese Schicht deckend
- * ist, sieht man nie zwei Bälle übereinander.
+ * `RouteLoading` bleibt daneben bestehen und deckt ab, was ohne Klick passiert
+ * (Befehlspalette, Vor/Zurück, Tag im Verlauf). Beide zeigen denselben Ball an
+ * derselben Stelle; weil diese Schicht deckend ist, sieht man nie zwei.
  */
 
 /** Kürzer wirkt wie ein Zucken statt wie ein Ladevorgang. */
@@ -35,10 +37,25 @@ const MIN_MS = 480;
 /** Notbremse — hier darf nichts hängen bleiben. */
 const MAX_MS = 8000;
 
+/**
+ * Steht irgendwo ein **sichtbarer** Ladezustand? Nur sichtbare zählen: React
+ * streamt Inhalte in versteckten Behältern (`<div hidden id="S:0">`) an, die
+ * mitunter liegen bleiben — mit dem alten Platzhalter darin. Ohne diese
+ * Prüfung blieb der Ball über dem längst fertigen Inhalt stehen.
+ * `getClientRects()` ist leer, sobald ein Vorfahr `display: none` hat.
+ */
+function isLoadingVisible(): boolean {
+  return Array.from(document.querySelectorAll('[data-route-loading]')).some(
+    el => el.getClientRects().length > 0,
+  );
+}
+
 export function NavOrb() {
   const pathname = usePathname();
   const [pending, setPending] = useState(false);
   const startedAt = useRef(0);
+  /** Pfad beim Klick — solange er noch gilt, hat Next nicht umgeschaltet. */
+  const fromPath = useRef('');
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -57,6 +74,7 @@ export function NavOrb() {
       if (href.split(/[?#]/)[0] === window.location.pathname) return;
 
       startedAt.current = Date.now();
+      fromPath.current = window.location.pathname;
       setPending(true);
     }
 
@@ -65,16 +83,35 @@ export function NavOrb() {
     return () => document.removeEventListener('click', onClick, true);
   }, []);
 
-  // Der neue Pfad steht — Rest der Mindestzeit absitzen, dann weg.
-  // Absichtlich nur auf `pathname` hörend: `pending` mit aufzunehmen würde den
-  // Zeitgeber beim Setzen von `pending` schon starten, also vor der Navigation.
+  // Weg erst, wenn der neue Pfad steht und nichts mehr lädt. Der Beobachter
+  // meldet, wann ein Ladezustand verschwindet — genau dann setzt React den
+  // fertigen Inhalt ein. Danach den Rest der Mindestzeit absitzen.
   useEffect(() => {
     if (!pending) return;
-    const rest = Math.max(0, MIN_MS - (Date.now() - startedAt.current));
-    const timeout = setTimeout(() => setPending(false), rest);
-    return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    function check() {
+      clearTimeout(timeout);
+      if (pathname === fromPath.current) return;
+      if (isLoadingVisible()) return;
+      const rest = Math.max(0, MIN_MS - (Date.now() - startedAt.current));
+      timeout = setTimeout(() => setPending(false), rest);
+    }
+
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      // React blendet Inhalte über `style`/`hidden` aus und ein.
+      attributes: true,
+      attributeFilter: ['style', 'hidden'],
+    });
+    check();
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [pending, pathname]);
 
   useEffect(() => {
     if (!pending) return;
@@ -86,7 +123,7 @@ export function NavOrb() {
 
   return (
     <div className="nav-orb" aria-busy="true" aria-live="polite">
-      <JarvisOrb size={168} />
+      <JarvisOrb />
       <span className="route-label">lädt</span>
     </div>
   );

@@ -280,9 +280,11 @@ body {
 /* ============================================================
    Jarvis-Orb — der Drahtgitter-Ball aus dem App-Icon
 
-   Zwei Auftritte, ein Bauteil:
-   `.boot`  — Startsequenz über der ganzen Seite, beim Laden/Neuladen.
-   `.route` — Reiter-Wechsel, nur im Inhaltsbereich (Next `loading.tsx`).
+   Ein Bauteil, eine Größe, zwei Auftritte:
+   `.boot`  — Startsequenz über der ganzen Seite, beim Laden/Neuladen. Nur
+              hier wird der Ball eingezeichnet (`.orb--intro`).
+   `.nav-orb` / `.route` — Reiter-Wechsel, nur im Inhaltsbereich. Der Ball
+              steht vom ersten Bild an geschlossen da.
 
    Beide enden an einem **echten** Ereignis, nicht nach Stoppuhr: die
    Startsequenz, wenn das Dokument fertig ist (`load` → `data-booted` auf
@@ -290,12 +292,12 @@ body {
    wenn React die fertige Seite einsetzt und `loading.tsx` verschwindet.
 
    Was das vom alten `EcosystemLoader` unterscheidet (siehe HANDOVER):
-   `pointer-events: none` auf dem Schleier, eine harte Obergrenze von 4 s im
-   Skript, und kein React im Schleier — ein Fehler im Bundle darf ihn nicht
-   stehen lassen.
+   `pointer-events: none` auf dem Schleier, Rückfalltüren im Skript (hängt
+   ein Bild oder der Server, geht er trotzdem), und kein React im Schleier —
+   ein Fehler im Bundle darf ihn nicht stehen lassen.
 
    Animiert werden fast nur `transform` und `opacity`; die Ausnahmen `rx` und
-   `stroke-dashoffset` sind genau die zwei, die sich nicht ersetzen lassen,
+   das Strichmuster sind genau die zwei, die sich nicht ersetzen lassen,
    ohne die Geometrie zu verfälschen.
    ============================================================ */
 
@@ -307,19 +309,10 @@ body {
   place-items: center;
   flex: none;
 
-  /* Aufbau des Balls. Der grosse Auftritt darf sich Zeit nehmen; der kleine
-     im Inhaltsbereich ist oft nach 300 ms schon wieder weg und wirkte dann
-     zu klein, weil er noch mitten im Hochskalieren war. */
-  --orb-in-dur: 860ms;
-  --orb-in-scale: 0.7;
-  --orb-in-blur: 8px;
-}
-
-.route .orb,
-.nav-orb .orb {
-  --orb-in-dur: 260ms;
-  --orb-in-scale: 0.93;
-  --orb-in-blur: 3px;
+  /* Koordinaten je Bildschirmpixel, gesetzt von `JarvisOrb` (200 / Größe).
+     Strichbreite × --orb-u ergibt bei jeder Größe denselben Strich auf dem
+     Schirm — ohne `non-scaling-stroke`, das die Strichmuster zerlegt. */
+  --orb-u: 1;
 }
 
 .orb-svg {
@@ -327,15 +320,23 @@ body {
   width: 100%;
   height: 100%;
   overflow: visible;
-  animation: orb-in var(--orb-in-dur) cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  /* Nur einblenden, nicht skalieren: im Inhaltsbereich steht der Ball oft
+     nur eine halbe Sekunde, ein Hochskalieren sähe man nie zu Ende. */
+  animation: orb-fade 200ms ease-out backwards;
+}
+
+@keyframes orb-fade {
+  from { opacity: 0; }
+}
+
+/* Startsequenz: der Ball kommt aus der Tiefe. Die Startsequenz steht mindestens
+   so lange, wie dieser Aufbau dauert (MIN im Skript des Root-Layouts). */
+.orb--intro .orb-svg {
+  animation: orb-in 860ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 @keyframes orb-in {
-  0% {
-    opacity: 0;
-    transform: scale(var(--orb-in-scale)) rotate(-14deg);
-    filter: blur(var(--orb-in-blur));
-  }
+  0% { opacity: 0; transform: scale(0.7) rotate(-14deg); filter: blur(8px); }
   100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
 }
 
@@ -374,6 +375,11 @@ body {
   filter: blur(11px);
   animation: orb-breathe 3400ms 600ms ease-in-out infinite;
 }
+
+/* `vector-effect: non-scaling-stroke` nur auf Linien **ohne** Strichmuster
+   (Wellen, Orbitalringe). Mit Muster zeichnet der Browser es dann in
+   Bildschirmpixeln, `pathLength` rechnet aber in Koordinaten — beim grossen
+   Orb fehlte so ein Drittel des Rands. Linien mit Muster nehmen `--orb-u`. */
 
 /* Wellen, die nach aussen laufen. Drei Stueck, um ein Drittel der Laufzeit
    versetzt — so ist immer eine unterwegs und es entsteht keine Pause. */
@@ -443,31 +449,36 @@ body {
 .orb-ring {
   fill: none;
   stroke: #b96bff;
-  vector-effect: non-scaling-stroke;
-  stroke-width: 1.25;
-  /* In pathLength-Einheiten (die Elemente tragen pathLength="1"): ein Umlauf
-     ist genau 1, egal wie gross der Orb angezeigt wird. Eine feste Zahl in
-     Koordinaten wäre bei `non-scaling-stroke` falsch — das Muster rechnet
-     dann in Bildschirmpixeln. */
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: orb-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  stroke-width: calc(1.25px * var(--orb-u));
 }
 
+/* Einzeichnen — nur in der Startsequenz. In pathLength-Einheiten (die
+   Elemente tragen pathLength="1"): ein Umlauf ist genau 1, egal wie gross der
+   Orb angezeigt wird. */
+.orb--intro .orb-ring {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: orb-draw 560ms var(--draw-delay, 0ms) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Lücke und Versatz schrumpfen gemeinsam; am Ende steht `1 0` — Strich ohne
+   Lücke, also ein geschlossener Ring, auch wenn ein Browser die Länge um
+   Rundungsreste anders misst. Die Naht bei 3 Uhr kann so nicht aufgehen. */
 @keyframes orb-draw {
-  to { stroke-dashoffset: 0; }
+  from { stroke-dasharray: 1 1; stroke-dashoffset: 1; }
+  to { stroke-dasharray: 1 0; stroke-dashoffset: 0; }
 }
 
 .orb-ring--rim {
   stroke: #d9a4ff;
-  stroke-width: 2;
+  stroke-width: calc(2px * var(--orb-u));
 }
 
 /* Ein zweiter Rand in Magenta, weichgezeichnet — das gibt der Kante die Tiefe,
    die das Icon hat, ohne einen echten Farbverlauf zu brauchen. */
 .orb-ring--halo {
   stroke: #ff6ad5;
-  stroke-width: 4;
+  stroke-width: calc(4px * var(--orb-u));
   opacity: 0.28;
   filter: blur(2.5px);
 }
@@ -476,9 +487,13 @@ body {
    Ellipse schmal, zur Linie, wieder breit — genau das animiert dieser Keyframe.
    Deshalb kein rotate() auf dem Bild: das würde stauchen statt drehen. */
 .orb-mer {
+  animation: orb-spin 7200ms var(--spin-delay, 0ms) linear infinite;
+}
+
+.orb--intro .orb-mer {
   animation:
-    orb-draw 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    orb-spin 7200ms linear infinite;
+    orb-draw 560ms var(--draw-delay, 0ms) cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    orb-spin 7200ms var(--spin-delay, 0ms) linear infinite;
 }
 
 @keyframes orb-spin {
@@ -489,16 +504,18 @@ body {
 
 .orb-node {
   fill: #ffffff;
-  opacity: 0;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.85));
-  animation:
-    orb-node-in 380ms ease-out forwards,
-    orb-twinkle 2600ms ease-in-out infinite;
+  animation: orb-twinkle 2600ms var(--twinkle-delay, 0ms) ease-in-out infinite;
 }
 
-@keyframes orb-node-in {
-  0% { opacity: 0; }
-  100% { opacity: 0.95; }
+/* Die Knoten erscheinen in der Startsequenz, wenn das Gitter steht — als
+   Gruppe, damit ihr Funkeln davon unberührt bleibt. */
+.orb--intro .orb-nodes {
+  animation: orb-nodes-in 420ms 380ms ease-out backwards;
+}
+
+@keyframes orb-nodes-in {
+  from { opacity: 0; }
 }
 
 @keyframes orb-twinkle {
@@ -512,8 +529,7 @@ body {
 .orb-pulse {
   fill: none;
   stroke: #ffffff;
-  vector-effect: non-scaling-stroke;
-  stroke-width: 2.4;
+  stroke-width: calc(2.4px * var(--orb-u));
   stroke-linecap: round;
   stroke-dasharray: 0.07 0.93;
   filter: drop-shadow(0 0 6px rgba(240, 217, 255, 0.95));
@@ -613,14 +629,18 @@ html[data-booted] .boot-word {
   to { opacity: 1; }
 }
 
+/* Ladezustand im Seitenfluss (`RouteLoading`: `loading.tsx` und die
+   Suspense-Grenzen der Reiter). Genau so hoch wie der Inhaltsbereich unter
+   der Kopfzeile (h-14) abzüglich des Innenabstands (p-4) — damit steht der
+   Ball an derselben Stelle wie in `.nav-orb`, und der Wechsel zwischen den
+   beiden ist unsichtbar. */
 .route {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  min-height: 60vh;
-  padding: 2rem;
+  height: calc(100vh - 3.5rem - 2rem);
 }
 
 .route-label {
@@ -641,6 +661,7 @@ html[data-booted] .boot-word {
 
 @media (prefers-reduced-motion: reduce) {
   .orb-svg,
+  .orb--intro .orb-svg,
   .orb-glow,
   .orb-mass,
   .orb-shine,
@@ -648,14 +669,16 @@ html[data-booted] .boot-word {
   .orb-wave,
   .orb-particle,
   .orb-mer,
+  .orb--intro .orb-mer,
   .orb-node,
+  .orb--intro .orb-nodes,
   .orb-pulse,
   .route-label { animation: none; }
   .orb-svg { opacity: 1; }
   .orb-glow { opacity: 0.8; }
   .orb-pulse,
   .orb-wave { opacity: 0; }
-  .orb-ring { animation: none; stroke-dashoffset: 0; }
+  .orb--intro .orb-ring { animation: none; stroke-dasharray: none; }
   .orb-node { opacity: 0.95; }
   .boot-word { animation: none; opacity: 0.55; letter-spacing: 0.4em; }
   html[data-booted] .boot { animation-duration: 200ms; }

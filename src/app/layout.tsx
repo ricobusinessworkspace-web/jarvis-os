@@ -29,14 +29,10 @@ export default function RootLayout({
   return (
     <html lang="de" className={`${inter.variable} h-full antialiased dark`}>
       {/*
-        Die Startsequenz liegt bewusst **über** dem Inhalt, nicht davor:
-        `children` steht zuerst im DOM und rendert serverseitig wie immer.
-
-        Der EcosystemLoader, der hier früher stand, verschwand per useEffect —
-        also erst nach vollständiger Hydration — und hat den Start dadurch
-        künstlich verlängert. `BootSplash` enthält kein JavaScript, endet nach
-        fester Zeit und lässt mit `pointer-events: none` jeden Klick durch.
-        Wer hier wieder etwas mit useState/useEffect einbaut, baut den alten
+        Kein useState/useEffect in der Startsequenz. Der EcosystemLoader, der
+        hier früher stand, verschwand per useEffect — also erst nach
+        vollständiger Hydration — und hat den Start dadurch künstlich
+        verlängert. Wer hier wieder einen Zustand einbaut, baut den alten
         Fehler nach.
       */}
       <body className="min-h-full">
@@ -45,25 +41,46 @@ export default function RootLayout({
           Läuft während des HTML-Parsens, registriert nur Rückrufe und blockiert
           deshalb nichts.
 
-          `MAX` ist die Rückfalltür und nicht verhandelbar: bleibt `load` aus —
-          hängendes Asset, Fehler im Bundle, was auch immer — geht der Schleier
-          trotzdem weg. Genau diese Sicherung fehlte dem alten EcosystemLoader,
-          der per useEffect an der Hydration hing und die App verdecken konnte.
-          `MIN` verhindert nur ein Aufblitzen bei sehr schnellem Laden.
+          Ladeende ist `load`. Die Reiter streamen: der Server schickt sofort
+          die Hülle und erst nach den Datenbankabfragen den Inhalt (auf dem
+          Dashboard 2–4 s). `load` kommt erst, wenn der Strom zu ist — also
+          wenn der Inhalt steht.
+
+          Rückfalltüren, damit der Schleier nie hängen bleibt:
+          - `SETTLE`: ist das Dokument durch (`DOMContentLoaded`, der Inhalt
+            steht), aber ein Bild oder eine Schrift hält `load` auf, geht der
+            Schleier trotzdem. Ein Fehler im Bundle hält `load` nicht auf.
+          - `MAX`: der Server hängt mitten im Strom. Dann gibt es darunter auch
+            nichts zu sehen außer dem Ladezustand des Reiters.
+          Die frühere feste Obergrenze von 4 s lag mitten in der echten Ladezeit
+          des Dashboards: der grosse Ball verschwand zu früh und der kleine aus
+          `loading.tsx` stand an seiner Stelle.
+
+          `MIN` ist so lang wie der Aufbau des Balls (Gitter, Knoten, Schrift-
+          zug ≈ 1 s). Kürzer, und er ginge weg, bevor er fertig ist — dann wirkt
+          er kleiner und halb gezeichnet.
         */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){var MIN=700,MAX=4000,t0=Date.now(),d=0;' +
+              '(function(){var MIN=1000,SETTLE=1500,MAX=15000,t0=Date.now(),d=0;' +
               'function go(){if(d)return;d=1;document.documentElement.dataset.booted="1";}' +
-              'setTimeout(go,MAX);' +
               'function ready(){setTimeout(go,Math.max(0,MIN-(Date.now()-t0)));}' +
-              'if(document.readyState==="complete")ready();' +
-              'else addEventListener("load",ready,{once:true});})();',
+              'setTimeout(go,MAX);' +
+              'if(document.readyState==="complete"){ready();return;}' +
+              'addEventListener("load",ready,{once:true});' +
+              'addEventListener("DOMContentLoaded",function(){setTimeout(ready,SETTLE);},{once:true});})();',
           }}
         />
-        {children}
+        {/*
+          Vor dem Inhalt, nicht dahinter: der Browser darf ein halb
+          empfangenes Dokument schon malen. Steht der Schleier zuerst im DOM,
+          ist er in jedem ersten Bild dabei — dahinter könnte kurz das
+          Dashboard aufblitzen. Oben liegt er über `z-index`, nicht über die
+          Reihenfolge.
+        */}
         <BootSplash />
+        {children}
       </body>
     </html>
   );

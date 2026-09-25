@@ -7,6 +7,7 @@ import { MetricCard } from '@/components/today/MetricCard';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { BodyLogCard } from '@/components/today/BodyLogCard';
 import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
+import { RouteLoading } from '@/components/layout/RouteLoading';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,11 +102,12 @@ async function Health() {
 }
 
 export default function HealthPage() {
+  // Grenze außen, siehe Dashboard.
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl border border-border/30 bg-elevated/30" />}>
+    <Suspense fallback={<RouteLoading />}>
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
         <Health />
-      </Suspense>
-    </div>
+      </div>
+    </Suspense>
   );
 }
