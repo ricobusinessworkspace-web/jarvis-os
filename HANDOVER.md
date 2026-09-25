@@ -90,8 +90,10 @@ Pipeline sind nur Folgen.
   Freigeben ist gesperrt ohne Betreff, Text und Empfängeradresse.
   **Offen: alle drei Vorgänge haben „keine Adresse im CRM"** — die Karte sagt
   das in Rot, statt eine leere Mail zuzulassen.
-- **Jarvis-Orb** (24.09., finalisiert 25.09., **lokal geprüft, noch nicht
-  veröffentlicht**): Der Drahtgitter-Ball aus dem App-Icon als ein Bauteil
+- **Jarvis-Orb** (24.09., finalisiert 25.09. in `b271165`, **live und in
+  Production nachgemessen**: Startsequenz geht auf allen Reitern erst mit dem
+  Inhalt weg, auch bei 4,9 s; Reiter-Wechsel ohne leeren Moment, Ball immer
+  300 px. **Safari/iPhone nicht geprüft** — nur Chrome): Der Drahtgitter-Ball aus dem App-Icon als ein Bauteil
   (`JarvisOrb`), **eine Größe (300 px) für alle Auftritte**:
   **Startsequenz** (`BootSplash` im Root-Layout, `intro`: wird eingezeichnet)
   beim Laden und Neuladen, und **Ladezustand im Inhaltsbereich** beim
