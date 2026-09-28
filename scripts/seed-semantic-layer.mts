@@ -97,10 +97,10 @@ const INTENTIONS: Array<{
   { metricKey: 'content.posts',     baseValue: 1,  stretchValue: null },
   { metricKey: 'body.sleep_hours',  baseValue: 6,  stretchValue: 8, comparator: '>=' },
 
-  // Basis = alle Pflichtschritte, Soll = alle Schritte. Solange kein Schritt
-  // als Pflicht markiert ist, gibt es bewusst keine Basis.
-  { metricKey: 'routine.morning', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Morgenroutine' } },
-  { metricKey: 'routine.evening', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Abendroutine' } },
+  // Basis = alle Schritte bis auf höchstens `maxSkip` (Pflichtschritte nie
+  // darunter), Soll = alle Schritte.
+  { metricKey: 'routine.morning', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Morgenroutine', maxSkip: 3 } },
+  { metricKey: 'routine.evening', derivedKind: 'routine_completeness', derivedConfig: { tracker: 'Abendroutine', maxSkip: 3 } },
 
   // Soll = Kalorienziel, Basis = Ziel + 10 %. Vergleich `<=`: mehr ist schlechter.
   {

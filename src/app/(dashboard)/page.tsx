@@ -51,6 +51,12 @@ async function Today() {
   );
 
   const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
+
+  // Die Basis der Routine kommt aus der Metrik (`maxSkip` in der Intention).
+  const routineBlocks = routines.map(b => {
+    const m = cell(`routine.${b.kind}`);
+    return { ...b, base: m.base, targetHint: m.targetHint };
+  });
   const calls = cell('sales.calls_count');
 
   // Beschriftungen kommen aus den echten Zielen, nicht aus fest getipptem Text.
@@ -125,9 +131,9 @@ async function Today() {
         <CausesCard rows={causeRows} date={today} />
       </div>
 
-      {routines.length > 0 && (
+      {routineBlocks.length > 0 && (
         <div className="mt-3">
-          <RoutineCard blocks={routines} date={today} />
+          <RoutineCard blocks={routineBlocks} date={today} />
         </div>
       )}
 

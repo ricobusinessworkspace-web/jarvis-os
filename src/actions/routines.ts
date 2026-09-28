@@ -11,8 +11,8 @@ import { invalidateSemanticConfig } from '@/core/services/AnalyticsService';
  * die Historie dieses Schritts ist damit weg. Deshalb verlangt die Oberfläche
  * dafür einen zweiten Klick.
  *
- * Anzahl und Pflichtstatus der Schritte sind Teil des Semantic-Layer-Caches
- * (sie bilden das Ziel der Routine-Metrik). Jede strukturelle Änderung muss
+ * Die Anzahl der Schritte ist Teil des Semantic-Layer-Caches (aus ihr und
+ * `maxSkip` entsteht das Ziel der Routine-Metrik). Jede strukturelle Änderung muss
  * ihn deshalb verwerfen, sonst zeigt das Dashboard bis zu 30 Sekunden lang
  * das alte Ziel.
  */
@@ -127,25 +127,6 @@ export async function renameRoutine(trackerId: string, name: string): Promise<Re
     await prisma.tracker.update({ where: { id: trackerId }, data: { name: clean } });
     await retargetTrackerName(before.name, clean);
 
-    invalidateSemanticConfig();
-    revalidateTracking();
-    return { success: true };
-  } catch (error) {
-    return fail(error);
-  }
-}
-
-/**
- * Markiert einen Schritt als Pflicht — oder nimmt die Markierung zurück.
- *
- * Daraus entsteht die Basis der Routine: „Basis erreicht" heißt, dass alle
- * Pflichtschritte erledigt sind, nicht dass irgendwelche vier von sechs
- * abgehakt wurden. Ohne einen einzigen Pflichtschritt gibt es bewusst keine
- * Basis, und die Metrik sagt das auch („Ziel fehlt").
- */
-export async function setRoutineItemRequired(itemId: string, required: boolean): Promise<Result> {
-  try {
-    await prisma.trackerItem.update({ where: { id: itemId }, data: { required } });
     invalidateSemanticConfig();
     revalidateTracking();
     return { success: true };

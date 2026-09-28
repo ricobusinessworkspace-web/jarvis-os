@@ -200,7 +200,8 @@ model TrackerItem {
   order            Int
   expectedDuration Int?
   startWindow      String?
-  /// Pflichtschritt — entscheidet, ob die Routine als „Basis erreicht" gilt.
+  /// Früher: Pflichtschritt für die Basis der Routine. Seit 2026-09-28 nicht
+  /// mehr ausgewertet — die Basis ist „höchstens `maxSkip` ausgelassen".
   required         Boolean      @default(false)
   tracker          Tracker      @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   logs             TrackerLog[]

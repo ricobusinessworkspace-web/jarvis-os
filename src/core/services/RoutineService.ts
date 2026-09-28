@@ -109,7 +109,7 @@ export class RoutineService {
     const rows = await prisma.$queryRaw<
       Array<{
         tracker_id: string; tracker_name: string;
-        item_id: string; title: string; sort: number; done: boolean; required: boolean;
+        item_id: string; title: string; sort: number; done: boolean;
       }>
     >`
       SELECT t.id   AS tracker_id,
@@ -117,7 +117,6 @@ export class RoutineService {
              i.id   AS item_id,
              i.title,
              i."order" AS sort,
-             i.required,
              COALESCE(l.status = 'completed', FALSE) AS done
         FROM jarvis_trackers t
         JOIN jarvis_tracker_items i ON i.tracker_id = t.id
@@ -130,7 +129,7 @@ export class RoutineService {
 
     const byTracker = new Map<string, {
       trackerId: string; name: string; kind: 'morning' | 'evening';
-      items: Array<{ id: string; title: string; done: boolean; required: boolean }>;
+      items: Array<{ id: string; title: string; done: boolean }>;
     }>();
 
     for (const r of rows) {
@@ -143,7 +142,7 @@ export class RoutineService {
         });
       }
       byTracker.get(r.tracker_id)!.items.push({
-        id: r.item_id, title: r.title, done: r.done, required: r.required,
+        id: r.item_id, title: r.title, done: r.done,
       });
     }
 

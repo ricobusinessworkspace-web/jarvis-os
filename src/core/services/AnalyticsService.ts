@@ -21,8 +21,8 @@ import { blockInfo, dateRange, isOffDay, trackedDays, addDays } from '@/lib/bloc
  *
  * `zielfehlt` ist etwas anderes und der Unterschied ist wichtig: hier *ist* ein
  * Ziel konfiguriert, es lässt sich nur gerade nicht auflösen — das Kalorienziel
- * aus Cronometer kam nie an, oder in der Routine ist kein Pflichtschritt
- * markiert. Der Wert steht da, das Maß fehlt. Beides als `erfasst` zu zeigen
+ * aus Cronometer kam nie an, oder für die Routine ist keine Grenze
+ * hinterlegt, wie viele Schritte ausgelassen werden dürfen. Der Wert steht da, das Maß fehlt. Beides als `erfasst` zu zeigen
  * hieße, einen kaputten Anschluss wie eine Design-Entscheidung aussehen zu
  * lassen.
  */
@@ -82,8 +82,8 @@ type SemanticConfig = {
   definitions: Awaited<ReturnType<typeof prisma.coreMetricDefinition.findMany>>;
   sources: Awaited<ReturnType<typeof prisma.coreMetricSource.findMany>>;
   intentions: Awaited<ReturnType<typeof prisma.coreIntention.findMany>>;
-  /** Für `routine_completeness`: wie viele Schritte hat die Routine, wie viele davon sind Pflicht. */
-  routines: Array<{ name: string; total: number; required: number }>;
+  /** Für `routine_completeness`: wie viele Schritte hat die Routine. */
+  routines: Array<{ name: string; total: number }>;
   /** Zielwerte aus Health/Cronometer, für `health_target` und `weight_trajectory`. */
   healthTargets: Awaited<ReturnType<typeof prisma.ingestHealthTarget.findMany>>;
   /**
@@ -125,7 +125,7 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
       prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
       prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
       prisma.coreIntention.findMany(),
-      prisma.tracker.findMany({ select: { name: true, items: { select: { required: true } } } }),
+      prisma.tracker.findMany({ select: { name: true, _count: { select: { items: true } } } }),
       prisma.ingestHealthTarget.findMany(),
       prisma.$queryRaw<SemanticConfig['crmTargets']>`
         SELECT metric_key                        AS "metricKey",
@@ -142,11 +142,7 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
     definitions,
     sources,
     intentions,
-    routines: trackers.map(t => ({
-      name: t.name,
-      total: t.items.length,
-      required: t.items.filter(i => i.required).length,
-    })),
+    routines: trackers.map(t => ({ name: t.name, total: t._count.items })),
     healthTargets,
     crmTargets,
   };
@@ -187,10 +183,9 @@ export class AnalyticsService {
     const fromMs = Date.parse(`${from}T00:00:00.000Z`) - 2 * 86400000;
     const toMs = Date.parse(`${to}T00:00:00.000Z`) + 3 * 86400000;
 
-    // `flag` trägt je Zweig eine andere Ja/Nein-Information: beim Tracker, ob
-    // der Schritt ein Pflichtschritt ist; bei den Korrekturen von Hand, dass
-    // die Zeile überhaupt existiert (der Wert darf dort NULL sein und heißt
-    // dann „an dem Tag bewusst nicht gemessen").
+    // `flag` braucht nur der Zweig der Korrekturen von Hand: die Zeile
+    // existiert (der Wert darf dort NULL sein und heißt dann „an dem Tag
+    // bewusst nicht gemessen").
     return prisma.$queryRaw<
       Array<{ kind: string; k1: string; k2: string; d: string; value: number | null; flag: boolean }>
     >`
@@ -204,7 +199,7 @@ export class AnalyticsService {
       UNION ALL
       SELECT 'tracker', t.name, i.title,
              to_char(l.date, 'YYYY-MM-DD'),
-             (l.status = 'completed')::int::float8, i.required
+             (l.status = 'completed')::int::float8, FALSE
         FROM jarvis_tracker_logs l
         JOIN jarvis_tracker_items i ON i.id = l.item_id
         JOIN jarvis_trackers      t ON t.id = i.tracker_id
@@ -264,11 +259,7 @@ export class AnalyticsService {
    * Quellenarten ohne Ingest-Daten (reminders, gproject) liefern bewusst
    * nichts, statt einen Platzhalter zu erfinden.
    *
-   * Zwei Dinge fallen dabei zusätzlich ab:
-   * - `routineProgress`: wie viele Schritte einer Routine an dem Tag erledigt
-   *   waren und wie viele davon Pflicht — eine reine Zahl reicht nicht, weil
-   *   „4 von 6" nichts darüber sagt, ob die *richtigen* vier erledigt sind.
-   * - `manual`: Korrekturen von Hand. Sie stehen bewusst außerhalb der
+   * Zusätzlich fällt `manual` ab: Korrekturen von Hand. Sie stehen bewusst außerhalb der
    *   Quellenliste — eine Korrektur ist kein weiteres angeschlossenes System,
    *   sondern schlägt jedes.
    */
@@ -278,7 +269,6 @@ export class AnalyticsService {
     sources: ResolvedSource[]
   ): Promise<{
     byKind: Map<string, DayValues>;
-    routineProgress: Map<string, Map<string, { done: number; requiredDone: number }>>;
     manual: Map<string, Map<string, number | null>>;
   }> {
     const byKind = new Map<string, DayValues>();
@@ -289,7 +279,6 @@ export class AnalyticsService {
       perMetric.get(metricKey)!.set(date, value);
     };
 
-    const routineProgress = new Map<string, Map<string, { done: number; requiredDone: number }>>();
     const manual = new Map<string, Map<string, number | null>>();
 
     // Eine Abfrage für alles. Schlägt sie fehl — etwa weil das fremde CRM
@@ -336,7 +325,7 @@ export class AnalyticsService {
           // Ohne `item` zählt die Quelle die erledigten Schritte des Trackers
           // (Morgen-/Abendroutine); mit `item` ist sie ein einzelner Haken.
           const counting = !wantItem;
-          const tally = new Map<string, { done: number; requiredDone: number }>();
+          const tally = new Map<string, number>();
 
           for (const r of rows) {
             if (r.kind !== 'tracker') continue;
@@ -344,18 +333,14 @@ export class AnalyticsService {
             if (wantItem && r.k2.toLowerCase() !== wantItem) continue;
             const done = Number(r.value ?? 0);
             if (counting) {
-              const acc = tally.get(r.d) ?? { done: 0, requiredDone: 0 };
-              acc.done += done;
-              if (r.flag) acc.requiredDone += done;
-              tally.set(r.d, acc);
+              tally.set(r.d, (tally.get(r.d) ?? 0) + done);
             } else {
               put('tracker', s.metricKey, r.d, done);
             }
           }
 
           if (counting) {
-            for (const [d, acc] of tally) put('tracker', s.metricKey, d, acc.done);
-            routineProgress.set(s.metricKey, tally);
+            for (const [d, n] of tally) put('tracker', s.metricKey, d, n);
           }
           break;
         }
@@ -419,7 +404,7 @@ export class AnalyticsService {
       }
     }
 
-    return { byKind, routineProgress, manual };
+    return { byKind, manual };
   }
 
   /**
@@ -436,18 +421,23 @@ export class AnalyticsService {
     ctx: SemanticConfig
   ): { base: number | null; stretch: number | null; hint?: string } {
     switch (kind) {
-      // Basis = alle Pflichtschritte, Soll = alle Schritte. Beide Zahlen kommen
-      // aus der Routine selbst und wandern mit, wenn Rico sie umbaut.
+      // Basis = alle Schritte bis auf höchstens `maxSkip` (in der Konfiguration
+      // der Intention, nicht im Code), Soll = alle Schritte. Beide Zahlen
+      // wandern mit, wenn Rico die Routine umbaut.
       case 'routine_completeness': {
         const name = str(config.tracker).toLowerCase();
         const routine = ctx.routines.find(r => r.name.toLowerCase() === name);
         if (!routine || routine.total === 0) {
           return { base: null, stretch: null, hint: `Routine „${str(config.tracker)}" nicht gefunden` };
         }
-        if (routine.required === 0) {
-          return { base: null, stretch: null, hint: 'kein Pflichtschritt markiert' };
+        const maxSkip = config.maxSkip;
+        if (typeof maxSkip !== 'number' || !Number.isInteger(maxSkip) || maxSkip < 0) {
+          return { base: null, stretch: null, hint: 'keine Grenze fürs Auslassen hinterlegt' };
         }
-        return { base: routine.required, stretch: routine.total };
+        // Mindestens ein Schritt: bei einer Routine mit höchstens `maxSkip`
+        // Schritten hieße Basis sonst „nichts getan".
+        const base = Math.max(1, routine.total - maxSkip);
+        return { base, stretch: routine.total };
       }
 
       // Kalorienziel aus Cronometer/Health. Soll = das Ziel, Basis = Ziel plus
@@ -540,20 +530,19 @@ export class AnalyticsService {
   }
 
   /**
-   * Routinen werden nicht nach Anzahl beurteilt, sondern danach, *welche*
-   * Schritte erledigt sind: vier von sechs sagen nichts, solange nicht klar
-   * ist, ob die Pflichtschritte dabei waren.
+   * Basis heißt: höchstens `maxSkip` Schritte ausgelassen (`done >= base`),
+   * gleich welche. Soll heißt: alle.
    */
   private static routineStateFor(
     dateStr: string,
-    progress: { done: number; requiredDone: number } | undefined,
-    requiredTotal: number,
+    done: number | null,
+    base: number,
     total: number
   ): MetricState {
     if (isOffDay(dateStr)) return 'offday';
-    if (!progress || progress.done === 0) return 'ungemessen';
-    if (progress.done >= total) return 'soll';
-    if (progress.requiredDone >= requiredTotal) return 'basis';
+    if (!done) return 'ungemessen';
+    if (done >= total) return 'soll';
+    if (done >= base) return 'basis';
     return 'unter';
   }
 
@@ -591,7 +580,7 @@ export class AnalyticsService {
         config: (s.config ?? {}) as SourceConfig,
         priority: s.priority,
       }));
-    const { byKind, routineProgress, manual } = await this.resolveSources(from, to, relevantSources);
+    const { byKind, manual } = await this.resolveSources(from, to, relevantSources);
     const intentionOf = new Map(intentions.map(i => [i.metricKey, i]));
 
     const matrix: MetricMatrix = {};
@@ -646,7 +635,7 @@ export class AnalyticsService {
 
         const state =
           intention?.derivedKind === 'routine_completeness' && !targetMissing
-            ? this.routineStateFor(date, routineProgress.get(key)?.get(date), base ?? 0, stretch ?? 0)
+            ? this.routineStateFor(date, value, base ?? 0, stretch ?? 0)
             : this.stateFor(date, value, base, stretch, intention?.comparator ?? '>=', targetMissing);
 
         matrix[date][key] = { value, base, stretch, state, source, targetHint };

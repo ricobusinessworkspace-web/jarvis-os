@@ -24,7 +24,7 @@ export interface DaySheetData {
   routines: Array<{
     name: string;
     kind: 'morning' | 'evening';
-    items: Array<{ id: string; title: string; done: boolean; required: boolean }>;
+    items: Array<{ id: string; title: string; done: boolean }>;
   }>;
 }
 

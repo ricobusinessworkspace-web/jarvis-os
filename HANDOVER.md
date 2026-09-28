@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-25
-last_agent: Claude Opus 5.5 — Orb finalisiert: eine Größe, immer geschlossen, steht bis der Inhalt da ist
+last_updated: 2026-09-28
+last_agent: Claude Opus 5.5 — Routine-Basis: höchstens 3 Schritte auslassen
 status: In Progress
 ---
 
@@ -24,10 +24,18 @@ Pipeline sind nur Folgen.
   Aufgaben, Monatsverlauf. Rico trackt seit dem 08.09. damit.
 - **Reiter Verlauf / Vertrieb / Health**: fertig. Verlauf erlaubt Nachtragen und
   Korrigieren beliebiger Tage.
-- **Routinen bearbeitbar**: fertig — umbenennen, verschieben, löschen, ergänzen
-  und **Pflichtschritte markieren**. Die Pflichtschritte bilden die Basis der
-  Routine-Metrik. **Offen: Rico hat noch keine markiert**, beide Routinen stehen
-  deshalb korrekt auf „Ziel fehlt — kein Pflichtschritt markiert".
+- **Routinen bearbeitbar**: fertig — umbenennen, verschieben, löschen, ergänzen.
+- **Routine-Basis = höchstens 3 ausgelassen** (28.09., Ricos Vorgabe): Basis =
+  alle Schritte bis auf `maxSkip`, gleich welche; Soll = alle. Bei 8 Schritten
+  also Basis ab 5, Soll bei 8. `maxSkip: 3` steht in
+  `core_intentions.derived_config` (beide Routinen, bereits in der geteilten
+  Datenbank — die alte Fassung ignoriert das Feld) und im Seed. Fehlt es,
+  steht die Routine auf `zielfehlt` mit Hinweis. **Ersetzt die
+  Pflichtschritte**: Rico hatte inzwischen alle 8 je Routine als Pflicht
+  markiert — damit hätte Auslassen nie gegriffen. Pflicht-Knopf und
+  `setRoutineItemRequired` sind raus; die Spalte `jarvis_tracker_items.required`
+  bleibt ungenutzt stehen (keine Migration nötig). Gegen echte Daten
+  nachgerechnet (14.–28.09.).
 - **Abgeleitete Ziele**: fertig. Eine Intention ist jetzt *entweder* eine feste
   Zahl *oder* eine Ableitung (`routine_completeness`, `health_target`,
   `weight_trajectory`). Schlaf hat ein festes Ziel bekommen (Basis 6 h, Soll 8 h).
@@ -137,17 +145,19 @@ Pipeline sind nur Folgen.
   vergessener Log-Tag nicht von einem schlechten Tag zu unterscheiden.
 - **`erfasst` ≠ `zielfehlt`.** `erfasst` heißt „gemessen, bewusst ohne Ziel".
   `zielfehlt` heißt „Wert da, Maß fehlt" — ein Ziel *ist* konfiguriert, ließ sich
-  aber nicht auflösen (Cronometer-Ziel nie angekommen, kein Pflichtschritt
-  markiert). Beides gleich zu zeigen würde einen kaputten Anschluss wie eine
+  aber nicht auflösen (Cronometer-Ziel nie angekommen, keine
+  Auslass-Grenze `maxSkip` an der Routine). Beides gleich zu zeigen würde einen kaputten Anschluss wie eine
   Design-Entscheidung aussehen lassen. Die UI nennt bei `zielfehlt` immer den
   Grund (`DayMetric.targetHint`).
 - **Ziele dürfen abgeleitet sein.** `core_intentions` trägt entweder
   `base_value` (fest, aus Plan/CRM/Einstellungen) oder `derived_kind` (aus einer
   Verbindung, on-read gerechnet). Fällt eine Ableitung aus, wird **nichts
   geraten** — dieselbe Regel wie bei Werten, nur für die Zielseite.
-- **Routinen zählen nicht, sie prüfen.** „4 von 6" sagt nichts darüber, ob die
-  *richtigen* vier erledigt sind. Basis = alle Pflichtschritte, Soll = alle
-  Schritte; beides wandert mit, wenn Rico die Routine umbaut.
+- **Routinen: Basis = höchstens `maxSkip` ausgelassen, Soll = alle.** Seit
+  28.09. zählt die Anzahl, nicht *welche* Schritte (vorher: Pflichtschritte —
+  auf Ricos Wunsch ersetzt). Beide Zahlen wandern mit, wenn Rico die Routine
+  umbaut; die Grenze steht in der Datenbank, nicht im Code. Die Karte rechnet
+  sie nicht nach, sie bekommt `base` aus der Metrik.
 - **Das CRM besitzt die Vertriebsziele, Jarvis spiegelt sie.** `crm_metric_targets`
   ist historisiert: es gilt die Zeile mit dem größten `valid_from`, das nicht
   nach dem Stichtag liegt. Sonst würde eine Zielerhöhung die Vergangenheit
