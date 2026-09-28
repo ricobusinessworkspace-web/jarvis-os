@@ -25,7 +25,7 @@ Pipeline sind nur Folgen.
 - **Reiter Verlauf / Vertrieb / Health**: fertig. Verlauf erlaubt Nachtragen und
   Korrigieren beliebiger Tage.
 - **Routinen bearbeitbar**: fertig — umbenennen, verschieben, löschen, ergänzen.
-- **Routine-Basis = höchstens 3 ausgelassen** (28.09., Ricos Vorgabe): Basis =
+- **Routine-Basis = höchstens 3 ausgelassen** (28.09., Ricos Vorgabe, **live** in `779c65b`, gilt rückwirkend — Zustände werden beim Lesen gerechnet): Basis =
   alle Schritte bis auf `maxSkip`, gleich welche; Soll = alle. Bei 8 Schritten
   also Basis ab 5, Soll bei 8. `maxSkip: 3` steht in
   `core_intentions.derived_config` (beide Routinen, bereits in der geteilten
