@@ -133,7 +133,7 @@ Pipeline sind nur Folgen.
   Animation läuft, entscheidet das CSS je Auftritt (`.orb--intro`).
   *Ersetzt das frühere Skelett-`loading.tsx`* (graue Platzhalterkästen, aus dem
   Electron→Next-Umzug); es liegt in der Historie unter `54f08a4`.
-- **Reiter „Ziele"** (`/ziele`, 28.09.): **fertig, lokal geprüft.** Bearbeitbar
+- **Reiter „Ziele"** (`/ziele`, 28.09.): **fertig, live in `8acf453`.** Bearbeitbar
   ist nur, was Jarvis gehört (`EDITABLE` in `GoalService`): Schlaf, Training,
   Post (Basis/Soll), Routinen (`maxSkip`), Toleranzen um Kalorien/Gewicht,
   Umsatzziel. Nur angezeigt mit Herkunft: CRM-Vertriebsziele, Kalorien- und
