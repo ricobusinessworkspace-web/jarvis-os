@@ -131,14 +131,12 @@ const GOALS = [
   },
   {
     title: 'Umsatzziel Vertrieb',
-    metricKey: null,
-    targetValue: null, // bewusst leer, solange die Messphase läuft
-    comparator: null,
-    horizonEnd: null,
-    status: 'pending',
-    notes:
-      'Baseline wird ermittelt. Kein Zielwert setzen, bis die Conversion aus der Messphase steht. ' +
-      'In der UI als „Baseline wird ermittelt" zeigen, niemals als 0 % eines unsichtbaren Ziels.',
+    metricKey: 'sales.closed_value_eur',
+    targetValue: '10000', // Erwartete Provision, kumulativ ab Planbeginn — gepflegt im Reiter „Ziele"
+    comparator: '>=',
+    horizonEnd: new Date('2027-03-01T00:00:00.000Z'),
+    status: 'active',
+    notes: 'Ergebnis-Ziel des Plans. Wird im Reiter „Ziele" bearbeitet und auf „Vertrieb" angezeigt.',
   },
 ];
 

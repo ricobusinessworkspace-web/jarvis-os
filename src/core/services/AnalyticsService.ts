@@ -581,14 +581,40 @@ export class AnalyticsService {
         priority: s.priority,
       }));
     const { byKind, manual } = await this.resolveSources(from, to, relevantSources);
-    const intentionOf = new Map(intentions.map(i => [i.metricKey, i]));
+    // Ziele sind historisiert: eine Änderung legt eine neue Zeile ab dem
+    // Änderungstag an und schließt die alte am Vortag. Deshalb wird das Ziel
+    // **je Tag** gewählt — sonst würde eine Zielerhöhung die Vergangenheit
+    // rückwirkend schlechter aussehen lassen (dieselbe Regel wie bei
+    // `crm_metric_targets`).
+    const intentionsOf = new Map<string, typeof intentions>();
+    for (const i of intentions) {
+      const list = intentionsOf.get(i.metricKey) ?? [];
+      list.push(i);
+      intentionsOf.set(i.metricKey, list);
+    }
+    const intentionFor = (key: string, date: string) => {
+      const day = new Date(`${date}T00:00:00.000Z`);
+      const versions = intentionsOf.get(key) ?? [];
+      let hit: (typeof intentions)[number] | undefined;
+      for (const i of versions) {
+        if (i.validFrom > day || (i.validTo !== null && i.validTo < day)) continue;
+        if (!hit || i.validFrom > hit.validFrom) hit = i;
+      }
+      // Vor der ältesten Fassung galt schon immer die älteste — so war es,
+      // bevor Ziele historisiert wurden, und so bleibt es.
+      if (!hit && versions.length) {
+        hit = versions.reduce((a, b) => (b.validFrom < a.validFrom ? b : a));
+        if (hit.validFrom < day) hit = undefined; // Lücke zwischen Fassungen: nichts erfinden
+      }
+      return hit;
+    };
 
     const matrix: MetricMatrix = {};
     for (const date of dateRange(from, to)) {
       matrix[date] = {};
 
       for (const key of keys) {
-        const intention = intentionOf.get(key);
+        const intention = intentionFor(key, date);
 
         // Ziel bestimmen: fest aus dem Plan oder aus einer Verbindung abgeleitet.
         let base = intention?.baseValue ?? null;

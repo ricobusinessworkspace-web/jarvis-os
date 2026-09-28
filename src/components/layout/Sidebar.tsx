@@ -11,7 +11,8 @@ import {
   CalendarDays,
   PhoneCall,
   HeartPulse,
-  Mail
+  Mail,
+  Target
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './SidebarContext';
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { label: 'Anschreiben', href: '/mail', icon: Mail },
   { label: 'Health', href: '/health', icon: HeartPulse },
   { label: 'Finanzen', href: '/finance', icon: Wallet },
+  { label: 'Ziele', href: '/ziele', icon: Target },
 ] as const;
 
 const EXPANDED_WIDTH = 260;

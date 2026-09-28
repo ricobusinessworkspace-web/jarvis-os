@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { CrmService } from '@/core/services/CrmService';
+import { GoalService } from '@/core/services/GoalService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { blockInfo, blockWeekRange, trackedDays, dateRange } from '@/lib/blocks';
 import { MetricCard } from '@/components/today/MetricCard';
@@ -40,9 +41,6 @@ const STUFEN = [
 const UMSATZ = 'sales.closed_value_eur';
 const ABSCHLUESSE = 'sales.closed_count';
 
-/** Das Ergebnis-Ziel aus dem Plan. Kumulativ, nicht pro Tag. */
-const UMSATZ_ZIEL = 10_000;
-const UMSATZ_BIS = '2027-03-01';
 
 const ALLE_METRIKEN = [
   CALLS, ...TEILE.map(t => t.key), ...STUFEN.map(s => s.key), UMSATZ, ABSCHLUESSE,
@@ -105,6 +103,8 @@ async function Vertrieb() {
   const matrix = await AnalyticsService.getMatrix(from, monthEnd, ALLE_METRIKEN);
   const pipeline = await CrmService.getPipeline();
   const bestand = await CrmService.getStockMetrics();
+  // Das Ergebnis-Ziel steht in `core_goals` und wird im Reiter „Ziele" gepflegt.
+  const umsatzZiel = await GoalService.getRevenueGoal();
 
   const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
   const calls = cell(CALLS);
@@ -158,6 +158,11 @@ async function Vertrieb() {
     umsatzBisher += matrix[d]?.[UMSATZ]?.value ?? 0;
     abschluesseDatiert += matrix[d]?.[ABSCHLUESSE]?.value ?? 0;
   }
+
+  const ziel = umsatzZiel.amount;
+  const zielBis = umsatzZiel.until
+    ? `${umsatzZiel.until.slice(8)}.${umsatzZiel.until.slice(5, 7)}.${umsatzZiel.until.slice(0, 4)}`
+    : null;
 
   const ohneWert = bestand.get('sales.leads_without_value');
   const abschluesse = bestand.get('sales.closed_total');
@@ -323,7 +328,7 @@ async function Vertrieb() {
           <div className="crm-header">
             <h3 className="crm-title">Umsatz</h3>
             <span className="rounded-md border border-border/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted">
-              10.000 € bis 01.03.2027
+              {ziel !== null ? `${ziel.toLocaleString('de-DE')} €${zielBis ? ` bis ${zielBis}` : ''}` : 'kein Ziel'}
             </span>
           </div>
           {umsatzBisher > 0 ? (
@@ -333,15 +338,17 @@ async function Vertrieb() {
                   {umsatzBisher.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
                 </span>
                 <span className="font-mono text-[13px] text-muted">
-                  / {UMSATZ_ZIEL.toLocaleString('de-DE')} €
+                  {ziel !== null ? `/ ${ziel.toLocaleString('de-DE')} €` : '€'}
                 </span>
               </div>
-              <div className="mt-4 h-1.5 rounded-full bg-white/[0.07]">
-                <div
-                  className="h-full rounded-full bg-foreground"
-                  style={{ width: `${Math.min(100, (umsatzBisher / UMSATZ_ZIEL) * 100)}%` }}
-                />
-              </div>
+              {ziel !== null && (
+                <div className="mt-4 h-1.5 rounded-full bg-white/[0.07]">
+                  <div
+                    className="h-full rounded-full bg-foreground"
+                    style={{ width: `${Math.min(100, (umsatzBisher / ziel) * 100)}%` }}
+                  />
+                </div>
+              )}
               <p className="mt-auto border-t border-border/40 pt-3 text-[11px] leading-relaxed text-muted">
                 Erwartete Provision aus{' '}
                 <span className="text-foreground">{abschluesseDatiert}</span> datierten
@@ -370,9 +377,15 @@ async function Vertrieb() {
                 Eine 0 € stünde hier für die fehlende Eingabe, nicht für das Ergebnis.
               </p>
               <p className="mt-auto border-t border-border/40 pt-3 text-[11px] leading-relaxed text-muted">
-                Der Wert wird im CRM beim Abschluss abgefragt. Sobald der erste steht, rechnet
-                Jarvis hier gegen die {UMSATZ_ZIEL.toLocaleString('de-DE')} € bis{' '}
-                {UMSATZ_BIS.slice(8)}.{UMSATZ_BIS.slice(5, 7)}.{UMSATZ_BIS.slice(0, 4)}.
+                Der Wert wird im CRM beim Abschluss abgefragt.{' '}
+                {ziel !== null ? (
+                  <>
+                    Sobald der erste steht, rechnet Jarvis hier gegen die{' '}
+                    {ziel.toLocaleString('de-DE')} €{zielBis && <> bis {zielBis}</>}.
+                  </>
+                ) : (
+                  <>Ein Umsatzziel lässt sich im Reiter „Ziele&ldquo; hinterlegen.</>
+                )}
               </p>
             </>
           )}

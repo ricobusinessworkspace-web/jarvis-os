@@ -2,7 +2,6 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidateTracking } from '@/lib/revalidate';
-import { invalidateSemanticConfig } from '@/core/services/AnalyticsService';
 
 /**
  * Hakt eine Ursache für einen Tag ab — oder wieder ab.
@@ -47,26 +46,6 @@ export async function toggleCause(metricKey: string, dateStr: string, done: bool
       update: { status, completedAt: done ? new Date() : null },
       create: { itemId: item.id, date, status, completedAt: done ? new Date() : null },
     });
-
-    revalidateTracking();
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
-  }
-}
-
-/** Ändert Basis- und Soll-Wert einer laufenden Intention. */
-export async function updateIntention(metricKey: string, baseValue: number, stretchValue: number | null) {
-  try {
-    const current = await prisma.coreIntention.findFirst({ where: { metricKey, validTo: null } });
-    if (!current) return { success: false, error: `Keine laufende Intention für ${metricKey}.` };
-
-    await prisma.coreIntention.update({
-      where: { id: current.id },
-      data: { baseValue, stretchValue },
-    });
-
-    invalidateSemanticConfig(); // sonst gilt bis zu 30 s der alte Soll-Wert
 
     revalidateTracking();
     return { success: true };

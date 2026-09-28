@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-09-28
-last_agent: Claude Opus 5.5 — Routine-Basis: höchstens 3 Schritte auslassen
+last_agent: Claude Opus 5.5 — Reiter „Ziele" gebaut, Ziele historisiert
 status: In Progress
 ---
 
@@ -133,6 +133,17 @@ Pipeline sind nur Folgen.
   Animation läuft, entscheidet das CSS je Auftritt (`.orb--intro`).
   *Ersetzt das frühere Skelett-`loading.tsx`* (graue Platzhalterkästen, aus dem
   Electron→Next-Umzug); es liegt in der Historie unter `54f08a4`.
+- **Reiter „Ziele"** (`/ziele`, 28.09.): **fertig, lokal geprüft.** Bearbeitbar
+  ist nur, was Jarvis gehört (`EDITABLE` in `GoalService`): Schlaf, Training,
+  Post (Basis/Soll), Routinen (`maxSkip`), Toleranzen um Kalorien/Gewicht,
+  Umsatzziel. Nur angezeigt mit Herkunft: CRM-Vertriebsziele, Kalorien- und
+  Gewichtsziel aus Apple Health (Ricos Entscheidung: die bleiben, wo sie sind).
+  Aktionen in `src/actions/goals.ts` lehnen alles andere ab. Das Umsatzziel
+  stand fest im Code (`UMSATZ_ZIEL`), jetzt in `core_goals` (Zeile „Umsatzziel
+  Vertrieb", `metric_key = sales.closed_value_eur`, 10.000 € bis 2027-03-01 —
+  in der geteilten Datenbank bereits gesetzt, war vorher `pending`). Ohne Ziel
+  zeigt die Umsatzkarte „kein Ziel", nie 0 %. Das alte, ungenutzte
+  `updateIntention` aus `actions/today.ts` ist raus.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -158,6 +169,16 @@ Pipeline sind nur Folgen.
   auf Ricos Wunsch ersetzt). Beide Zahlen wandern mit, wenn Rico die Routine
   umbaut; die Grenze steht in der Datenbank, nicht im Code. Die Karte rechnet
   sie nicht nach, sie bekommt `base` aus der Metrik.
+- **Eigene Ziele sind historisiert, genau wie die CRM-Ziele.** Eine Änderung
+  schließt die laufende `core_intentions`-Zeile am Vortag (`valid_to`) und legt
+  ab heute eine neue an; mehrfach am selben Tag überschreibt die heutige.
+  `getMatrix` wählt das Ziel **je Tag** (`intentionFor`). Vor der ältesten
+  Fassung gilt die älteste — so verhielt es sich schon vorher. Nachgewiesen:
+  alter und neuer Code liefern auf 884 Zellen (17 Metriken, 15.08.–05.10.)
+  dieselbe Matrix. Wer `core_intentions` direkt per Skript ändert, soll das
+  ebenso tun (oder `revise` in `actions/goals.ts` nutzen), sonst werden
+  vergangene Tage rückwirkend neu bewertet. Ausnahme: die Schrittzahl einer
+  Routine ist nicht historisiert.
 - **Das CRM besitzt die Vertriebsziele, Jarvis spiegelt sie.** `crm_metric_targets`
   ist historisiert: es gilt die Zeile mit dem größten `valid_from`, das nicht
   nach dem Stichtag liegt. Sonst würde eine Zielerhöhung die Vergangenheit
@@ -463,10 +484,6 @@ Pipeline sind nur Folgen.
   `!.env.example` in die `.gitignore` und die Datei einchecken (sie enthält nur
   leere Platzhalter), oder die Datei löschen und die Variablenliste allein hier
   führen. Bis dahin: **neue Variablen immer auch im Handover nennen.**
-- **Einstellungs-Oberfläche für Intentionen** fehlt noch. `AnalyticsService
-  .getIntentions()` liefert die Daten, es gibt aber keine Seite, auf der Rico das
-  Schlafziel (6/8) oder die Toleranzen (`tolerancePct` 10 %, `toleranceKg` 1,5)
-  ohne Seed ändern kann. Nächster naheliegender Schritt.
 - **Gewicht ohne Startpunkt:** Schickt der Kurzbefehl nur `weightTarget` ohne
   `weightStart`/`weightStartDate`, misst Jarvis ab Tag eins gegen das Endgewicht,
   statt ein Zwischenziel zu interpolieren. Bewusst so — soll das lieber
