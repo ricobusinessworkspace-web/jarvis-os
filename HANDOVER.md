@@ -156,8 +156,13 @@ Pipeline sind nur Folgen.
   per offiziellem MCP Inspector gegen echte Daten. Nach dem Deploy erneut
   geprüft: MCP ohne Token `401`, beide OAuth-Metadaten mit der indol-Adresse,
   Dashboard-Seiten `/`, `/mail`, `/ziele`, `/vertrieb` jeweils `200`.
-  **ChatGPT-Plugin laut Rico erstellt;** Installation/OAuth und Text-/Sprachaufruf
-  sind noch nicht unabhängig geprüft. Claude-Verbindung ist optional.
+  **ChatGPT-Plugin laut Rico erstellt;** Rico meldete einen erfolgreichen Textaufruf.
+  Sprachaufruf und Installation/OAuth sind von Codex nicht unabhängig geprüft.
+  Claude-Verbindung zu Jarvis ist optional.
+  **Erweiterung 06.10.:** `performance_wochenverlauf` liest vier (wählbar 1–8)
+  abgeschlossene Di–Mo-Blockwochen plus die laufende Woche aus dem bestehenden
+  AnalyticsService; keine Datenbankänderung. Lokal: 49 Tests, TypeScript und Build
+  grün. Für ChatGPT muss die Plugin-Verbindung nach dem Deploy aktualisiert werden.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
@@ -671,6 +676,13 @@ aber tot. Vor jeder Sprach-Arbeit entweder wiederherstellen oder entfernen.
 
 ## Vision & Langziel
 
+**Assistenten-Zielbild (06.10.):** ChatGPT spricht mit Rico über Jarvis-Daten,
+Wochenverlauf, Ziele und Mindset; Claude bleibt die Arbeitsoberfläche für das
+Lightning CRM. Der vorgeschlagene Mailweg ist ChatGPT/Claude als Oberfläche →
+ein Jarvis-Entwurf mit überprüfter Freigabe → ein Versanddienst → CRM-Rückmeldung.
+Die Versandzuständigkeit ist vor Umsetzung mit Rico festzulegen; Details und
+Alternativen stehen in `docs/assistant-vision.md`.
+
 Ein Cockpit, das ehrlich zeigt, ob die täglichen Ursachen erfüllt wurden — auch
 und gerade wenn die Antwort unangenehm ist. Alles Weitere (Vertrieb, Health,
 Finanzen) hängt daran, nie umgekehrt. Externe Systeme (CRM, Apple, G-Projekt)
@@ -705,8 +717,8 @@ Semantic Layer.
 5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
    iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm test` (Vitest — seit 06.10. 48
-   Prüfungen für den MCP-Server, ohne Datenbank), `npm run test:e2e`
+   `npm run build` (prüft auch Typen), `npm test` (Vitest — 49 Prüfungen,
+   darunter MCP ohne Datenbank), `npm run test:e2e`
    (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
 
 ## Dokumente

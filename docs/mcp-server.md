@@ -85,7 +85,7 @@ Erwartet `401` (nicht `503` — das hieße: Variable fehlt oder nicht neu veröf
 npx @modelcontextprotocol/inspector --cli https://jarvis-os-indol.vercel.app/api/mcp --transport http --header "Authorization: Bearer DEIN_ZUGANGSWORT" --method tools/list
 ```
 
-Erwartet: sechs Werkzeuge.
+Erwartet: sieben Werkzeuge (nach dem Refresh der ChatGPT-Verbindung).
 
 ---
 
@@ -94,6 +94,7 @@ Erwartet: sechs Werkzeuge.
 | Werkzeug | Art | Quelle im Code |
 |---|---|---|
 | `heute_ueberblick` | liest | `AnalyticsService.getMatrix` — dieselben Zahlen wie „Heute" |
+| `performance_wochenverlauf` | liest | `AnalyticsService.getMatrix` und `summarize` — abgeschlossene Blockwochen plus laufende Woche |
 | `aufgaben_anzeigen` | liest | `TaskInboxService.getCrmTasksMitStatus`, `getReminders` |
 | `routinen_anzeigen` | liest | `RoutineService.getRoutineBlocks` + Routine-Metriken |
 | `ziele_anzeigen` | liest | `GoalService.getGoalsPage` — mit Herkunft Jarvis/CRM/Apple Health |
@@ -108,6 +109,7 @@ gesendet` erst erzwingen (heute prüft es nur Pflichtfelder).
 ## Testfragen (Text und Sprache)
 
 - „Wie läuft mein Tag?" → `heute_ueberblick`
+- „Wie lief meine Performance in den letzten vier Wochen?" → `performance_wochenverlauf`; Blockwochen sind Dienstag bis Montag, die laufende Woche ist unvollständig.
 - „Wie viele Calls habe ich heute, und was ist das Ziel?" → `heute_ueberblick`
 - „Was steht an Aufgaben an?" → `aufgaben_anzeigen`
 - „Wie weit bin ich mit der Abendroutine?" → `routinen_anzeigen`

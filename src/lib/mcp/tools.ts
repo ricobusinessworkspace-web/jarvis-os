@@ -4,7 +4,7 @@ import { RoutineService } from '@/core/services/RoutineService';
 import { GoalService } from '@/core/services/GoalService';
 import { MailService, MailRegelFehler, ENTWURF_GRENZEN, type DraftView } from '@/core/services/MailService';
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
-import { blockInfo, BLOCK_WEEKS } from '@/lib/blocks';
+import { addDays, blockInfo, blockWeekRange, dateRange, BLOCK_START, BLOCK_WEEKS } from '@/lib/blocks';
 import { STATE_LABEL, EMPTY_METRIC, FEIERABEND_HOUR, SOURCE_LABEL } from '@/lib/metricState';
 import { WerkzeugFehler, type Werkzeug } from './protocol';
 
@@ -133,6 +133,76 @@ const heuteUeberblick: Werkzeug = {
       lesehilfe:
         'wert null = nicht gemessen (nicht 0). urteil "laeuft" = Ziel noch nicht erreicht, Tag aber nicht vorbei. ' +
         'zustand "zielfehlt" = Wert da, Ziel nicht auflösbar (siehe hinweis).',
+    };
+  },
+};
+
+// ── Wochenverlauf ────────────────────────────────────────────────────────────
+
+const performanceWochenverlauf: Werkzeug = {
+  name: 'performance_wochenverlauf',
+  title: 'Performance der letzten Wochen',
+  description:
+    'Jarvis-Kennzahlen für bis zu acht abgeschlossene Blockwochen (Dienstag bis Montag) ' +
+    'und die laufende Woche. Zeigt je Kennzahl Wochenwert, erfüllte und gemessene Tage ' +
+    'sowie Zielquote. Für Rückblicke und Trends; nur lesend.',
+  inputSchema: {
+    type: 'object',
+    properties: { wochen: LIMIT_SCHEMA('Anzahl abgeschlossener Wochen vor der laufenden Woche.', 4, 8) },
+    additionalProperties: false,
+  },
+  annotations: NUR_LESEN,
+  async run(args) {
+    nurErlaubt(args, ['wochen']);
+    const anzahl = ganzzahl(args.wochen, 'wochen', 1, 8, 4);
+    const heute = getBerlinDateStr();
+    const [aktuellVon] = blockWeekRange(heute);
+    const zeitraeume: Array<{ von: string; bis: string; abgeschlossen: boolean }> = [];
+
+    for (let i = anzahl; i >= 1; i--) {
+      const von = addDays(aktuellVon, -7 * i);
+      if (von < BLOCK_START) continue;
+      zeitraeume.push({ von, bis: addDays(von, 6), abgeschlossen: true });
+    }
+    if (aktuellVon >= BLOCK_START) {
+      zeitraeume.push({ von: aktuellVon, bis: heute, abgeschlossen: false });
+    }
+    if (!zeitraeume.length) {
+      return { datenstand: datenstand(), wochen: [], hinweis: `Der Jarvis-Block beginnt am ${BLOCK_START}.` };
+    }
+
+    // Ein Datenlauf für den gesamten Zeitraum; dieselbe historische Zielberechnung wie im Dashboard.
+    const matrix = await AnalyticsService.getMatrix(zeitraeume[0].von, heute);
+    const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
+    return {
+      datenstand: datenstand(),
+      wochen: zeitraeume.map(w => ({
+        ...w,
+        kennzahlen: definitionen.map(d => {
+          const summary = AnalyticsService.summarize(matrix, d.key, w.von, w.bis);
+          const gemessen = dateRange(w.von, w.bis)
+            .map(tag => matrix[tag]?.[d.key]?.value)
+            .filter((wert): wert is number => wert !== null && wert !== undefined);
+          const letzterWert = gemessen.at(-1) ?? null;
+          const wochenwert = gemessen.length === 0 ? null
+            : d.aggregation === 'last' ? letzterWert
+              : d.aggregation === 'avg' || d.aggregation === 'ratio'
+                ? gemessen.reduce((a, b) => a + b, 0) / gemessen.length
+                : gemessen.reduce((a, b) => a + b, 0);
+          return {
+            key: d.key, name: d.label, einheit: d.unit,
+            aggregation: d.aggregation, wochenwert: rund(wochenwert),
+            erfuellte_tage: summary.met, gemessene_tage: summary.measured,
+            getrackte_tage: summary.tracked,
+            zielquote: rund(summary.adherence), datenabdeckung: rund(summary.coverage),
+          };
+        }),
+      })),
+      lesehilfe:
+        'Abgeschlossene Blockwochen laufen Dienstag bis Montag. Die laufende Woche endet heute und ist ' +
+        'nur eingeschränkt vergleichbar. Sonntag zählt nicht zur Zielquote. wochenwert null heißt: ' +
+        'kein Messwert; 0 ist ein echter Wert. Zielquote = erfüllte / getrackte Tage; ' +
+        'Datenabdeckung = gemessene / getrackte Tage. Wochenwert folgt der Aggregation der Metrik.',
     };
   },
 };
@@ -414,6 +484,7 @@ const mailEntwurfSpeichern: Werkzeug = {
 
 export const WERKZEUGE: Werkzeug[] = [
   heuteUeberblick,
+  performanceWochenverlauf,
   aufgabenAnzeigen,
   routinenAnzeigen,
   zieleAnzeigen,
