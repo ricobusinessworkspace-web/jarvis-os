@@ -144,15 +144,19 @@ Pipeline sind nur Folgen.
   in der geteilten Datenbank bereits gesetzt, war vorher `pending`). Ohne Ziel
   zeigt die Umsatzkarte „kein Ziel", nie 0 %. Das alte, ungenutzte
   `updateIntention` aus `actions/today.ts` ist raus.
-- **MCP-Server für ChatGPT/Claude** (06.10.): **gebaut, lokal geprüft, nicht
-  deployt** — Branch `feat/jarvis-mcp`, nicht auf `main`. `POST /api/mcp`, eigene
+- **MCP-Server für ChatGPT/Claude** (06.10.): **gebaut, geprüft und live** —
+  Commit `97257b6` von `feat/jarvis-mcp` nach `main` übernommen und auf Vercel
+  Production unter `https://jarvis-os-indol.vercel.app/api/mcp` veröffentlicht.
+  `POST /api/mcp`, eigene
   OAuth-Anmeldung (`/api/oauth/*`, `/.well-known/*`). Fünf Lesewerkzeuge
   (`heute_ueberblick`, `aufgaben_anzeigen`, `routinen_anzeigen`,
   `ziele_anzeigen`, `mail_warteschlange_anzeigen`) und ein Schreibwerkzeug
   (`mail_entwurf_speichern` — nur Betreff/Text, nie freigeben/senden).
   Geprüft: 48 Unit-Tests, Build, OAuth-Ablauf über HTTP, alle Lesewerkzeuge
-  per offiziellem MCP Inspector gegen echte Daten. **Nicht geprüft:** echte
-  ChatGPT-/Claude-Verbindung und Sprache — geht erst nach Deploy + Variablen.
+  per offiziellem MCP Inspector gegen echte Daten. Nach dem Deploy erneut
+  geprüft: MCP ohne Token `401`, beide OAuth-Metadaten mit der indol-Adresse,
+  Dashboard-Seiten `/`, `/mail`, `/ziele`, `/vertrieb` jeweils `200`.
+  **Noch offen:** echte ChatGPT-/Claude-Verbindung und Sprache.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
@@ -544,7 +548,7 @@ Stufe 1 steht; hier die Leiter und die Entscheidungen, die schon gefallen sind.
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Warteschlange aus CRM-Aufgaben, Kontextfelder, Vorlagen, Kopieren/`mailto` | **fertig** (21.09.) |
-| 2 | MCP-Server für Jarvis — Claude/ChatGPT liest die Warteschlange und schreibt Entwürfe zurück | **gebaut** (06.10., Branch `feat/jarvis-mcp`, nicht deployt) |
+| 2 | MCP-Server für Jarvis — Claude/ChatGPT liest die Warteschlange und schreibt Entwürfe zurück | **live** (06.10., `main`, Commit `97257b6`; Client-Verbindung noch offen) |
 | 3 | SMTP senden / IMAP lesen | wartet auf Ricos Postfach-Daten |
 | 4 | Rückmeldung ans CRM über `nachricht_festhalten` (MCP) | offen |
 
@@ -579,15 +583,19 @@ getrennten MCP-Server. Die alten Voice-Hooks sind weiterhin verwaist.
 **Übergabe an Claude:** `docs/CLAUDE-MCP-HANDOVER.md` enthält den vollständigen
 Implementierungsauftrag samt Werkzeuge, OAuth, Tests und ChatGPT-Anbindung.
 Rico meldet, dass eine gesprochene CRM-Leseabfrage vermutlich bereits klappt;
-dieser Vorversuch muss nicht wiederholt werden. Jarvis ist weiterhin nicht
-als Plugin verbunden. Beim Review fiel auf, dass `MailService.setStatus()` die
+dieser Vorversuch muss nicht wiederholt werden. Jarvis ist live, aber noch nicht
+als ChatGPT-Plugin verbunden. Beim Review fiel auf, dass `MailService.setStatus()` die
 dokumentierte Zustandsfolge noch nicht vollständig erzwingt; vor einem
 MCP-Status-/Sende-Werkzeug beheben.
 
 **Umsetzung 06.10. (Claude):** Server steht, siehe „Aktueller Stand" und
-`docs/mcp-server.md`. Was Rico noch tun muss: Branch prüfen und auf `main`
-bringen, `JARVIS_MCP_SECRET` (+ empfohlen `JARVIS_MCP_PUBLIC_URL`) bei Vercel
-setzen, neu veröffentlichen, dann in ChatGPT als eigenes Plugin verbinden.
+`docs/mcp-server.md`. Codex hat `feat/jarvis-mcp` nach 48 grünen Tests, Build
+und Diff-Review per Fast-Forward auf `main` gebracht und gepusht. Vercel
+Production enthält `JARVIS_MCP_SECRET` und `JARVIS_MCP_PUBLIC_URL` (indol-Adresse);
+der Redeploy ist live. Produktionsprüfung: ohne Token `401`, OAuth-Metadaten
+korrekt, vier Dashboard-Seiten `200`. Offen ist die Verbindung mit Ricos
+privatem ChatGPT-Konto und der Text-/Sprachtest auf dem Handy. Zugangswort
+niemals in Chat, Repo oder Logs schreiben.
 Entscheidungen dabei:
 - **Kein offizielles MCP-SDK.** `@modelcontextprotocol/sdk` 1.32 zieht Express,
   Hono und einen eigenen HTTP-Unterbau in die Next-App. Protokoll von Hand wie
