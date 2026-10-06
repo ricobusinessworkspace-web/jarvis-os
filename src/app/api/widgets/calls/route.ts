@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AnalyticsService, type DayMetric, type MetricState } from '@/core/services/AnalyticsService';
-import { STATE_LABEL, EMPTY_METRIC, targetSub, formatValue } from '@/lib/metricState';
+import { STATE_LABEL, EMPTY_METRIC, FEIERABEND_HOUR, targetSub, formatValue } from '@/lib/metricState';
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { isOffDay } from '@/lib/blocks';
 import { checkWidgetAuth, widgetAuthResponse } from '@/lib/widgetAuth';
@@ -33,17 +33,7 @@ const TEILE = [
   { key: 'sales.calls_followup', label: 'Nachgreifen' },
 ];
 
-/**
- * Ab dieser Berliner Stunde heißt ein nicht erreichtes Tagesziel „verfehlt".
- *
- * Auf dem Dashboard ist `unter` den ganzen Tag richtig: dort steht die Zahl in
- * einer Tabelle neben der Uhrzeit, der Zusammenhang ist sichtbar. Ein Widget
- * steht dagegen ab Mitternacht auf dem Homescreen — ein roter Balken um 08:00
- * Uhr bei drei Calls behauptet „Tag verfehlt", obwohl der Tag noch läuft. Bis
- * zum Feierabend ist der Zustand deshalb `laeuft`. Der Wert selbst wird dabei
- * nicht geschönt, nur das Urteil zurückgehalten.
- */
-const FEIERABEND_HOUR = 18;
+/** Wann ein nicht erreichtes Ziel „verfehlt" heißt: `FEIERABEND_HOUR` in `metricState.ts`. */
 
 /** Wie `MetricState`, plus „Tag läuft noch" — nur für die Anzeige, nie in der Matrix. */
 type Verdict = MetricState | 'laeuft';

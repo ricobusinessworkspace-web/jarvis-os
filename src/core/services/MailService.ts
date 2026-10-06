@@ -1,6 +1,6 @@
 import { prisma } from '../db';
-import { TaskInboxService } from './TaskInboxService';
-import { CrmService } from './CrmService';
+import { TaskInboxService, type CrmStatus } from './TaskInboxService';
+import { CrmService, type MailLead } from './CrmService';
 import type { MailContext } from '@/lib/mailTemplate';
 
 /**
@@ -62,6 +62,11 @@ export interface TemplateView {
   sortOrder: number;
 }
 
+/** Ein abgelehnter Vorgang mit einem Grund, den Rico lesen darf. */
+export class MailRegelFehler extends Error {}
+
+export const ENTWURF_GRENZEN = { betreff: 200, text: 10_000 } as const;
+
 const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
 function toDraftView(d: {
@@ -105,23 +110,46 @@ export class MailService {
    * Was heute an Mails ansteht: offene CRM-Aufgaben, die mit „Mail" beginnen,
    * angereichert um die Lead-Daten und den Entwurf, falls es schon einen gibt.
    *
-   * Fällt das CRM aus, liefert `getCrmTasks` eine leere Liste — dann ist die
-   * Warteschlange leer, statt dass die Seite kippt. Bereits begonnene Entwürfe
-   * gehen dabei nicht verloren, sie hängen an `mail_drafts`.
+   * Fällt das CRM aus, ist die Warteschlange leer, statt dass die Seite kippt.
+   * Bereits begonnene Entwürfe gehen dabei nicht verloren, sie hängen an
+   * `mail_drafts`. Wer den Ausfall melden muss, nimmt `getQueueMitStatus`.
    */
   static async getQueue(userName = 'Rico'): Promise<QueueItem[]> {
-    const tasks = (await TaskInboxService.getCrmTasks(userName, 100))
-      .filter(t => MAIL_MARKER.test(t.text));
+    return (await this.getQueueMitStatus(userName)).items;
+  }
 
-    if (tasks.length === 0) return [];
+  /**
+   * Die Warteschlange mit Auskunft über ihre Quelle.
+   *
+   * `status` betrifft die Aufgaben selbst (siehe `CrmStatus`), `adressen`
+   * die Lead-Daten dahinter. Sind die Aufgaben da, die Lead-Daten aber nicht,
+   * steht jeder Vorgang ohne Adresse da — das ist dann „unbekannt", nicht
+   * „keine Adresse im CRM".
+   */
+  static async getQueueMitStatus(userName = 'Rico'): Promise<{
+    status: CrmStatus;
+    adressen: 'ok' | 'nicht_erreichbar';
+    items: QueueItem[];
+  }> {
+    const crm = await TaskInboxService.getCrmTasksMitStatus(userName, 100);
+    const tasks = crm.items.filter(t => MAIL_MARKER.test(t.text));
+    if (tasks.length === 0) return { status: crm.status, adressen: 'ok', items: [] };
 
-    const leads = await CrmService.getLeadsForMail(tasks.map(t => t.leadId));
+    let adressen: 'ok' | 'nicht_erreichbar' = 'ok';
+    let leads = new Map<string, MailLead>();
+    try {
+      leads = await CrmService.loadLeadsForMail(tasks.map(t => t.leadId));
+    } catch (error) {
+      console.error('[MailService] Lead-Daten nicht verfügbar:', error instanceof Error ? error.message : error);
+      adressen = 'nicht_erreichbar';
+    }
+
     const drafts = await prisma.mailDraft.findMany({
       where: { taskKey: { in: tasks.map(t => t.id) } },
     });
     const byTask = new Map(drafts.map(d => [d.taskKey!, toDraftView(d)]));
 
-    return tasks.map(t => {
+    const items = tasks.map(t => {
       const lead = leads.get(t.leadId);
       return {
         taskKey: t.id,
@@ -137,6 +165,8 @@ export class MailService {
         draft: byTask.get(t.id) ?? null,
       };
     });
+
+    return { status: crm.status, adressen, items };
   }
 
   /** Entwürfe, deren CRM-Aufgabe schon abgehakt ist, aber die noch offen sind. */
@@ -227,6 +257,106 @@ export class MailService {
 
   static async deleteDraft(id: string): Promise<void> {
     await prisma.mailDraft.delete({ where: { id } });
+  }
+
+  /**
+   * Entwurf von außen speichern — der Weg für den MCP-Server.
+   *
+   * Anders als `updateDraft` (Rico tippt in Jarvis, die Oberfläche kennt den
+   * Entwurf) kommt hier alles von einem Sprachmodell. Deshalb wird nichts aus
+   * den Parametern geglaubt, was der Server selbst nachsehen kann:
+   *
+   * - **Die Aufgabe muss jetzt offen im CRM stehen.** Der `taskKey` wird gegen
+   *   die frisch gelesene Warteschlange geprüft; Lead, Adresse und Thema
+   *   kommen von dort, nie aus dem Aufruf.
+   * - **Nichts Fremdes überschreiben.** Gibt es schon einen Entwurf, muss der
+   *   Aufrufer dessen Stand (`updatedAt`) nennen. Hat Rico ihn seither
+   *   geändert, wird abgelehnt — und zwar in der Datenbank, nicht nur im
+   *   Code davor (`updateMany` mit dem Stand als Bedingung).
+   * - **Wiederholung ändert nichts.** Derselbe Text noch einmal ergibt
+   *   `unveraendert`, keinen zweiten Entwurf und keinen neuen Stand.
+   * - **Nie freigeben, nie senden.** Höchstens `offen → entwurf`. Ein
+   *   freigegebener oder gesendeter Entwurf wird nicht mehr angefasst.
+   *
+   * Geändert werden nur Betreff und Text; Empfänger, Gesprächskontext und
+   * Vorlage bleiben, wie Rico sie gesetzt hat.
+   */
+  static async entwurfSpeichern(
+    eingabe: { taskKey: string; betreff: string; text: string; stand: string | null },
+    userName = 'Rico',
+  ): Promise<{ ergebnis: 'angelegt' | 'aktualisiert' | 'unveraendert'; entwurf: DraftView }> {
+    const betreff = eingabe.betreff.trim();
+    const text = eingabe.text.replace(/\s+$/, '');
+    if (!betreff) throw new MailRegelFehler('Der Betreff ist leer.');
+    if (!text.trim()) throw new MailRegelFehler('Der Text ist leer.');
+    if (betreff.length > ENTWURF_GRENZEN.betreff) throw new MailRegelFehler(`Der Betreff ist länger als ${ENTWURF_GRENZEN.betreff} Zeichen.`);
+    if (text.length > ENTWURF_GRENZEN.text) throw new MailRegelFehler(`Der Text ist länger als ${ENTWURF_GRENZEN.text} Zeichen.`);
+
+    const queue = await this.getQueueMitStatus(userName);
+    if (queue.status !== 'ok') {
+      throw new MailRegelFehler('Die CRM-Aufgaben sind gerade nicht lesbar. Ohne die Aufgabe im CRM wird kein Entwurf gespeichert.');
+    }
+    const item = queue.items.find(i => i.taskKey === eingabe.taskKey);
+    if (!item) {
+      throw new MailRegelFehler('Zu diesem taskKey gibt es keine offene Mail-Aufgabe im CRM. Zuerst mail_warteschlange_anzeigen aufrufen.');
+    }
+
+    const vorhanden = item.draft;
+
+    if (!vorhanden) {
+      if (eingabe.stand) {
+        throw new MailRegelFehler('Den genannten Entwurf gibt es nicht mehr. Warteschlange neu laden.');
+      }
+      try {
+        const angelegt = await prisma.mailDraft.create({
+          data: {
+            leadId: BigInt(item.leadId),
+            taskKey: item.taskKey,
+            toEmail: item.toEmail,
+            thema: item.auftrag,
+            subject: betreff,
+            body: text,
+            status: 'entwurf',
+          },
+        });
+        return { ergebnis: 'angelegt', entwurf: toDraftView(angelegt) };
+      } catch (error) {
+        // Eindeutigkeit auf task_key: ein paralleler Aufruf war schneller.
+        if ((error as { code?: string })?.code === 'P2002') {
+          throw new MailRegelFehler('Inzwischen gibt es einen Entwurf zu dieser Aufgabe. Warteschlange neu laden.');
+        }
+        throw error;
+      }
+    }
+
+    if (vorhanden.status === 'freigegeben' || vorhanden.status === 'gesendet') {
+      throw new MailRegelFehler(`Der Entwurf ist bereits ${vorhanden.status}. Änderungen daran nur in Jarvis selbst.`);
+    }
+
+    if (vorhanden.subject === betreff && vorhanden.body === text) {
+      return { ergebnis: 'unveraendert', entwurf: vorhanden };
+    }
+
+    if (!eingabe.stand || eingabe.stand !== vorhanden.updatedAt) {
+      throw new MailRegelFehler('Der Entwurf wurde seit dem Lesen geändert oder der Stand fehlt. Warteschlange neu laden und den aktuellen Stand mitgeben.');
+    }
+
+    // Der Stand ist auf Millisekunden genau; die Spalte kann feiner sein.
+    const stand = new Date(eingabe.stand);
+    const geaendert = await prisma.mailDraft.updateMany({
+      where: {
+        id: vorhanden.id,
+        status: { in: ['offen', 'entwurf'] },
+        updatedAt: { gte: stand, lt: new Date(stand.getTime() + 1) },
+      },
+      data: { subject: betreff, body: text, status: 'entwurf' },
+    });
+    if (geaendert.count === 0) {
+      throw new MailRegelFehler('Der Entwurf wurde gerade eben geändert. Warteschlange neu laden.');
+    }
+
+    const neu = await prisma.mailDraft.findUniqueOrThrow({ where: { id: vorhanden.id } });
+    return { ergebnis: 'aktualisiert', entwurf: toDraftView(neu) };
   }
 
   /** Kontext eines Entwurfs für die Platzhalter. */

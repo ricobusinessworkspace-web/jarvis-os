@@ -65,6 +65,7 @@ export const STATE_BAR: Record<MetricState, string> = {
 /** Woher der Wert kam — „auto aus CRM" ist etwas anderes als ein Haken von Hand. */
 export const SOURCE_LABEL: Record<string, string> = {
   crm_calls: 'CRM',
+  crm_metrics: 'CRM',
   tracker: 'manuell',
   personal_log: 'Tagebuch',
   weight: 'Waage',
@@ -73,6 +74,18 @@ export const SOURCE_LABEL: Record<string, string> = {
   gproject: 'G-Projekt',
   manual: 'von Hand',
 };
+
+/**
+ * Ab dieser Berliner Stunde heißt ein nicht erreichtes Tagesziel „verfehlt".
+ *
+ * Auf dem Dashboard ist `unter` den ganzen Tag richtig: dort steht die Zahl in
+ * einer Tabelle neben der Uhrzeit, der Zusammenhang ist sichtbar. Ein Widget —
+ * oder eine gesprochene Antwort — hat diesen Zusammenhang nicht: „unter Basis"
+ * um 08:00 Uhr bei drei Calls behauptet „Tag verfehlt", obwohl der Tag noch
+ * läuft. Bis zum Feierabend heißt das Urteil deshalb `laeuft`. Der Wert selbst
+ * wird nie geschönt, nur das Urteil zurückgehalten.
+ */
+export const FEIERABEND_HOUR = 18;
 
 export function formatValue(value: number | null, unit: string): string {
   if (value === null) return '–';

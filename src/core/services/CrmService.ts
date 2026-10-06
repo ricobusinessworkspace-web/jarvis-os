@@ -1,5 +1,12 @@
 import { prisma } from '../db';
 
+export interface MailLead {
+  email: string;
+  ansprechpartner: string;
+  firma: string;
+  ort: string;
+}
+
 export class CrmService {
   /**
    * Pipeline-Stufen so, wie das CRM sie führt (`crm_leads.stage`).
@@ -133,38 +140,41 @@ export class CrmService {
    * Fällt das CRM aus, kommt eine leere Map zurück; die Warteschlange zeigt
    * dann Namen ohne Adresse statt zu kippen.
    */
-  static async getLeadsForMail(ids: string[]): Promise<Map<string, {
-    email: string; ansprechpartner: string; firma: string; ort: string;
-  }>> {
-    const out = new Map<string, { email: string; ansprechpartner: string; firma: string; ort: string }>();
+  static async getLeadsForMail(ids: string[]): Promise<Map<string, MailLead>> {
+    try {
+      return await this.loadLeadsForMail(ids);
+    } catch (error) {
+      console.error('[CrmService] Lead-Daten für Mail nicht verfügbar:', error instanceof Error ? error.message : error);
+      return new Map();
+    }
+  }
+
+  /** Wie `getLeadsForMail`, aber ein CRM-Ausfall wirft — für Aufrufer, die ihn melden müssen. */
+  static async loadLeadsForMail(ids: string[]): Promise<Map<string, MailLead>> {
+    const out = new Map<string, MailLead>();
     if (ids.length === 0) return out;
 
-    try {
-      const rows = await prisma.$queryRaw<Array<{
-        id: string; email: string; director_name: string;
-        firma: string; maps_city: string;
-      }>>`
-        SELECT id::text                                            AS id,
-               coalesce(email, '')                                 AS email,
-               coalesce(director_name, '')                         AS director_name,
-               coalesce(nullif(legal_company_name, ''), name, '')  AS firma,
-               coalesce(maps_city, '')                             AS maps_city
-        FROM crm_leads
-        WHERE id = ANY(${ids.map(Number)}::bigint[])
-      `;
+    const rows = await prisma.$queryRaw<Array<{
+      id: string; email: string; director_name: string;
+      firma: string; maps_city: string;
+    }>>`
+      SELECT id::text                                            AS id,
+             coalesce(email, '')                                 AS email,
+             coalesce(director_name, '')                         AS director_name,
+             coalesce(nullif(legal_company_name, ''), name, '')  AS firma,
+             coalesce(maps_city, '')                             AS maps_city
+      FROM crm_leads
+      WHERE id = ANY(${ids.map(Number)}::bigint[])
+    `;
 
-      for (const r of rows) {
-        out.set(r.id, {
-          email: r.email,
-          ansprechpartner: r.director_name,
-          firma: r.firma,
-          ort: r.maps_city,
-        });
-      }
-    } catch (error) {
-      console.error('[CrmService] Lead-Daten für Mail nicht verfügbar:', error);
+    for (const r of rows) {
+      out.set(r.id, {
+        email: r.email,
+        ansprechpartner: r.director_name,
+        firma: r.firma,
+        ort: r.maps_city,
+      });
     }
-
     return out;
   }
 }

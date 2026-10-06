@@ -30,6 +30,8 @@ export interface CrmTaskItem {
   openSubtasks: number;
 }
 
+export type CrmStatus = 'ok' | 'kein_profil' | 'nicht_erreichbar';
+
 interface RawTask {
   id?: number | string;
   text?: string;
@@ -59,17 +61,36 @@ export class TaskInboxService {
    * es ist eine fremde Anwendung, auf die wir nur lesend zugreifen.
    */
   static async getCrmTasks(userName = 'Rico', limit = 20): Promise<CrmTaskItem[]> {
+    return (await this.getCrmTasksMitStatus(userName, limit)).items;
+  }
+
+  /**
+   * Dieselben Aufgaben, aber mit ehrlicher Auskunft, **warum** die Liste leer
+   * sein kann. Das Dashboard kann eine leere Spalte zeigen; ein Sprach-
+   * assistent, der „keine Aufgaben" sagt, während das CRM gerade nicht
+   * erreichbar ist, sagt etwas Falsches.
+   *
+   * - `ok`: gelesen — eine leere Liste heißt wirklich „nichts offen".
+   * - `kein_profil`: Zu `userName` gibt es kein CRM-Profil.
+   * - `nicht_erreichbar`: Die Abfrage ist gescheitert.
+   */
+  static async getCrmTasksMitStatus(userName = 'Rico', limit = 20): Promise<{
+    status: CrmStatus;
+    items: CrmTaskItem[];
+  }> {
     try {
-      return await this.loadCrmTasks(userName, limit);
+      const items = await this.loadCrmTasks(userName, limit);
+      return items === null ? { status: 'kein_profil', items: [] } : { status: 'ok', items };
     } catch (error) {
-      console.error('[TaskInboxService] CRM nicht verfügbar:', error);
-      return [];
+      console.error('[TaskInboxService] CRM nicht verfügbar:', error instanceof Error ? error.message : error);
+      return { status: 'nicht_erreichbar', items: [] };
     }
   }
 
-  private static async loadCrmTasks(userName: string, limit: number): Promise<CrmTaskItem[]> {
+  /** `null` heißt: kein CRM-Profil zu diesem Namen. */
+  private static async loadCrmTasks(userName: string, limit: number): Promise<CrmTaskItem[] | null> {
     const uid = await this.userId(userName);
-    if (!uid) return [];
+    if (!uid) return null;
 
     const leads = await prisma.$queryRaw<
       Array<{ id: string; name: string; stage: string | null; task_text: string | null }>

@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-09-28
-last_agent: Claude Opus 5.5 — Reiter „Ziele" gebaut, Ziele historisiert
+last_updated: 2026-10-06
+last_agent: Claude Opus 5.5 — Jarvis-MCP-Server gebaut (Branch feat/jarvis-mcp, nicht deployt)
 status: In Progress
 ---
 
@@ -144,6 +144,16 @@ Pipeline sind nur Folgen.
   in der geteilten Datenbank bereits gesetzt, war vorher `pending`). Ohne Ziel
   zeigt die Umsatzkarte „kein Ziel", nie 0 %. Das alte, ungenutzte
   `updateIntention` aus `actions/today.ts` ist raus.
+- **MCP-Server für ChatGPT/Claude** (06.10.): **gebaut, lokal geprüft, nicht
+  deployt** — Branch `feat/jarvis-mcp`, nicht auf `main`. `POST /api/mcp`, eigene
+  OAuth-Anmeldung (`/api/oauth/*`, `/.well-known/*`). Fünf Lesewerkzeuge
+  (`heute_ueberblick`, `aufgaben_anzeigen`, `routinen_anzeigen`,
+  `ziele_anzeigen`, `mail_warteschlange_anzeigen`) und ein Schreibwerkzeug
+  (`mail_entwurf_speichern` — nur Betreff/Text, nie freigeben/senden).
+  Geprüft: 48 Unit-Tests, Build, OAuth-Ablauf über HTTP, alle Lesewerkzeuge
+  per offiziellem MCP Inspector gegen echte Daten. **Nicht geprüft:** echte
+  ChatGPT-/Claude-Verbindung und Sprache — geht erst nach Deploy + Variablen.
+  Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -258,6 +268,19 @@ Pipeline sind nur Folgen.
   sich seither durchs Symbol (Sonne/Mond), nicht durch Farbe.
 - **`npm run core:check`** rechnet alles gegen echte Daten nach — bestes Werkzeug
   bei jedem Datenzweifel.
+- **MCP-Werkzeuge rechnen nicht selbst.** Jedes ruft dieselbe Service-Funktion
+  wie die Dashboard-Seite und formt nur die Antwort um. Neue Werkzeuge genauso
+  — sonst gibt es zwei Wahrheiten, eine davon auf Ricos Telefon.
+- **Ein Ausfall ist kein leeres Ergebnis.** `getCrmTasksMitStatus` und
+  `getQueueMitStatus` sagen `ok` / `kein_profil` / `nicht_erreichbar`. Das
+  Dashboard darf eine leere Spalte zeigen; ein Sprachassistent, der „keine
+  Aufgaben" sagt, während das CRM ausgefallen ist, lügt. Die alten Funktionen
+  (`getCrmTasks`, `getQueue`) bleiben als dünne Hülle für die Seiten.
+- **Schreiben von außen nur mit Stand.** `mail_entwurf_speichern` glaubt dem
+  Modell nichts, was der Server nachsehen kann (Aufgabe, Lead, Adresse kommen
+  aus dem CRM) und überschreibt einen vorhandenen Entwurf nur mit dessen
+  `updatedAt` als Bedingung **in der Datenbank** (`updateMany`). Wiederholung
+  = `unveraendert`, kein zweiter Schreibvorgang.
 
 ## Gelöste Probleme (nicht wiederholen)
 
@@ -521,7 +544,7 @@ Stufe 1 steht; hier die Leiter und die Entscheidungen, die schon gefallen sind.
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Warteschlange aus CRM-Aufgaben, Kontextfelder, Vorlagen, Kopieren/`mailto` | **fertig** (21.09.) |
-| 2 | MCP-Server für Jarvis — Claude liest die Warteschlange und schreibt Entwürfe zurück | offen |
+| 2 | MCP-Server für Jarvis — Claude/ChatGPT liest die Warteschlange und schreibt Entwürfe zurück | **gebaut** (06.10., Branch `feat/jarvis-mcp`, nicht deployt) |
 | 3 | SMTP senden / IMAP lesen | wartet auf Ricos Postfach-Daten |
 | 4 | Rückmeldung ans CRM über `nachricht_festhalten` (MCP) | offen |
 
@@ -547,6 +570,46 @@ Warteschlange stehen ohne Adresse da. Das Nachziehen gehört ins CRM und ist
 unabhängig von allen weiteren Stufen.
 
 ## Für nächsten Agent — Claude-Code-Anbindung
+
+**Planungsupdate 06.10.:** `docs/chatgpt-voice-plan.md` prüft den aktuellen Code
+und den Weg über ChatGPT Voice. Der MCP-Beschluss bleibt bestehen; ChatGPT ist
+als zusätzlicher Client neben Claude vorgesehen. Erstes Ziel ist ein
+authentifizierter, lesender Jarvis-MCP-Server. Lightning CRM hat bereits einen
+getrennten MCP-Server. Die alten Voice-Hooks sind weiterhin verwaist.
+**Übergabe an Claude:** `docs/CLAUDE-MCP-HANDOVER.md` enthält den vollständigen
+Implementierungsauftrag samt Werkzeuge, OAuth, Tests und ChatGPT-Anbindung.
+Rico meldet, dass eine gesprochene CRM-Leseabfrage vermutlich bereits klappt;
+dieser Vorversuch muss nicht wiederholt werden. Jarvis ist weiterhin nicht
+als Plugin verbunden. Beim Review fiel auf, dass `MailService.setStatus()` die
+dokumentierte Zustandsfolge noch nicht vollständig erzwingt; vor einem
+MCP-Status-/Sende-Werkzeug beheben.
+
+**Umsetzung 06.10. (Claude):** Server steht, siehe „Aktueller Stand" und
+`docs/mcp-server.md`. Was Rico noch tun muss: Branch prüfen und auf `main`
+bringen, `JARVIS_MCP_SECRET` (+ empfohlen `JARVIS_MCP_PUBLIC_URL`) bei Vercel
+setzen, neu veröffentlichen, dann in ChatGPT als eigenes Plugin verbinden.
+Entscheidungen dabei:
+- **Kein offizielles MCP-SDK.** `@modelcontextprotocol/sdk` 1.32 zieht Express,
+  Hono und einen eigenen HTTP-Unterbau in die Next-App. Protokoll von Hand wie
+  im CRM (`src/lib/mcp/protocol.ts`), Kompatibilität per MCP Inspector geprüft.
+- **ChatGPT-Anforderungen** (am 06.10. in der OpenAI-Doku nachgelesen):
+  Rücksprung `https://chatgpt.com/connector_platform_oauth_redirect` bzw.
+  `…/connector/oauth/{id}`, PKCE S256 in den Metadaten, `iss` in jeder
+  Antwort der Zustimmungsseite (RFC 9207), `resource` wird als Empfänger ins
+  Zeichen übernommen. Alles umgesetzt; CIMD bewusst nicht (DCR reicht).
+- **Eigenes Geheimnis, eigener Schlüssel.** CRM-Zeichen sind bei Jarvis
+  ungültig — auch wenn jemand dasselbe Geheimnis wählt (Test vorhanden).
+- **Bekannte Grenze:** ohne Datenbank kann ein OAuth-Code in seinen fünf
+  Minuten nicht als verbraucht markiert werden; PKCE bindet ihn an den
+  Connector. Sperren aller Zeichen: Geheimnis wechseln.
+
+**⚠️ Befund fürs CRM (nicht hier lösen):** Der CRM-Anmelde-Server erlaubt als
+Rücksprung nur `claude.ai`/`claude.com`/`anthropic.com`
+(`Lightning CRM/api/_lib/oauth.js`, `rueckSprungErlaubt`). ChatGPT kann den
+CRM-Connector damit **nicht** über OAuth verbinden. Ricos Eindruck, die
+gesprochene CRM-Abfrage in ChatGPT klappe schon, sollte er am Plugin selbst
+nachprüfen. Fix gehört ins CRM-Projekt: `chatgpt.com` zulassen und `iss` in
+der Antwort mitschicken (so wie hier).
 
 Claude Code wird später **direkt** in Jarvis OS integriert (Rico, 2026-09-09).
 Der KI-Export-Button ist deshalb am 2026-09-10 entfernt worden. Keine Arbeit mehr
@@ -580,7 +643,9 @@ aber tot. Vor jeder Sprach-Arbeit entweder wiederherstellen oder entfernen.
 - **Vercel** — Deployment vom `main`-Branch
 - Konfiguration: `DATABASE_URL` mit `pgbouncer=true&connection_limit=1`,
   `DIRECT_URL` für Migrationen, `INGEST_SECRET` für die Apple-Kurzbefehle,
-  `WIDGET_SECRET_TOKEN` für die iPhone-Widgets
+  `WIDGET_SECRET_TOKEN` für die iPhone-Widgets, `JARVIS_MCP_SECRET` (mind. 32
+  Zeichen, eigenes Geheimnis) für den MCP-Server, optional
+  `JARVIS_MCP_PUBLIC_URL` (feste Basisadresse = OAuth-Issuer)
 
 ## Vision & Langziel
 
@@ -618,8 +683,9 @@ Semantic Layer.
 5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
    iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm run test:e2e` (Playwright-Rauchtest —
-   die einzige Testsuite; `npm run test` läuft leer, es gibt keine Unit-Tests).
+   `npm run build` (prüft auch Typen), `npm test` (Vitest — seit 06.10. 48
+   Prüfungen für den MCP-Server, ohne Datenbank), `npm run test:e2e`
+   (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
 
 ## Dokumente
 
@@ -632,5 +698,7 @@ Semantic Layer.
 | `docs/apple-shortcuts.md` | iOS-Kurzbefehle für Erinnerungen, Health **und Zielwerte**; Sync-Zeitpunkte; nachträglich korrigieren | beim Einrichten der Apple-Anbindung |
 | `docs/ios-widget.md` | beide iPhone-Widgets (Calls, Routine): Einrichtung und Technik | beim Anfassen der Widgets / `/routines` / `/vertrieb` |
 | `docs/bank-sync.md` | Bank-Sync über n8n | beim Anfassen des Bank-Imports |
+| `docs/mcp-server.md` | MCP-Server: Adresse, Vercel-Variablen, ChatGPT/Claude verbinden, Testfragen, Fehlerbilder | beim Verbinden oder wenn der Connector klemmt |
+| `docs/chatgpt-voice-plan.md`, `docs/CLAUDE-MCP-HANDOVER.md` | Planung und Auftrag für den MCP-Weg (Codex, 06.10.) | nur als Hintergrund — Stand steht hier |
 
 `~/dev/coding-workflow-standards.md` (außerhalb des Repos) gilt projektübergreifend.

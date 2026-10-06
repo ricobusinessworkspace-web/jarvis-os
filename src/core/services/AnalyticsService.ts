@@ -725,6 +725,11 @@ export class AnalyticsService {
     };
   }
 
+  /** Metrik-Definitionen (Name, Einheit) — aus dem Cache des Semantic Layer, meist ohne Abfrage. */
+  static async getDefinitions() {
+    return (await loadSemanticConfig()).definitions;
+  }
+
   /** Ziele — inklusive der bewusst zielwertlosen („Messphase"). */
   static async getGoals() {
     return prisma.coreGoal.findMany({ orderBy: { createdAt: 'asc' } });
