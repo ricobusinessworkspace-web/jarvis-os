@@ -596,6 +596,16 @@ der Redeploy ist live. Produktionsprüfung: ohne Token `401`, OAuth-Metadaten
 korrekt, vier Dashboard-Seiten `200`. Offen ist die Verbindung mit Ricos
 privatem ChatGPT-Konto und der Text-/Sprachtest auf dem Handy. Zugangswort
 niemals in Chat, Repo oder Logs schreiben.
+
+**Verbindungsversuch:** Rico ist im privaten ChatGPT-Plus-Konto angemeldet.
+Im Codex-internen Browser wurde das Formular „Add custom MCP server" mit
+`Jarvis OS`, der indol-MCP-URL und OAuth ausgefüllt. ChatGPT meldete bei der
+automatischen Erkennung „Couldn’t discover OAuth settings" und konnte seine
+eigene Callback-URL nicht laden; auch „Retry" half nicht. Der Server lieferte
+parallel beide öffentlichen Metadaten als JSON mit HTTP `200` und am MCP-Endpunkt
+`401` mit `WWW-Authenticate`. Ein Gegenversuch in Ricos normalem Browser steht
+aus. Das Plugin wurde noch nicht erstellt, Text und Sprache sind ungetestet.
+
 Entscheidungen dabei:
 - **Kein offizielles MCP-SDK.** `@modelcontextprotocol/sdk` 1.32 zieht Express,
   Hono und einen eigenen HTTP-Unterbau in die Next-App. Protokoll von Hand wie
