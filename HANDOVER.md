@@ -156,7 +156,8 @@ Pipeline sind nur Folgen.
   per offiziellem MCP Inspector gegen echte Daten. Nach dem Deploy erneut
   geprüft: MCP ohne Token `401`, beide OAuth-Metadaten mit der indol-Adresse,
   Dashboard-Seiten `/`, `/mail`, `/ziele`, `/vertrieb` jeweils `200`.
-  **Noch offen:** echte ChatGPT-/Claude-Verbindung und Sprache.
+  **ChatGPT-Plugin laut Rico erstellt;** Installation/OAuth und Text-/Sprachaufruf
+  sind noch nicht unabhängig geprüft. Claude-Verbindung ist optional.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
@@ -548,7 +549,7 @@ Stufe 1 steht; hier die Leiter und die Entscheidungen, die schon gefallen sind.
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Warteschlange aus CRM-Aufgaben, Kontextfelder, Vorlagen, Kopieren/`mailto` | **fertig** (21.09.) |
-| 2 | MCP-Server für Jarvis — Claude/ChatGPT liest die Warteschlange und schreibt Entwürfe zurück | **live** (06.10., `main`, Commit `97257b6`; Client-Verbindung noch offen) |
+| 2 | MCP-Server für Jarvis — Claude/ChatGPT liest die Warteschlange und schreibt Entwürfe zurück | **live** (06.10., `main`, Commit `97257b6`; ChatGPT-Plugin laut Rico erstellt, Funktionstest offen) |
 | 3 | SMTP senden / IMAP lesen | wartet auf Ricos Postfach-Daten |
 | 4 | Rückmeldung ans CRM über `nachricht_festhalten` (MCP) | offen |
 
@@ -583,8 +584,8 @@ getrennten MCP-Server. Die alten Voice-Hooks sind weiterhin verwaist.
 **Übergabe an Claude:** `docs/CLAUDE-MCP-HANDOVER.md` enthält den vollständigen
 Implementierungsauftrag samt Werkzeuge, OAuth, Tests und ChatGPT-Anbindung.
 Rico meldet, dass eine gesprochene CRM-Leseabfrage vermutlich bereits klappt;
-dieser Vorversuch muss nicht wiederholt werden. Jarvis ist live, aber noch nicht
-als ChatGPT-Plugin verbunden. Beim Review fiel auf, dass `MailService.setStatus()` die
+dieser Vorversuch muss nicht wiederholt werden. Jarvis ist live; das ChatGPT-
+Plugin wurde laut Rico erstellt. Beim Review fiel auf, dass `MailService.setStatus()` die
 dokumentierte Zustandsfolge noch nicht vollständig erzwingt; vor einem
 MCP-Status-/Sende-Werkzeug beheben.
 
@@ -593,8 +594,10 @@ MCP-Status-/Sende-Werkzeug beheben.
 und Diff-Review per Fast-Forward auf `main` gebracht und gepusht. Vercel
 Production enthält `JARVIS_MCP_SECRET` und `JARVIS_MCP_PUBLIC_URL` (indol-Adresse);
 der Redeploy ist live. Produktionsprüfung: ohne Token `401`, OAuth-Metadaten
-korrekt, vier Dashboard-Seiten `200`. Offen ist die Verbindung mit Ricos
-privatem ChatGPT-Konto und der Text-/Sprachtest auf dem Handy. Zugangswort
+korrekt, vier Dashboard-Seiten `200`. Rico hat das Plugin in seinem privaten
+ChatGPT-Konto nach eigener Angabe erstellt. Offen sind die Prüfung von
+Installation/OAuth und der Text-/Sprachtest auf dem Handy. Claude muss für
+dieses Ziel nicht verbunden werden. Zugangswort
 niemals in Chat, Repo oder Logs schreiben.
 
 **Verbindungsversuch:** Rico ist im privaten ChatGPT-Plus-Konto angemeldet.
@@ -603,8 +606,9 @@ Im Codex-internen Browser wurde das Formular „Add custom MCP server" mit
 automatischen Erkennung „Couldn’t discover OAuth settings" und konnte seine
 eigene Callback-URL nicht laden; auch „Retry" half nicht. Der Server lieferte
 parallel beide öffentlichen Metadaten als JSON mit HTTP `200` und am MCP-Endpunkt
-`401` mit `WWW-Authenticate`. Ein Gegenversuch in Ricos normalem Browser steht
-aus. Das Plugin wurde noch nicht erstellt, Text und Sprache sind ungetestet.
+`401` mit `WWW-Authenticate`. Rico meldete anschließend, dass er das Plugin in
+ChatGPT erstellt hat; die Codex-Browsersitzung konnte dies nicht verifizieren.
+Text und Sprache sind weiterhin ungetestet.
 
 Entscheidungen dabei:
 - **Kein offizielles MCP-SDK.** `@modelcontextprotocol/sdk` 1.32 zieht Express,
