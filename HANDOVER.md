@@ -162,7 +162,11 @@ Pipeline sind nur Folgen.
   **Erweiterung 06.10.:** `performance_wochenverlauf` liest vier (wählbar 1–8)
   abgeschlossene Di–Mo-Blockwochen plus die laufende Woche aus dem bestehenden
   AnalyticsService; keine Datenbankänderung. Lokal: 49 Tests, TypeScript und Build
-  grün. Für ChatGPT muss die Plugin-Verbindung nach dem Deploy aktualisiert werden.
+  grün. Commit `cb012f1` ist auf `main` und Vercel Production **Ready**.
+  Danach geprüft: `/api/mcp` ohne Token `401`, beide OAuth-Metadaten `200`
+  mit indol-Adresse, Dashboard `/`, `/mail`, `/ziele`, `/vertrieb` je `200`.
+  Authentifizierter Aufruf des neuen Werkzeugs und Text-/Sprachtest in ChatGPT
+  bleiben offen; Rico muss die Plugin-Verbindung dafür aktualisieren.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
