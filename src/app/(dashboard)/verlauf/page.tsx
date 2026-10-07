@@ -5,6 +5,7 @@ import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { RoutineService } from '@/core/services/RoutineService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { addDays, dateRange, isOffDay } from '@/lib/blocks';
+import { PHASE_2_START } from '@/lib/phases';
 import { DaySheet, type DaySheetData } from '@/components/verlauf/DaySheet';
 import { ScrollToSelected } from '@/components/verlauf/ScrollToSelected';
 import { STATE_CELL } from '@/lib/metricState';
@@ -23,8 +24,9 @@ async function Verlauf({ selected }: { selected: string }) {
   const from = selected < stripFrom ? selected : stripFrom;
   const to = selected > today ? selected : today;
 
+  const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
   const matrix = await AnalyticsService.getMatrix(from, to, [
-    ...URSACHEN, 'body.sleep_hours', 'body.weight', 'body.calories',
+    ...URSACHEN, ...rules.map(r => r.key), 'body.sleep_hours', 'body.weight', 'body.calories',
   ]);
   const routines = await RoutineService.getRoutineBlocks(selected);
 
@@ -54,6 +56,13 @@ async function Verlauf({ selected }: { selected: string }) {
     },
     sleepHours: row['body.sleep_hours']?.value ?? null,
     weight: row['body.weight']?.value ?? null,
+    // Seit Phase 2 ohne Ziel — nachtragbar bleibt es trotzdem.
+    bodyJudged: selected < PHASE_2_START,
+    // Regeln gibt es erst seit Phase 2; davor gibt es nichts nachzutragen.
+    rules:
+      selected < PHASE_2_START
+        ? []
+        : rules.map(r => ({ metricKey: r.key, label: r.label, state: row[r.key]?.state ?? 'ungemessen' })),
     routines,
   };
 

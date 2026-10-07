@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/ui/command';
-import { Sun, CalendarDays, PhoneCall, HeartPulse, Wallet, Target, CornerDownLeft } from 'lucide-react';
+import { Sun, CalendarDays, PhoneCall, HeartPulse, Target, CornerDownLeft } from 'lucide-react';
 
 /**
  * ⌘K — Sprungmarken statt Suchfeld.
@@ -26,8 +26,8 @@ const PAGES = [
   { label: 'Heute', href: '/', icon: Sun, hint: 'Dashboard' },
   { label: 'Verlauf', href: '/verlauf', icon: CalendarDays, hint: 'Tage nachtragen' },
   { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall, hint: 'Calls, Pipeline' },
-  { label: 'Health', href: '/health', icon: HeartPulse, hint: 'Training, Körper' },
-  { label: 'Finanzen', href: '/finance', icon: Wallet, hint: 'Konten' },
+  { label: 'Health', href: '/health', icon: HeartPulse, hint: 'Training, Routinen, Regeln' },
+  // Finanzen kaltgestellt (07.10.), siehe Sidebar.
   { label: 'Ziele', href: '/ziele', icon: Target, hint: 'Basis, Soll, Umsatz' },
 ];
 

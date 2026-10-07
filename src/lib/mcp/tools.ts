@@ -6,6 +6,7 @@ import { MailService, MailRegelFehler, ENTWURF_GRENZEN, type DraftView } from '@
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { addDays, blockInfo, blockWeekRange, dateRange, BLOCK_START, BLOCK_WEEKS } from '@/lib/blocks';
 import { STATE_LABEL, EMPTY_METRIC, FEIERABEND_HOUR, SOURCE_LABEL } from '@/lib/metricState';
+import { PHASES, phaseOf } from '@/lib/phases';
 import { WerkzeugFehler, type Werkzeug } from './protocol';
 
 /**
@@ -83,15 +84,23 @@ function metrik(key: string, m: DayMetric, def: { label: string; unit: string } 
   };
 }
 
+/**
+ * Die Phasen des Plans. Jede Antwort, die über Tage hinweg vergleicht, trägt
+ * sie mit — sonst liest ein Modell einen Systemwechsel (andere Ziele, andere
+ * Routine) als Leistungsänderung.
+ */
+const phasen = () => PHASES.map(p => ({ ...p }));
+
 // ── 1. Tagesüberblick ────────────────────────────────────────────────────────
 
 const heuteUeberblick: Werkzeug = {
   name: 'heute_ueberblick',
   title: 'Heute in Jarvis',
   description:
-    'Ricos heutiger Tag aus Jarvis OS: Datum, Position im 12-Wochen-Block und alle Tageskennzahlen ' +
-    '(Calls, Training, Post, Schlaf, Kalorien, Gewicht, Routinen) mit Wert, Basis, Soll und Zustand. ' +
-    'Für Fragen wie „Wie läuft mein Tag?" oder „Wie viele Calls habe ich heute?". Nur lesend.',
+    'Ricos heutiger Tag aus Jarvis OS: Datum, Position im 12-Wochen-Block, laufende Phase und alle ' +
+    'Tageskennzahlen (Calls, Training, Post, Routinen, Tagesregeln; Schlaf/Kalorien/Gewicht nur noch ' +
+    'ohne Ziel) mit Wert, Basis, Soll und Zustand. Für Fragen wie „Wie läuft mein Tag?" oder „Habe ich ' +
+    'heute meine Regeln gehalten?". Nur lesend.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   annotations: NUR_LESEN,
   async run(args) {
@@ -99,6 +108,7 @@ const heuteUeberblick: Werkzeug = {
     const heute = getBerlinDateStr();
     const stunde = getBerlinHour();
     const block = blockInfo(heute);
+    const phase = phaseOf(heute);
 
     // Nacheinander — eine Pooler-Verbindung pro Instanz.
     const matrix = await AnalyticsService.getMatrix(heute, heute);
@@ -129,10 +139,12 @@ const heuteUeberblick: Werkzeug = {
             tage_verbleibend: block.daysRemaining,
             ende: block.blockEnd,
           },
+      phase,
       kennzahlen,
       lesehilfe:
         'wert null = nicht gemessen (nicht 0). urteil "laeuft" = Ziel noch nicht erreicht, Tag aber nicht vorbei. ' +
-        'zustand "zielfehlt" = Wert da, Ziel nicht auflösbar (siehe hinweis).',
+        'zustand "zielfehlt" = Wert da, Ziel nicht auflösbar (siehe hinweis). zustand "erfasst" = Wert ohne Ziel, ' +
+        'kein Urteil. Regeln (key rule.*): wert 1 = gehalten, 0 = gebrochen, null = noch nicht eingetragen.',
     };
   },
 };
@@ -145,7 +157,9 @@ const performanceWochenverlauf: Werkzeug = {
   description:
     'Jarvis-Kennzahlen für bis zu acht abgeschlossene Blockwochen (Dienstag bis Montag) ' +
     'und die laufende Woche. Zeigt je Kennzahl Wochenwert, erfüllte und gemessene Tage ' +
-    'sowie Zielquote. Für Rückblicke und Trends; nur lesend.',
+    'sowie Zielquote, dazu die Phase jeder Woche. Am 07.10.2026 begann Phase 2 mit anderen ' +
+    'Tageszielen (Regeln statt Körperwerte) — Wochen verschiedener Phasen nur mit Blick auf ' +
+    '`phasen` vergleichen. Für Rückblicke und Trends; nur lesend.',
   inputSchema: {
     type: 'object',
     properties: { wochen: LIMIT_SCHEMA('Anzahl abgeschlossener Wochen vor der laufenden Woche.', 4, 8) },
@@ -176,8 +190,10 @@ const performanceWochenverlauf: Werkzeug = {
     const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
     return {
       datenstand: datenstand(),
+      phasen: phasen(),
       wochen: zeitraeume.map(w => ({
         ...w,
+        phasen: PHASES.filter(p => p.von <= w.bis && (p.bis === null || p.bis >= w.von)).map(p => p.nummer),
         kennzahlen: definitionen.map(d => {
           const summary = AnalyticsService.summarize(matrix, d.key, w.von, w.bis);
           const gemessen = dateRange(w.von, w.bis)
@@ -193,16 +209,19 @@ const performanceWochenverlauf: Werkzeug = {
             key: d.key, name: d.label, einheit: d.unit,
             aggregation: d.aggregation, wochenwert: rund(wochenwert),
             erfuellte_tage: summary.met, gemessene_tage: summary.measured,
-            getrackte_tage: summary.tracked,
+            getrackte_tage: summary.tracked, ziel_galt_an_tagen: summary.targeted,
             zielquote: rund(summary.adherence), datenabdeckung: rund(summary.coverage),
           };
         }),
       })),
       lesehilfe:
         'Abgeschlossene Blockwochen laufen Dienstag bis Montag. Die laufende Woche endet heute und ist ' +
-        'nur eingeschränkt vergleichbar. Sonntag zählt nicht zur Zielquote. wochenwert null heißt: ' +
-        'kein Messwert; 0 ist ein echter Wert. Zielquote = erfüllte / getrackte Tage; ' +
-        'Datenabdeckung = gemessene / getrackte Tage. Wochenwert folgt der Aggregation der Metrik.',
+        'nur eingeschränkt vergleichbar. Sonntag zählt nicht zur Zielquote — außer bei den Regeln, die ' +
+        'gelten täglich. wochenwert null heißt: kein Messwert; 0 ist ein echter Wert. ' +
+        'Zielquote = erfüllte Tage / Tage, an denen ein Ziel galt (ziel_galt_an_tagen); null = in der ' +
+        'Woche galt kein Ziel (z. B. Schlaf/Kalorien/Gewicht ab Phase 2, Regeln vor Phase 2). ' +
+        'Datenabdeckung = gemessene / getrackte Tage. Wochenwert folgt der Aggregation der Metrik. ' +
+        'Jede Woche nennt ihre Phase(n); was eine Phase bewertet hat, steht in phasen.',
     };
   },
 };
@@ -309,16 +328,16 @@ const zieleAnzeigen: Werkzeug = {
   name: 'ziele_anzeigen',
   title: 'Ziele',
   description:
-    'Ricos aktuell gültige Ziele mit Herkunft: eigene Jarvis-Ziele (Schlaf, Training, Post, Routinen, Umsatz), ' +
-    'Vertriebsziele aus dem CRM und Kalorien-/Gewichtsziel aus Apple Health. Nur lesend; Ziele ändert Rico ' +
-    'im Reiter „Ziele" bzw. im CRM.',
+    'Ricos aktuell gültige Ziele mit Herkunft: eigene Jarvis-Ziele (Training, Post, Routinen, Tagesregeln, ' +
+    'Umsatz), Vertriebsziele aus dem CRM und — nur falls noch bewertet — Kalorien-/Gewichtsziel aus Apple ' +
+    'Health. Nur lesend; Ziele ändert Rico im Reiter „Ziele" bzw. im CRM.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   annotations: NUR_LESEN,
   async run(args) {
     nurErlaubt(args, []);
     const z = await GoalService.getGoalsPage();
 
-    const health = (h: typeof z.calories) => ({
+    const health = (h: NonNullable<typeof z.calories>) => ({
       key: h.metricKey,
       name: h.label,
       einheit: h.unit,
@@ -352,7 +371,12 @@ const zieleAnzeigen: Werkzeug = {
       crm: z.crm.map(c => ({
         key: c.metricKey, name: c.label, herkunft: 'CRM', basis: c.base, soll: c.stretch, hinweis: c.hint ?? null,
       })),
-      apple_health: [health(z.calories), health(z.weight)],
+      regeln: z.rules.map(r => ({
+        key: r.metricKey, name: r.label, ziel: 'jeden Tag gehalten', tage_pro_woche: r.weekdays, gilt_seit: r.since,
+      })),
+      // Leer seit Phase 2: Schlaf, Kalorien und Gewicht werden nicht mehr bewertet.
+      apple_health: [z.calories, z.weight].filter(h => h !== null).map(health),
+      phase: phaseOf(z.today),
     };
   },
 };

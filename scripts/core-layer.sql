@@ -179,3 +179,16 @@ CREATE TABLE IF NOT EXISTS core_manual_values (
 
 ALTER TABLE jarvis_tracker_items
   ADD COLUMN IF NOT EXISTS required BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ============================================================
+--  Schritte archivieren statt löschen (07.10.2026)
+--
+--  Ein gelöschter Schritt nahm per Cascade alle seine Haken mit, und die
+--  Schrittzahl vergangener Tage war immer die heutige. Jetzt hat jeder
+--  Schritt ein Gültigkeitsfenster: [active_from, archived_on). Beides NULL =
+--  gilt schon immer und weiterhin.
+-- ============================================================
+
+ALTER TABLE jarvis_tracker_items
+  ADD COLUMN IF NOT EXISTS active_from DATE,
+  ADD COLUMN IF NOT EXISTS archived_on DATE;

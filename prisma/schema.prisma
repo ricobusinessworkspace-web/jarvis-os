@@ -203,6 +203,11 @@ model TrackerItem {
   /// Früher: Pflichtschritt für die Basis der Routine. Seit 2026-09-28 nicht
   /// mehr ausgewertet — die Basis ist „höchstens `maxSkip` ausgelassen".
   required         Boolean      @default(false)
+  /// Erster Tag, an dem der Schritt zählt. `null` = schon immer.
+  activeFrom       DateTime?    @map("active_from") @db.Date
+  /// Ab diesem Tag zählt der Schritt nicht mehr. Archiviert statt gelöscht,
+  /// damit seine Haken (und die Schrittzahl vergangener Tage) erhalten bleiben.
+  archivedOn       DateTime?    @map("archived_on") @db.Date
   tracker          Tracker      @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   logs             TrackerLog[]
 

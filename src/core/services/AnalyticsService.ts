@@ -1,6 +1,6 @@
 import { prisma } from '../db';
 import { getBerlinDateStr } from '@/lib/dateUtils';
-import { blockInfo, dateRange, isOffDay, trackedDays, addDays } from '@/lib/blocks';
+import { blockInfo, dateRange, isOffDay, isoWeekday, addDays } from '@/lib/blocks';
 
 /**
  * Semantic Layer — rechnet Tageswerte on-read aus den vorhandenen Quellen.
@@ -48,14 +48,21 @@ export interface MetricSummary {
   met: number;
   /** Tage mit irgendeinem gemessenen Wert. */
   measured: number;
-  /** Getrackte Tage im Zeitraum (Mo–Sa, ohne Off-Days). */
+  /** Getrackte Tage im Zeitraum — ohne die Off-Days *dieser* Metrik (Regeln kennen keinen). */
   tracked: number;
-  /** met / tracked — 0…1, `null` wenn nichts zu tracken war. */
+  /**
+   * Getrackte Tage, an denen überhaupt ein Ziel galt. Kleiner als `tracked`,
+   * wenn eine Metrik im Zeitraum erst dazukam oder ihr Ziel endete (Phase 2).
+   */
+  targeted: number;
+  /** met / targeted — 0…1, `null` wenn im Zeitraum kein Ziel galt. */
   adherence: number | null;
   /** measured / tracked — 0…1. Eine hohe Adherence bei niedriger Coverage sagt etwas anderes. */
   coverage: number | null;
   /** Aktuelle Serie erfüllter Tage, rückwärts ab `to`. Off-Days unterbrechen sie nicht. */
   streak: number;
+  /** Längste Serie im Zeitraum. */
+  bestStreak: number;
 }
 
 /** Ein Tag darf pro Metrik nur einmal in der Map stehen. */
@@ -82,8 +89,13 @@ type SemanticConfig = {
   definitions: Awaited<ReturnType<typeof prisma.coreMetricDefinition.findMany>>;
   sources: Awaited<ReturnType<typeof prisma.coreMetricSource.findMany>>;
   intentions: Awaited<ReturnType<typeof prisma.coreIntention.findMany>>;
-  /** Für `routine_completeness`: wie viele Schritte hat die Routine. */
-  routines: Array<{ name: string; total: number }>;
+  /**
+   * Für `routine_completeness`: die Schritte jeder Routine mit ihrem
+   * Gültigkeitsfenster. Die Schrittzahl wird **je Tag** gezählt — ein neuer
+   * Schritt hebt das Soll erst ab seinem Anlegetag, ein archivierter senkt es
+   * erst ab seinem Archivtag.
+   */
+  routines: Array<{ name: string; items: Array<{ activeFrom: string | null; archivedOn: string | null }> }>;
   /** Zielwerte aus Health/Cronometer, für `health_target` und `weight_trajectory`. */
   healthTargets: Awaited<ReturnType<typeof prisma.ingestHealthTarget.findMany>>;
   /**
@@ -125,7 +137,9 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
       prisma.coreMetricDefinition.findMany({ orderBy: { sortOrder: 'asc' } }),
       prisma.coreMetricSource.findMany({ orderBy: { priority: 'asc' } }),
       prisma.coreIntention.findMany(),
-      prisma.tracker.findMany({ select: { name: true, _count: { select: { items: true } } } }),
+      prisma.tracker.findMany({
+        select: { name: true, items: { select: { activeFrom: true, archivedOn: true } } },
+      }),
       prisma.ingestHealthTarget.findMany(),
       prisma.$queryRaw<SemanticConfig['crmTargets']>`
         SELECT metric_key                        AS "metricKey",
@@ -142,7 +156,13 @@ async function loadSemanticConfig(): Promise<SemanticConfig> {
     definitions,
     sources,
     intentions,
-    routines: trackers.map(t => ({ name: t.name, total: t._count.items })),
+    routines: trackers.map(t => ({
+      name: t.name,
+      items: t.items.map(i => ({
+        activeFrom: i.activeFrom ? i.activeFrom.toISOString().slice(0, 10) : null,
+        archivedOn: i.archivedOn ? i.archivedOn.toISOString().slice(0, 10) : null,
+      })),
+    })),
     healthTargets,
     crmTargets,
   };
@@ -205,6 +225,10 @@ export class AnalyticsService {
         JOIN jarvis_trackers      t ON t.id = i.tracker_id
        WHERE l.date >= ${fromTs}::timestamp AND l.date <= ${toTs}::timestamp
          AND l.status <> 'skipped'
+         -- Nur Haken aus dem Gültigkeitsfenster des Schritts — dasselbe Fenster,
+         -- aus dem die Schrittzahl des Tages entsteht.
+         AND (i.active_from IS NULL OR l.date >= i.active_from)
+         AND (i.archived_on IS NULL OR l.date <  i.archived_on)
 
       UNION ALL
       SELECT 'personal_log', 'sleep_hours', '', date, sleep_hours::float8, FALSE
@@ -422,12 +446,15 @@ export class AnalyticsService {
   ): { base: number | null; stretch: number | null; hint?: string } {
     switch (kind) {
       // Basis = alle Schritte bis auf höchstens `maxSkip` (in der Konfiguration
-      // der Intention, nicht im Code), Soll = alle Schritte. Beide Zahlen
-      // wandern mit, wenn Rico die Routine umbaut.
+      // der Intention, nicht im Code), Soll = alle Schritte, die an *diesem*
+      // Tag galten. Umbauen der Routine bewertet so die Vergangenheit nicht neu.
       case 'routine_completeness': {
         const name = str(config.tracker).toLowerCase();
         const routine = ctx.routines.find(r => r.name.toLowerCase() === name);
-        if (!routine || routine.total === 0) {
+        const total = routine?.items.filter(
+          i => (i.activeFrom === null || i.activeFrom <= date) && (i.archivedOn === null || i.archivedOn > date)
+        ).length ?? 0;
+        if (total === 0) {
           return { base: null, stretch: null, hint: `Routine „${str(config.tracker)}" nicht gefunden` };
         }
         const maxSkip = config.maxSkip;
@@ -436,8 +463,8 @@ export class AnalyticsService {
         }
         // Mindestens ein Schritt: bei einer Routine mit höchstens `maxSkip`
         // Schritten hieße Basis sonst „nichts getan".
-        const base = Math.max(1, routine.total - maxSkip);
-        return { base, stretch: routine.total };
+        const base = Math.max(1, total - maxSkip);
+        return { base, stretch: total };
       }
 
       // Kalorienziel aus Cronometer/Health. Soll = das Ziel, Basis = Ziel plus
@@ -508,7 +535,7 @@ export class AnalyticsService {
   }
 
   private static stateFor(
-    dateStr: string,
+    offDay: boolean,
     value: number | null,
     base: number | null,
     stretch: number | null,
@@ -516,7 +543,7 @@ export class AnalyticsService {
     /** Ein Ziel *ist* konfiguriert, ließ sich aber nicht auflösen. */
     targetMissing = false
   ): MetricState {
-    if (isOffDay(dateStr)) return 'offday';
+    if (offDay) return 'offday';
     if (value === null) return 'ungemessen';
     if (targetMissing) return 'zielfehlt'; // Wert da, Maß fehlt — kein Design, ein Defekt
     if (base === null) return 'erfasst'; // bewusst ohne Soll — kein Urteil gewollt
@@ -534,12 +561,12 @@ export class AnalyticsService {
    * gleich welche. Soll heißt: alle.
    */
   private static routineStateFor(
-    dateStr: string,
+    offDay: boolean,
     done: number | null,
     base: number,
     total: number
   ): MetricState {
-    if (isOffDay(dateStr)) return 'offday';
+    if (offDay) return 'offday';
     if (!done) return 'ungemessen';
     if (done >= total) return 'soll';
     if (done >= base) return 'basis';
@@ -659,10 +686,16 @@ export class AnalyticsService {
           }
         }
 
+        // Off-Day je Ziel: Sonntag ist frei, außer das Ziel gilt an allen
+        // sieben Tagen (die Regeln). Ohne Ziel gilt der Plan-Sonntag.
+        const offDay = intention
+          ? !intention.activeWeekdays.includes(isoWeekday(date))
+          : isOffDay(date);
+
         const state =
           intention?.derivedKind === 'routine_completeness' && !targetMissing
-            ? this.routineStateFor(date, value, base ?? 0, stretch ?? 0)
-            : this.stateFor(date, value, base, stretch, intention?.comparator ?? '>=', targetMissing);
+            ? this.routineStateFor(offDay, value, base ?? 0, stretch ?? 0)
+            : this.stateFor(offDay, value, base, stretch, intention?.comparator ?? '>=', targetMissing);
 
         matrix[date][key] = { value, base, stretch, state, source, targetHint };
       }
@@ -674,27 +707,52 @@ export class AnalyticsService {
   /**
    * Adherence, Coverage und Streak einer Metrik über einen Zeitraum.
    * `erfasst` zählt als gemessen, aber nicht als erfüllt — ohne Soll gibt es
-   * nichts zu erfüllen.
+   * nichts zu erfüllen. Off-Day ist, was die Matrix für *diese* Metrik als
+   * Off-Day führt: der Sonntag zählt für Regeln mit, für den Rest nicht.
    */
   static summarize(matrix: MetricMatrix, metricKey: string, from: string, to: string): MetricSummary {
-    const tracked = trackedDays(from, to);
+    const cellOf = (d: string) => matrix[d]?.[metricKey];
+    const off = (d: string) => {
+      const cell = cellOf(d);
+      return cell ? cell.state === 'offday' : isOffDay(d);
+    };
+    const fulfilled = (cell: DayMetric | undefined) => cell?.state === 'soll' || cell?.state === 'basis';
+    // Heute ohne Eintrag ist noch offen, nicht verfehlt — bricht keine Serie.
+    const stillOpen = (d: string) => d === to && (!cellOf(d) || cellOf(d)!.value === null);
+
+    let tracked = 0;
+    let targeted = 0;
     let met = 0;
     let measured = 0;
+    let run = 0;
+    let bestStreak = 0;
 
-    for (const date of tracked) {
-      const cell = matrix[date]?.[metricKey];
+    for (const date of dateRange(from, to)) {
+      // Heute ohne Eintrag zählt weder für noch gegen die Quote — der Tag läuft.
+      if (off(date) || stillOpen(date)) continue;
+      tracked++;
+      const cell = cellOf(date);
+      // Ein Ziel galt, auch wenn es sich nicht auflösen ließ (`zielfehlt`).
+      if (cell && (cell.base !== null || cell.targetHint)) targeted++;
+
+      if (fulfilled(cell)) {
+        run++;
+        bestStreak = Math.max(bestStreak, run);
+      } else {
+        run = 0;
+      }
+
       if (!cell || cell.value === null) continue;
       measured++;
-      if (cell.state === 'soll' || cell.state === 'basis') met++;
+      if (fulfilled(cell)) met++;
     }
 
     // Streak rückwärts ab `to`; Off-Days werden übersprungen, nicht gewertet.
     let streak = 0;
     for (let d = to; d >= from; d = addDays(d, -1)) {
-      if (isOffDay(d)) continue;
-      const cell = matrix[d]?.[metricKey];
-      if (cell && (cell.state === 'soll' || cell.state === 'basis')) streak++;
-      else if (d === to && (!cell || cell.value === null)) continue; // heute noch offen
+      if (off(d)) continue;
+      if (fulfilled(cellOf(d))) streak++;
+      else if (stillOpen(d)) continue;
       else break;
     }
 
@@ -702,10 +760,12 @@ export class AnalyticsService {
       metricKey,
       met,
       measured,
-      tracked: tracked.length,
-      adherence: tracked.length ? met / tracked.length : null,
-      coverage: tracked.length ? measured / tracked.length : null,
+      tracked,
+      targeted,
+      adherence: targeted ? met / targeted : null,
+      coverage: tracked ? measured / tracked : null,
       streak,
+      bestStreak,
     };
   }
 

@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-10-06
-last_agent: Claude Opus 5.5 — Jarvis-MCP-Server gebaut (Branch feat/jarvis-mcp, nicht deployt)
+last_updated: 2026-10-07
+last_agent: Claude Opus 5.5 — Phase 2: Regeln, Routine-Archiv, Körperwerte ohne Ziel
 status: In Progress
 ---
 
@@ -168,6 +168,30 @@ Pipeline sind nur Folgen.
   Authentifizierter Aufruf des neuen Werkzeugs und Text-/Sprachtest in ChatGPT
   bleiben offen; Rico muss die Plugin-Verbindung dafür aktualisieren.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
+- **Phase 2 — Regeln statt Körperwerte** (07.10., lokal geprüft): Rico hat die
+  Wochen davor als wenig aussagekräftig eingestuft und wollte einen Schnitt,
+  ohne dass die Daten kaputtgehen. Umgesetzt als **Schnitt in der Bewertung,
+  nicht in den Daten**:
+  - `src/lib/phases.ts`: Phase 1 „Aufbau" 01.09.–06.10., Phase 2 ab 07.10.,
+    je mit Klartext, was bewertet wurde. Dashboard und Health rechnen Quoten
+    und Serien ab Phasenstart (`evaluationStart`), der Verlauf zeigt alles.
+  - **Drei Regeln** (`rule.nofap`, `rule.substances`, `rule.scrolling`, Domäne
+    `rules`, Tracker „Regeln" Typ `rules`): Ziel 1, `active_weekdays` 1–7 —
+    **gelten auch sonntags**. Karte `RulesCard` neben den Ursachen: Kästchen =
+    gehalten, ✕ = gebrochen (rot), kein Eintrag = nicht gemessen; Flamme =
+    Serie, „Rekord" = längste Serie. Nachtragen im Verlauf (ab 07.10.).
+    Welche Regeln es gibt, steht in der DB — Seiten filtern nach Domäne.
+  - **Schlaf/Kalorien/Gewicht**: Ziel per `valid_to = 2026-10-06` beendet,
+    nichts gelöscht. Phase-1-Tage behalten ihre Bewertung, ab Phase 2 „erfasst"
+    ohne Ziel. Apple-Sync läuft weiter. Körperkarte vom Dashboard entfernt,
+    Health zeigt Training/Routinen/Regeln, Ziele-Seite blendet die Körperziele aus.
+  - **MCP**: `heute_ueberblick` und `ziele_anzeigen` nennen die Phase und die
+    Regeln; `performance_wochenverlauf` liefert `phasen` + je Woche die
+    Phase(n) und `ziel_galt_an_tagen`; Zielquote ist `null`, wenn kein Ziel galt.
+  - **Finanzen kaltgestellt** (Ricos Wunsch): aus Sidebar und ⌘K genommen,
+    `/finance` bleibt erreichbar.
+  - Daten liegen bereits in der geteilten DB (`core:migrate` +
+    `scripts/phase-2.mts`, idempotent). **Code ist noch nicht veröffentlicht.**
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
@@ -296,7 +320,33 @@ Pipeline sind nur Folgen.
   `updatedAt` als Bedingung **in der Datenbank** (`updateMany`). Wiederholung
   = `unveraendert`, kein zweiter Schreibvorgang.
 
+- **Ein Systemwechsel ist ein Schnitt in der Bewertung, nie in den Daten.**
+  Ziele enden per `valid_to`, neue beginnen per `valid_from`, Phasen
+  (`src/lib/phases.ts`) erklären den Schnitt in Worten — für Dashboard und
+  ChatGPT. Wer Wochen über einen Phasenwechsel vergleicht, ohne die Phase zu
+  nennen, liest einen Systemwechsel als Leistungsänderung.
+- **Off-Day je Ziel, nicht global.** `stateFor` fragt
+  `core_intentions.active_weekdays` (vorher ungenutzt); ohne Ziel gilt der
+  Plan-Sonntag. `summarize` zählt Off-Days aus der Matrix, nicht aus dem
+  Kalender — deshalb zählen Regeln sonntags mit, alles andere nicht.
+- **Quote nur über Tage mit Ziel** (`targeted`), heute ohne Eintrag zählt
+  gar nicht (läuft noch). Ohne Ziel ist die Quote `null`, nie 0 %.
+- **Routine-Schritte haben ein Gültigkeitsfenster** (`active_from`,
+  `archived_on`). Entfernen archiviert ab heute (Schritte ohne je einen Haken
+  werden echt gelöscht), Hinzufügen zählt ab heute. Die Schrittzahl und die
+  gezählten Haken kommen je Tag aus demselben Fenster.
+
 ## Gelöste Probleme (nicht wiederholen)
+
+- **Problem:** Routine von 8 auf 6 Schritte gekürzt (nach dem 28.09.) — die
+  Haken der gestrichenen Schritte waren weg, und alle vergangenen Tage wurden
+  gegen die neue Schrittzahl bewertet.
+  **Lösung (07.10.):** Archivieren statt Löschen + Schrittzahl je Tag (siehe
+  „Was funktioniert"). Verlorenes ist nicht wiederherstellbar (Supabase
+  `free`, kein Backup); die Bewertung der Phase-1-Tage gegen 6 Schritte ist
+  in sich stimmig, weil auch nur die Haken der 6 verbliebenen gezählt werden.
+  **Warum wichtig:** `TrackerLog → TrackerItem` ist `onDelete: Cascade`. Jedes
+  `trackerItem.delete` mit Historie vernichtet Daten — nie wieder einbauen.
 
 - **Problem:** Am Rand des Orbs fehlte oben rechts ein Stück Kreis — er sah
   unfertig aus, aber nur beim großen Auftritt (Startsequenz, 300 px).
@@ -503,6 +553,11 @@ Pipeline sind nur Folgen.
   denselben Origin. Bei „Seite leer, Server aber ok" zuerst dort nachsehen.
 
 ## Offene Entscheidungen
+
+- **`core:seed` ist veraltet — nicht ausführen.** Er ersetzt *alle* Quellen
+  durch seine Liste, kennt aber die CRM-Quellen (`crm_metrics`, seit 12.09.)
+  und die Regeln nicht. Ein Lauf klemmt Calls, Trichter und Regeln ab.
+  Entweder Seed auf den heutigen Stand bringen oder auf „nur ergänzen" umbauen.
 
 - **Session-Mode statt Transaction-Mode für die Datenbank?** Tauscht Tempo gegen
   Skalierbarkeit. Erst nach dem Vercel-Regionswechsel bewerten — siehe
@@ -721,7 +776,7 @@ Semantic Layer.
 5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
    iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm test` (Vitest — 49 Prüfungen,
+   `npm run build` (prüft auch Typen), `npm test` (Vitest — 57 Prüfungen,
    darunter MCP ohne Datenbank), `npm run test:e2e`
    (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
 
@@ -735,6 +790,7 @@ Semantic Layer.
 | `DATENBANK_BRIEFING.md` | Performance-Analyse mit Messungen, Übergabe an DB-Agent | bei Performance-Fragen; danach archivierbar |
 | `docs/apple-shortcuts.md` | iOS-Kurzbefehle für Erinnerungen, Health **und Zielwerte**; Sync-Zeitpunkte; nachträglich korrigieren | beim Einrichten der Apple-Anbindung |
 | `docs/ios-widget.md` | beide iPhone-Widgets (Calls, Routine): Einrichtung und Technik | beim Anfassen der Widgets / `/routines` / `/vertrieb` |
+| `docs/orb-animation.md` | Start-/Ladeanimation (Jarvis-Orb): Vertrag, Regeln, Zahlen, Portierung auf Lightning CRM, Abnahmeliste | beim Anfassen des Orbs oder wenn er ins CRM soll |
 | `docs/bank-sync.md` | Bank-Sync über n8n | beim Anfassen des Bank-Imports |
 | `docs/mcp-server.md` | MCP-Server: Adresse, Vercel-Variablen, ChatGPT/Claude verbinden, Testfragen, Fehlerbilder | beim Verbinden oder wenn der Connector klemmt |
 | `docs/chatgpt-voice-plan.md`, `docs/CLAUDE-MCP-HANDOVER.md` | Planung und Auftrag für den MCP-Weg (Codex, 06.10.) | nur als Hintergrund — Stand steht hier |

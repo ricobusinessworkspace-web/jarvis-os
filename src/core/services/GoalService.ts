@@ -57,7 +57,7 @@ export class GoalService {
     });
     const trackers = await prisma.tracker.findMany({
       where: { type: 'routine' },
-      select: { name: true, _count: { select: { items: true } } },
+      select: { name: true, _count: { select: { items: { where: { archivedOn: null } } } } },
     });
     const healthTargets = await prisma.ingestHealthTarget.findMany();
     const revenue = await this.getRevenueGoal();
@@ -97,7 +97,10 @@ export class GoalService {
       }];
     });
 
+    // Seit Phase 2 ohne laufendes Ziel → `null`, der Reiter zeigt dann nichts
+    // zum Einstellen an, was gar nicht mehr bewertet wird.
     const health = (key: 'body.calories' | 'body.weight') => {
+      if (!byKey.has(key)) return null;
       const t = healthTargets.find(h => h.metricKey === key);
       const c = cell(key);
       const field = EDITABLE.tolerance[key];
@@ -125,10 +128,21 @@ export class GoalService {
       };
     });
 
+    // Regeln: Ziel ist immer „gehalten", an allen sieben Tagen. Nur Anzeige.
+    const rules = intentions
+      .filter(i => i.metric.domain === 'rules' && i.metric.isActive)
+      .map(i => ({
+        metricKey: i.metricKey,
+        label: i.metric.label,
+        weekdays: i.activeWeekdays.length,
+        since: dateStr(i.validFrom),
+      }));
+
     return {
       today,
       fixed,
       routines,
+      rules,
       calories: health('body.calories'),
       weight: health('body.weight'),
       crm,

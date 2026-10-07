@@ -3,16 +3,19 @@
 import { prisma } from '@/lib/prisma';
 import { revalidateTracking } from '@/lib/revalidate';
 import { invalidateSemanticConfig } from '@/core/services/AnalyticsService';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 /**
  * Bearbeiten der Routine-Schritte.
  *
- * Ein Schritt zu löschen nimmt seine Logs mit (Cascade in der Datenbank) —
- * die Historie dieses Schritts ist damit weg. Deshalb verlangt die Oberfläche
- * dafür einen zweiten Klick.
+ * Schritte haben ein Gültigkeitsfenster (`activeFrom` … `archivedOn`). Ein
+ * neuer Schritt zählt ab heute, ein entfernter wird ab heute **archiviert**,
+ * nicht gelöscht: ein echtes Löschen nähme per Cascade alle seine Haken mit,
+ * und vergangene Tage würden gegen die neue Schrittzahl bewertet. So ist es
+ * Ende September passiert (8 → 6 Schritte, Haken verloren).
  *
- * Die Anzahl der Schritte ist Teil des Semantic-Layer-Caches (aus ihr und
- * `maxSkip` entsteht das Ziel der Routine-Metrik). Jede strukturelle Änderung muss
+ * Die Schritte sind Teil des Semantic-Layer-Caches (aus ihnen und `maxSkip`
+ * entsteht das Ziel der Routine-Metrik). Jede strukturelle Änderung muss
  * ihn deshalb verwerfen, sonst zeigt das Dashboard bis zu 30 Sekunden lang
  * das alte Ziel.
  */
@@ -35,11 +38,17 @@ export async function addRoutineItem(trackerId: string, title: string): Promise<
       select: { order: true },
     });
 
+    // Zählt ab heute — vergangene Tage behalten ihr Soll.
     await prisma.trackerItem.create({
-      data: { trackerId, title: clean, order: (last?.order ?? 0) + 1 },
+      data: {
+        trackerId,
+        title: clean,
+        order: (last?.order ?? 0) + 1,
+        activeFrom: new Date(`${getBerlinDateStr()}T00:00:00.000Z`),
+      },
     });
 
-    invalidateSemanticConfig(); // ein Schritt mehr = ein höheres Soll
+    invalidateSemanticConfig(); // ein Schritt mehr = ein höheres Soll ab heute
     revalidateTracking();
     return { success: true };
   } catch (error) {
@@ -60,11 +69,22 @@ export async function renameRoutineItem(itemId: string, title: string): Promise<
   }
 }
 
-/** Löscht den Schritt samt seiner bisherigen Logs. */
+/**
+ * Nimmt den Schritt ab heute aus der Routine. Hat er nie einen Haken
+ * bekommen, gibt es nichts zu bewahren — dann wird er wirklich gelöscht.
+ */
 export async function deleteRoutineItem(itemId: string): Promise<Result> {
   try {
-    await prisma.trackerItem.delete({ where: { id: itemId } });
-    invalidateSemanticConfig(); // ein Schritt weniger = ein niedrigeres Soll
+    const logs = await prisma.trackerLog.count({ where: { itemId } });
+    if (logs === 0) {
+      await prisma.trackerItem.delete({ where: { id: itemId } });
+    } else {
+      await prisma.trackerItem.update({
+        where: { id: itemId },
+        data: { archivedOn: new Date(`${getBerlinDateStr()}T00:00:00.000Z`) },
+      });
+    }
+    invalidateSemanticConfig(); // ein Schritt weniger = ein niedrigeres Soll ab heute
     revalidateTracking();
     return { success: true };
   } catch (error) {
@@ -84,6 +104,7 @@ export async function moveRoutineItem(itemId: string, direction: 'up' | 'down'):
     const neighbour = await prisma.trackerItem.findFirst({
       where: {
         trackerId: item.trackerId,
+        archivedOn: null,
         order: direction === 'up' ? { lt: item.order } : { gt: item.order },
       },
       orderBy: { order: direction === 'up' ? 'desc' : 'asc' },

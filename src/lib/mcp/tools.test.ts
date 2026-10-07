@@ -36,4 +36,31 @@ describe('performance_wochenverlauf', () => {
     expect(result.wochen[1].kennzahlen[0].wochenwert).toBeNull();
     expect(AnalyticsService.getMatrix).toHaveBeenCalledWith('2026-09-29', '2026-10-06');
   });
+
+  it('nennt die Phase jeder Woche, damit ein Systemwechsel nicht wie ein Leistungswechsel aussieht', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-14T12:00:00.000Z'));
+    vi.spyOn(AnalyticsService, 'getMatrix').mockResolvedValue({});
+    vi.spyOn(AnalyticsService, 'getDefinitions').mockResolvedValue([
+      { key: 'body.weight', label: 'Gewicht', unit: 'kg', aggregation: 'last', isActive: true },
+    ] as Awaited<ReturnType<typeof AnalyticsService.getDefinitions>>);
+
+    const tool = WERKZEUGE.find(w => w.name === 'performance_wochenverlauf')!;
+    const result = await tool.run({ wochen: 2 }) as {
+      phasen: Array<{ nummer: number; von: string; bis: string | null }>;
+      wochen: Array<{ von: string; phasen: number[]; kennzahlen: Array<{ zielquote: number | null }> }>;
+    };
+    expect(result.phasen.map(p => [p.nummer, p.von, p.bis])).toEqual([
+      [1, '2026-09-01', '2026-10-06'],
+      [2, '2026-10-07', null],
+    ]);
+    // 29.09.–05.10. ganz Phase 1, 06.–12.10. über den Wechsel, ab 13.10. Phase 2.
+    expect(result.wochen.map(w => [w.von, w.phasen])).toEqual([
+      ['2026-09-29', [1]],
+      ['2026-10-06', [1, 2]],
+      ['2026-10-13', [2]],
+    ]);
+    // Ohne Ziel keine Quote — nicht 0.
+    expect(result.wochen[2].kennzahlen[0].zielquote).toBeNull();
+  });
 });

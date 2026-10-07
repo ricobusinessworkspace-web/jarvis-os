@@ -148,7 +148,7 @@ function RoutineRow({ goal }: { goal: GoalsPageData['routines'][number] }) {
   );
 }
 
-function HealthRow({ goal, kind }: { goal: GoalsPageData['calories']; kind: 'calories' | 'weight' }) {
+function HealthRow({ goal, kind }: { goal: NonNullable<GoalsPageData['calories']>; kind: 'calories' | 'weight' }) {
   const { pending, error, run, attempt } = useSave();
   const unit = kind === 'calories' ? 'kcal' : 'kg';
   // Kalorien-Toleranz steht als Anteil in der Datenbank (0,1), gezeigt in %.
@@ -252,14 +252,33 @@ export function GoalsEditor({ data }: { data: GoalsPageData }) {
         {data.routines.map(g => <RoutineRow key={g.metricKey} goal={g} />)}
       </Card>
 
-      <Card title="Körper" badge="Apple Health">
-        <HealthRow goal={data.calories} kind="calories" />
-        <HealthRow goal={data.weight} kind="weight" />
-        <p className="border-t border-border/40 pt-2.5 text-[10.5px] leading-relaxed text-muted">
-          Kalorien- und Gewichtsziel kommen per Kurzbefehl aus Apple Health und werden dort
-          geändert. Die Toleranz legt fest, wie weit daneben noch als Basis zählt.
-        </p>
-      </Card>
+      {data.rules.length > 0 && (
+        <Card title="Regeln" badge="Jarvis">
+          {data.rules.map(r => (
+            <Row
+              key={r.metricKey}
+              label={r.label}
+              sub={r.since ? `seit ${r.since.slice(8)}.${r.since.slice(5, 7)}.` : undefined}
+            >
+              <span className="font-mono text-[12.5px] text-muted">
+                gehalten · <span className="text-foreground">{r.weekdays === 7 ? 'täglich' : `${r.weekdays} Tage/Woche`}</span>
+              </span>
+            </Row>
+          ))}
+        </Card>
+      )}
+
+      {/* Seit Phase 2 ohne Ziel — dann gibt es hier nichts einzustellen. */}
+      {(data.calories || data.weight) && (
+        <Card title="Körper" badge="Apple Health">
+          {data.calories && <HealthRow goal={data.calories} kind="calories" />}
+          {data.weight && <HealthRow goal={data.weight} kind="weight" />}
+          <p className="border-t border-border/40 pt-2.5 text-[10.5px] leading-relaxed text-muted">
+            Kalorien- und Gewichtsziel kommen per Kurzbefehl aus Apple Health und werden dort
+            geändert. Die Toleranz legt fest, wie weit daneben noch als Basis zählt.
+          </p>
+        </Card>
+      )}
 
       <Card title="Vertrieb" badge="CRM">
         {data.crm.map(g => (

@@ -31,8 +31,8 @@ export interface RoutineBlock {
  * Morgen noch nachgetragen werden kann.
  *
  * Im Bearbeiten-Modus lassen sich Schritte umbenennen, verschieben, löschen
- * und ergänzen. Löschen nimmt die Historie des Schritts mit, deshalb braucht
- * es dort einen zweiten Klick.
+ * und ergänzen. Entfernen archiviert den Schritt ab heute — seine Haken und
+ * die Bewertung vergangener Tage bleiben. Trotzdem ein zweiter Klick.
  *
  * Basis = alle Schritte bis auf höchstens drei (`maxSkip` der Metrik), gleich
  * welche; Soll = alle. Die Grenze kommt als `base` aus der Metrik — die Karte
@@ -276,7 +276,7 @@ function RoutineColumn({
                       ? 'bg-red-500/15 text-red-400'
                       : 'text-muted hover:text-red-400'
                   )}
-                  title={confirmDelete === item.id ? 'Wirklich löschen — auch die Historie' : 'Löschen'}
+                  title={confirmDelete === item.id ? 'Ab heute entfernen — bisherige Haken bleiben' : 'Entfernen'}
                 >
                   {confirmDelete === item.id ? 'Sicher?' : <Trash2 className="h-3.5 w-3.5" />}
                 </button>

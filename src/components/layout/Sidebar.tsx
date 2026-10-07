@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import {
   ChevronLeft,
   ChevronRight,
-  Wallet,
   Sun,
   CalendarDays,
   PhoneCall,
@@ -25,7 +24,7 @@ const NAV_ITEMS = [
   { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall },
   { label: 'Anschreiben', href: '/mail', icon: Mail },
   { label: 'Health', href: '/health', icon: HeartPulse },
-  { label: 'Finanzen', href: '/finance', icon: Wallet },
+  // Finanzen ist kaltgestellt (Rico, 07.10.) — die Seite unter /finance bleibt erreichbar.
   { label: 'Ziele', href: '/ziele', icon: Target },
 ] as const;
 

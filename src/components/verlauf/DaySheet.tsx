@@ -21,6 +21,9 @@ export interface DaySheetData {
   calories: { value: number | null; source: string | null };
   sleepHours: number | null;
   weight: number | null;
+  /** Wurden Schlaf, Kalorien und Gewicht an diesem Tag bewertet? Seit Phase 2 nicht mehr. */
+  bodyJudged: boolean;
+  rules: Array<{ metricKey: string; label: string; state: MetricState }>;
   routines: Array<{
     name: string;
     kind: 'morning' | 'evening';
@@ -50,8 +53,15 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 
 /** Dreizustands-Schalter: erfüllt · nicht geschafft · nicht gemessen. */
 function TriToggle({
-  state, disabled, onSet, onClear,
-}: { state: MetricState; disabled?: boolean; onSet: (done: boolean) => void; onClear: () => void }) {
+  state, disabled, onSet, onClear, labels = ['geschafft', 'nicht geschafft'],
+}: {
+  state: MetricState;
+  disabled?: boolean;
+  onSet: (done: boolean) => void;
+  onClear: () => void;
+  /** Titel für erfüllt / nicht erfüllt — bei Regeln „gehalten" / „gebrochen". */
+  labels?: [string, string];
+}) {
   const done = state === 'soll' || state === 'basis';
   const missed = state === 'unter';
   return (
@@ -59,7 +69,7 @@ function TriToggle({
       <button
         onClick={() => onSet(true)}
         disabled={disabled}
-        title="geschafft"
+        title={labels[0]}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
           done ? 'border-foreground bg-foreground text-background' : 'border-border text-muted hover:text-foreground'
@@ -70,7 +80,7 @@ function TriToggle({
       <button
         onClick={() => onSet(false)}
         disabled={disabled}
-        title="nicht geschafft"
+        title={labels[1]}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-lg border transition-colors',
           missed ? 'border-error/60 bg-error/15 text-error' : 'border-border text-muted hover:text-foreground'
@@ -95,6 +105,7 @@ function TriToggle({
 
 type Patch =
   | { field: 'training' | 'post'; state: MetricState }
+  | { field: 'rule'; metricKey: string; state: MetricState }
   | { field: 'sleepHours' | 'weight'; value: number | null }
   | { field: 'calories'; value: number | null; source: string | null };
 
@@ -112,6 +123,11 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         return { ...state, training: { ...state.training, state: patch.state } };
       case 'post':
         return { ...state, post: { ...state.post, state: patch.state } };
+      case 'rule':
+        return {
+          ...state,
+          rules: state.rules.map(r => (r.metricKey === patch.metricKey ? { ...r, state: patch.state } : r)),
+        };
       case 'sleepHours':
         return { ...state, sleepHours: patch.value };
       case 'weight':
@@ -197,7 +213,32 @@ export function DaySheet({ data }: { data: DaySheetData }) {
           />
         </Field>
 
-        <GroupLabel>Körper</GroupLabel>
+        {d.rules.length > 0 && (
+          <>
+            <GroupLabel>Regeln</GroupLabel>
+            {d.rules.map(rule => (
+              <Field key={rule.metricKey} label={rule.label} hint="gilt auch sonntags">
+                <TriToggle
+                  state={rule.state}
+                  labels={['gehalten', 'gebrochen']}
+                  disabled={locked || pending}
+                  onSet={held =>
+                    run({ field: 'rule', metricKey: rule.metricKey, state: held ? 'soll' : 'unter' }, () =>
+                      toggleCause(rule.metricKey, d.date, held)
+                    )
+                  }
+                  onClear={() =>
+                    run({ field: 'rule', metricKey: rule.metricKey, state: 'ungemessen' }, () =>
+                      clearCause(rule.metricKey, d.date)
+                    )
+                  }
+                />
+              </Field>
+            ))}
+          </>
+        )}
+
+        <GroupLabel>{d.bodyJudged ? 'Körper' : 'Körper · optional, ohne Ziel'}</GroupLabel>
 
         {/* Health ist die Wahrheit — aber ein Tag, an dem der Kurzbefehl nie
             lief, muss trotzdem nachtragbar sein, ohne Cronometer zu öffnen.

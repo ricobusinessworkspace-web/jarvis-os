@@ -124,6 +124,10 @@ export class RoutineService {
                ON l.item_id = i.id
               AND l.date = ${`${dateStr}T00:00:00.000Z`}::timestamp
        WHERE t.type = 'routine'
+         -- Die Schritte, die an diesem Tag galten — im Verlauf also auch die
+         -- inzwischen archivierten, und keine, die erst später dazukamen.
+         AND (i.active_from IS NULL OR i.active_from <= ${dateStr}::date)
+         AND (i.archived_on IS NULL OR i.archived_on >  ${dateStr}::date)
        ORDER BY t.name, i."order"
     `;
 
@@ -152,9 +156,12 @@ export class RoutineService {
 
   static async getDashboardTrackers(today: Date) {
     try {
+      // Regeln sind keine Routine; archivierte Schritte stehen nicht mehr an.
       const trackers = await prisma.tracker.findMany({
+        where: { type: { not: 'rules' } },
         include: {
           items: {
+            where: { archivedOn: null },
             include: {
               logs: {
                 where: {

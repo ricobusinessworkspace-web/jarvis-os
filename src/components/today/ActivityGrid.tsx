@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   matrix: MetricMatrix;
-  metrics: Array<{ key: string; label: string; sub: string }>;
+  /** `since`: erster Tag, an dem es die Metrik gibt — davor ist die Zelle leer, nicht „nicht gemessen". */
+  metrics: Array<{ key: string; label: string; sub: string; since?: string }>;
   summaries: Record<string, MetricSummary>;
   from: string;
   to: string;
@@ -62,18 +63,25 @@ export function ActivityGrid({ matrix, metrics, summaries, from, to, today, titl
                     <div key={i} className="flex gap-[3px]">
                       {week.map(day => {
                         const future = day > today;
+                        const before = !!metric.since && day < metric.since;
                         const cell = matrix[day]?.[metric.key];
-                        const state = future ? null : (cell?.state ?? 'ungemessen');
+                        const state = future || before ? null : (cell?.state ?? 'ungemessen');
                         const label = future
                           ? 'noch offen'
-                          : `${STATE_LABEL[state!]}${cell?.value !== null && cell?.value !== undefined ? ` · ${cell.value}` : ''}`;
+                          : before
+                            ? 'gab es noch nicht'
+                            : `${STATE_LABEL[state!]}${cell?.value !== null && cell?.value !== undefined ? ` · ${cell.value}` : ''}`;
                         return (
                           <div
                             key={day}
                             title={`${day.slice(8)}.${day.slice(5, 7)}. — ${label}`}
                             className={cn(
                               'h-3.5 w-3.5 rounded-[3.5px]',
-                              future ? 'ring-1 ring-inset ring-white/[0.06]' : STATE_CELL[state!],
+                              future
+                                ? 'ring-1 ring-inset ring-white/[0.06]'
+                                : before
+                                  ? 'scale-[0.4] rounded-full bg-white/[0.08]'
+                                  : STATE_CELL[state!],
                               day === today && 'ring-2 ring-accent ring-offset-1 ring-offset-elevated'
                             )}
                           />
@@ -87,7 +95,7 @@ export function ActivityGrid({ matrix, metrics, summaries, from, to, today, titl
                     vielen Tagen überhaupt etwas erfasst wurde. */}
                 <div className="w-[92px] shrink-0 text-right">
                   <div className="font-mono text-[11.5px] tabular-nums">
-                    {!s ? '–' : hasTarget(matrix, metric.key) ? `${s.met} / ${s.tracked}` : `${s.measured} / ${s.tracked}`}
+                    {!s ? '–' : hasTarget(matrix, metric.key) ? (s.targeted ? `${s.met} / ${s.targeted}` : '–') : `${s.measured} / ${s.tracked}`}
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-muted">
                     {!s
