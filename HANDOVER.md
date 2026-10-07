@@ -168,7 +168,7 @@ Pipeline sind nur Folgen.
   Authentifizierter Aufruf des neuen Werkzeugs und Text-/Sprachtest in ChatGPT
   bleiben offen; Rico muss die Plugin-Verbindung dafür aktualisieren.
   Einrichtung, Variablen, Testfragen: `docs/mcp-server.md`.
-- **Phase 2 — Regeln statt Körperwerte** (07.10., lokal geprüft): Rico hat die
+- **Phase 2 — Regeln statt Körperwerte** (07.10., live): Rico hat die
   Wochen davor als wenig aussagekräftig eingestuft und wollte einen Schnitt,
   ohne dass die Daten kaputtgehen. Umgesetzt als **Schnitt in der Bewertung,
   nicht in den Daten**:
@@ -190,8 +190,10 @@ Pipeline sind nur Folgen.
     Phase(n) und `ziel_galt_an_tagen`; Zielquote ist `null`, wenn kein Ziel galt.
   - **Finanzen kaltgestellt** (Ricos Wunsch): aus Sidebar und ⌘K genommen,
     `/finance` bleibt erreichbar.
-  - Daten liegen bereits in der geteilten DB (`core:migrate` +
-    `scripts/phase-2.mts`, idempotent). **Code ist noch nicht veröffentlicht.**
+  - Daten per `core:migrate` + `scripts/phase-2.mts` (idempotent), Code in
+    `0e9a1c3` — **live in Production** und nachgeprüft: alle Reiter `200`,
+    Regel-Karte auf `/`, MCP ohne Token `401`. 57 Tests, Build grün. Offen:
+    ChatGPT-Abfrage des Wochenverlaufs mit Phasen von Rico selbst testen.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
 - **Performance**: von 3,4 s auf ~1,1 s Seitenaufruf. Hauptursache liegt aber
   außerhalb des Codes, siehe `DATENBANK_BRIEFING.md`.
