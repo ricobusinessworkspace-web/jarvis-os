@@ -199,7 +199,7 @@ Pipeline sind nur Folgen.
   - **Finanzen kaltgestellt** (Ricos Wunsch): aus Sidebar und ⌘K genommen,
     `/finance` bleibt erreichbar.
   - Daten per `core:migrate` + `scripts/phase-2.mts` (idempotent), Code in
-    `0e9a1c3` (+ Umbau Haken/Regeln danach) — **live in Production** und nachgeprüft: alle Reiter `200`,
+    `0e9a1c3` + `d2d45b8` (Haken/Regeln umgedreht) — **live in Production** und nachgeprüft: alle Reiter `200`,
     Regel-Karte auf `/`, MCP ohne Token `401`. 57 Tests, Build grün. Offen:
     ChatGPT-Abfrage des Wochenverlaufs mit Phasen von Rico selbst testen.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
