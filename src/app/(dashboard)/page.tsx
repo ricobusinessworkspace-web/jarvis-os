@@ -83,7 +83,8 @@ async function Today() {
       streak: s?.streak ?? 0,
       bestStreak: s?.bestStreak ?? 0,
       adherence: s?.adherence ?? null,
-      coverage: s?.coverage ?? null,
+      // Regeln kennen nur 1 und 0 — jeder gemessene, nicht erfüllte Tag ist ein Rückfall.
+      broken: s ? s.measured - s.met : 0,
     };
   });
 
@@ -93,12 +94,10 @@ async function Today() {
     return {
       metricKey: m.key,
       label: m.label === 'Post' ? 'Personal Brand Post' : m.label === 'Training' ? 'Trainingseinheit' : m.label,
-      value: c.value,
-      base: c.base,
-      stretch: c.stretch,
       state: c.state,
       source: c.source,
       streak: s?.streak ?? 0,
+      bestStreak: s?.bestStreak ?? 0,
       adherence: s?.adherence ?? null,
       coverage: s?.coverage ?? null,
       // Calls kommen aus dem CRM und werden nicht von Hand abgehakt.

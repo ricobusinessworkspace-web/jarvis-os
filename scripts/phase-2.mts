@@ -28,11 +28,18 @@ const TRACKER = 'Regeln';
 const START = new Date(`${PHASE_2_START}T00:00:00.000Z`);
 const END_PHASE_1 = new Date(`${addDays(PHASE_2_START, -1)}T00:00:00.000Z`);
 
+/** `formerly`: frühere Namen — der Haken wird umbenannt, nicht neu angelegt (Historie bleibt). */
 const RULES = [
-  { key: 'rule.nofap', label: 'NoFap', sortOrder: 90 },
-  { key: 'rule.substances', label: 'Kein Alkohol & Cannabis', sortOrder: 91 },
-  { key: 'rule.scrolling', label: 'Kein Scrolling', sortOrder: 92 },
+  { key: 'rule.nofap', label: 'No Jerking', sortOrder: 90, formerly: ['NoFap'] },
+  { key: 'rule.substances', label: 'Keine Drogen', sortOrder: 91, formerly: ['Kein Alkohol & Cannabis'] },
+  { key: 'rule.scrolling', label: 'Kein Scrolling', sortOrder: 92, formerly: [] as string[] },
 ];
+
+/**
+ * Regeln gelten als gehalten, bis ein Rückfall eingetragen ist — ab diesem
+ * Tag (`assumeDoneFrom` an der Quelle, siehe AnalyticsService).
+ */
+const sourceConfig = (label: string) => ({ tracker: TRACKER, item: label, assumeDoneFrom: PHASE_2_START });
 
 const BODY = ['body.sleep_hours', 'body.calories', 'body.weight'];
 
@@ -48,7 +55,13 @@ async function main() {
 
   for (const [i, rule] of RULES.entries()) {
     const exists = await prisma.trackerItem.findFirst({ where: { trackerId: tracker.id, title: rule.label } });
-    if (!exists) {
+    const former = exists
+      ? null
+      : await prisma.trackerItem.findFirst({ where: { trackerId: tracker.id, title: { in: rule.formerly } } });
+    if (former) {
+      await prisma.trackerItem.update({ where: { id: former.id }, data: { title: rule.label } });
+      console.log(`✓ Haken „${former.title}" → „${rule.label}"`);
+    } else if (!exists) {
       await prisma.trackerItem.create({
         data: { trackerId: tracker.id, title: rule.label, order: i + 1, activeFrom: START },
       });
@@ -69,10 +82,13 @@ async function main() {
     };
     await prisma.coreMetricDefinition.upsert({ where: { key: rule.key }, update: def, create: def });
 
+    // Die Quelle verweist über den Namen auf den Haken — immer mitziehen.
     const source = await prisma.coreMetricSource.findFirst({ where: { metricKey: rule.key, kind: 'tracker' } });
-    if (!source) {
+    if (source) {
+      await prisma.coreMetricSource.update({ where: { id: source.id }, data: { config: sourceConfig(rule.label) } });
+    } else {
       await prisma.coreMetricSource.create({
-        data: { metricKey: rule.key, kind: 'tracker', config: { tracker: TRACKER, item: rule.label }, priority: 10 },
+        data: { metricKey: rule.key, kind: 'tracker', config: sourceConfig(rule.label), priority: 10 },
       });
     }
 

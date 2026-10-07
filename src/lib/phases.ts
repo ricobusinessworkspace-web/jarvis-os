@@ -50,11 +50,11 @@ export const PHASES: Phase[] = [
     bis: null,
     bewertet:
       'Ursachen (Calls, Training, Post), Morgen- und Abendroutine mit 6 Schritten, drei Tagesregeln ' +
-      '(NoFap, kein Alkohol & Cannabis, kein Scrolling) an allen 7 Tagen.',
+      '(No Jerking, keine Drogen — Alkohol und Cannabis —, kein Scrolling) an allen 7 Tagen.',
     hinweis:
       'Schlaf, Kalorien und Gewicht werden nicht mehr bewertet. Was Apple Health noch liefert, steht ' +
-      'als „erfasst" ohne Ziel da. Regeln: Haken = gehalten, „gebrochen" = bewusst eingetragener ' +
-      'Rückfall, kein Eintrag = nicht gemessen.',
+      'als „erfasst" ohne Ziel da. Regeln gelten als gehalten, solange kein Rückfall eingetragen ' +
+      'ist — nur Rückfälle werden festgehalten.',
   },
 ];
 

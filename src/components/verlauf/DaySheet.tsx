@@ -51,14 +51,17 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Dreizustands-Schalter: erfüllt · nicht geschafft · nicht gemessen. */
+/**
+ * Dreizustands-Schalter: erfüllt · nicht geschafft · nicht gemessen. Ohne
+ * `onClear` nur zwei Zustände — bei Regeln gibt es kein „nicht gemessen".
+ */
 function TriToggle({
   state, disabled, onSet, onClear, labels = ['geschafft', 'nicht geschafft'],
 }: {
   state: MetricState;
   disabled?: boolean;
   onSet: (done: boolean) => void;
-  onClear: () => void;
+  onClear?: () => void;
   /** Titel für erfüllt / nicht erfüllt — bei Regeln „gehalten" / „gebrochen". */
   labels?: [string, string];
 }) {
@@ -88,17 +91,19 @@ function TriToggle({
       >
         <Minus className="h-3.5 w-3.5" strokeWidth={3} />
       </button>
-      <button
-        onClick={onClear}
-        disabled={disabled}
-        title="nicht gemessen"
-        className={cn(
-          'flex h-7 items-center justify-center rounded-lg border px-2 text-[10px] transition-colors',
-          state === 'ungemessen' ? 'border-white/25 border-dashed text-foreground' : 'border-border text-muted hover:text-foreground'
-        )}
-      >
-        –
-      </button>
+      {onClear && (
+        <button
+          onClick={onClear}
+          disabled={disabled}
+          title="nicht gemessen"
+          className={cn(
+            'flex h-7 items-center justify-center rounded-lg border px-2 text-[10px] transition-colors',
+            state === 'ungemessen' ? 'border-white/25 border-dashed text-foreground' : 'border-border text-muted hover:text-foreground'
+          )}
+        >
+          –
+        </button>
+      )}
     </div>
   );
 }
@@ -217,19 +222,15 @@ export function DaySheet({ data }: { data: DaySheetData }) {
           <>
             <GroupLabel>Regeln</GroupLabel>
             {d.rules.map(rule => (
-              <Field key={rule.metricKey} label={rule.label} hint="gilt auch sonntags">
+              <Field key={rule.metricKey} label={rule.label} hint="gehalten, solange kein Rückfall eingetragen ist">
+                {/* Gespeichert wird nur der Rückfall; „gehalten" nimmt ihn zurück. */}
                 <TriToggle
                   state={rule.state}
                   labels={['gehalten', 'gebrochen']}
                   disabled={locked || pending}
                   onSet={held =>
                     run({ field: 'rule', metricKey: rule.metricKey, state: held ? 'soll' : 'unter' }, () =>
-                      toggleCause(rule.metricKey, d.date, held)
-                    )
-                  }
-                  onClear={() =>
-                    run({ field: 'rule', metricKey: rule.metricKey, state: 'ungemessen' }, () =>
-                      clearCause(rule.metricKey, d.date)
+                      held ? clearCause(rule.metricKey, d.date) : toggleCause(rule.metricKey, d.date, false)
                     )
                   }
                 />

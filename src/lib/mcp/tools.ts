@@ -144,7 +144,7 @@ const heuteUeberblick: Werkzeug = {
       lesehilfe:
         'wert null = nicht gemessen (nicht 0). urteil "laeuft" = Ziel noch nicht erreicht, Tag aber nicht vorbei. ' +
         'zustand "zielfehlt" = Wert da, Ziel nicht auflösbar (siehe hinweis). zustand "erfasst" = Wert ohne Ziel, ' +
-        'kein Urteil. Regeln (key rule.*): wert 1 = gehalten, 0 = gebrochen, null = noch nicht eingetragen.',
+        'kein Urteil. Regeln (key rule.*): wert 1 = gehalten (gilt, solange kein Rückfall eingetragen ist), 0 = gebrochen.',
     };
   },
 };

@@ -1,27 +1,34 @@
 'use client';
 
 import { useOptimistic, useTransition } from 'react';
-import { Flame } from 'lucide-react';
 import { toggleCause } from '@/actions/today';
-import { STATE_TEXT, SOURCE_LABEL, formatPercent } from '@/lib/metricState';
+import { formatPercent } from '@/lib/metricState';
 import type { MetricState } from '@/core/services/AnalyticsService';
-import { cn } from '@/lib/utils';
-import { StateBox } from './StateBox';
+import { HabitRow } from './HabitRow';
 
 export interface CauseRow {
   metricKey: string;
   label: string;
-  value: number | null;
-  base: number | null;
-  stretch: number | null;
   state: MetricState;
+  /** `kind` der Quelle — Calls kommen aus dem CRM. */
   source: string | null;
   streak: number;
+  bestStreak: number;
   adherence: number | null;
   coverage: number | null;
   /** Nur Metriken mit manueller Quelle lassen sich hier abhaken. */
   toggleable: boolean;
 }
+
+const isDone = (state: MetricState) => state === 'soll' || state === 'basis';
+
+/**
+ * Was offen ist, ist rot — von morgens an, nicht erst nach dem Abwählen.
+ * Rein in der Anzeige: gespeichert bleibt „nicht gemessen", die Matrix und
+ * der Verlauf unterscheiden weiter zwischen vergessen und verfehlt. Off-Day,
+ * „erfasst" und „Ziel fehlt" behalten ihr eigenes Kästchen.
+ */
+const shown = (state: MetricState): MetricState => (state === 'ungemessen' ? 'unter' : state);
 
 export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
   const [, startTransition] = useTransition();
@@ -38,9 +45,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
   );
 
   const toggle = (row: CauseRow) => {
-    if (!row.toggleable) return;
-    const done = !(row.state === 'soll' || row.state === 'basis');
-
+    const done = !isDone(row.state);
     startTransition(async () => {
       applyOptimistic({ metricKey: row.metricKey, state: done ? 'soll' : 'unter' });
       const res = await toggleCause(row.metricKey, date, done);
@@ -56,51 +61,24 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
 
       <div className="flex flex-col">
         {optimisticRows.map(row => {
-          const soll = row.stretch ?? row.base;
-          const state = row.state;
-
+          const done = isDone(row.state);
+          const status = row.state === 'offday' ? 'Off-Day' : done ? 'erledigt' : 'offen';
           return (
-            <div
+            <HabitRow
               key={row.metricKey}
-              className="flex items-center gap-3 border-t border-border/40 py-2.5 first:border-t-0 first:pt-0"
-            >
-              <button
-                onClick={() => toggle(row)}
-                disabled={!row.toggleable}
-                aria-label={`${row.label} abhaken`}
-                className={cn(
-                  'shrink-0 transition-transform',
-                  row.toggleable ? 'cursor-pointer active:scale-90' : 'cursor-default'
-                )}
-              >
-                <StateBox state={state} />
-              </button>
-
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm">{row.label}</div>
-                <div className="mt-0.5 text-[11px] text-muted">
-                  {row.base !== null
-                    ? `Basis ${row.base}${row.stretch ? ` · Soll ${row.stretch}` : ''}`
-                    : 'ohne Zielwert'}
-                  {row.source && ` · ${SOURCE_LABEL[row.source] ?? row.source}`}
-                </div>
-              </div>
-
-              <div className="shrink-0 text-right">
-                <div className={cn('font-mono text-sm tabular-nums', STATE_TEXT[state])}>
-                  {row.value === null ? '–' : row.value.toLocaleString('de-DE')}
-                  {soll !== null && row.value !== null && (
-                    <span className="text-muted"> / {soll}</span>
-                  )}
-                </div>
-                {row.streak > 0 && (
-                  <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-muted">
-                    <Flame className="h-3 w-3" />
-                    {row.streak}
-                  </div>
-                )}
-              </div>
-            </div>
+              label={row.label}
+              sub={
+                <>
+                  {status}
+                  {row.source === 'crm_calls' || row.source === 'crm_metrics' ? ' · CRM' : ''}
+                  {row.bestStreak > 0 && ` · Rekord ${row.bestStreak}`}
+                </>
+              }
+              state={shown(row.state)}
+              streak={row.streak}
+              onToggle={row.toggleable ? () => toggle(row) : undefined}
+              toggleLabel={done ? `${row.label}: Haken entfernen` : `${row.label} abhaken`}
+            />
           );
         })}
       </div>

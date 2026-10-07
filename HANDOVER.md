@@ -175,12 +175,20 @@ Pipeline sind nur Folgen.
   - `src/lib/phases.ts`: Phase 1 „Aufbau" 01.09.–06.10., Phase 2 ab 07.10.,
     je mit Klartext, was bewertet wurde. Dashboard und Health rechnen Quoten
     und Serien ab Phasenstart (`evaluationStart`), der Verlauf zeigt alles.
-  - **Drei Regeln** (`rule.nofap`, `rule.substances`, `rule.scrolling`, Domäne
-    `rules`, Tracker „Regeln" Typ `rules`): Ziel 1, `active_weekdays` 1–7 —
-    **gelten auch sonntags**. Karte `RulesCard` neben den Ursachen: Kästchen =
-    gehalten, ✕ = gebrochen (rot), kein Eintrag = nicht gemessen; Flamme =
-    Serie, „Rekord" = längste Serie. Nachtragen im Verlauf (ab 07.10.).
+  - **Drei Regeln** „No Jerking", „Keine Drogen", „Kein Scrolling"
+    (`rule.nofap`, `rule.substances`, `rule.scrolling`, Domäne `rules`,
+    Tracker „Regeln" Typ `rules`): Ziel 1, `active_weekdays` 1–7 — **gelten
+    auch sonntags**. **Umgekehrt zu den Ursachen** (Rico, 07.10.): gehalten,
+    solange kein Rückfall eingetragen ist — Quelle mit `assumeDoneFrom`
+    (ab Phasenstart bis heute, nie Zukunft). Antippen = gebrochen (rotes ✕,
+    gespeichert als `not_done`), nochmal = Rückfall gelöscht. Es gibt dort
+    kein „nicht gemessen". Nachtragen im Verlauf (ab 07.10.).
     Welche Regeln es gibt, steht in der DB — Seiten filtern nach Domäne.
+  - **Ursachen und Regeln teilen eine Zeile** (`HabitRow`): Kästchen, Name,
+    Unterzeile (Status · Rekord), rechts immer die Serie, auch bei 0. Keine
+    Zahlen „0 / 1" mehr — Calls stehen links in eigener Karte. Ursachen zeigen
+    „offen" **in der Anzeige** rot von morgens an; gespeichert bleibt
+    „nicht gemessen" (Matrix/Verlauf trennen weiter vergessen und verfehlt).
   - **Schlaf/Kalorien/Gewicht**: Ziel per `valid_to = 2026-10-06` beendet,
     nichts gelöscht. Phase-1-Tage behalten ihre Bewertung, ab Phase 2 „erfasst"
     ohne Ziel. Apple-Sync läuft weiter. Körperkarte vom Dashboard entfernt,
@@ -191,7 +199,7 @@ Pipeline sind nur Folgen.
   - **Finanzen kaltgestellt** (Ricos Wunsch): aus Sidebar und ⌘K genommen,
     `/finance` bleibt erreichbar.
   - Daten per `core:migrate` + `scripts/phase-2.mts` (idempotent), Code in
-    `0e9a1c3` — **live in Production** und nachgeprüft: alle Reiter `200`,
+    `0e9a1c3` (+ Umbau Haken/Regeln danach) — **live in Production** und nachgeprüft: alle Reiter `200`,
     Regel-Karte auf `/`, MCP ohne Token `401`. 57 Tests, Build grün. Offen:
     ChatGPT-Abfrage des Wochenverlaufs mit Phasen von Rico selbst testen.
 - **G-Projekt (Punktesystem)**: bewusst nicht angebunden, `g_*`-Tabellen sind leer.
@@ -331,6 +339,9 @@ Pipeline sind nur Folgen.
   `core_intentions.active_weekdays` (vorher ungenutzt); ohne Ziel gilt der
   Plan-Sonntag. `summarize` zählt Off-Days aus der Matrix, nicht aus dem
   Kalender — deshalb zählen Regeln sonntags mit, alles andere nicht.
+- **Implizite Werte brauchen ein Anfangsdatum und enden heute.** `impliesZero`
+  (Calls), `zeroFrom` (Stufen) und jetzt `assumeDoneFrom` (Regeln) — und alle
+  drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`), heute ohne Eintrag zählt
   gar nicht (läuft noch). Ohne Ziel ist die Quote `null`, nie 0 %.
 - **Routine-Schritte haben ein Gültigkeitsfenster** (`active_from`,
@@ -556,6 +567,9 @@ Pipeline sind nur Folgen.
 
 ## Offene Entscheidungen
 
+- **Konsolenfehler „Received NaN … children"** auf allen Reitern (auch `/mail`),
+  im HTML steht kein NaN — kommt aus einer Client-Komponente der Shell. Als
+  eigene Aufgabe vorgeschlagen, nicht behoben.
 - **`core:seed` ist veraltet — nicht ausführen.** Er ersetzt *alle* Quellen
   durch seine Liste, kennt aber die CRM-Quellen (`crm_metrics`, seit 12.09.)
   und die Regeln nicht. Ein Lauf klemmt Calls, Trichter und Regeln ab.
@@ -778,7 +792,7 @@ Semantic Layer.
 5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
    iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm test` (Vitest — 57 Prüfungen,
+   `npm run build` (prüft auch Typen), `npm test` (Vitest — 58 Prüfungen,
    darunter MCP ohne Datenbank), `npm run test:e2e`
    (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
 

@@ -350,6 +350,7 @@ export class AnalyticsService {
           // (Morgen-/Abendroutine); mit `item` ist sie ein einzelner Haken.
           const counting = !wantItem;
           const tally = new Map<string, number>();
+          const seen = new Set<string>();
 
           for (const r of rows) {
             if (r.kind !== 'tracker') continue;
@@ -360,11 +361,28 @@ export class AnalyticsService {
               tally.set(r.d, (tally.get(r.d) ?? 0) + done);
             } else {
               put('tracker', s.metricKey, r.d, done);
+              seen.add(r.d);
             }
           }
 
           if (counting) {
             for (const [d, n] of tally) put('tracker', s.metricKey, d, n);
+          }
+
+          /**
+           * Regeln: gehalten, bis ein Rückfall eingetragen ist — ab
+           * `assumeDoneFrom`, bis einschließlich heute. Dieselbe Idee wie
+           * `impliesZero` bei den Calls, nur umgekehrt: hier ist „kein Eintrag"
+           * die Regel und nur die Ausnahme wird festgehalten. Schlägt die
+           * Sammelabfrage fehl (`rows` leer), wird nichts angenommen.
+           */
+          const assumeFrom = str(s.config.assumeDoneFrom);
+          if (!counting && assumeFrom && rows.length > 0) {
+            const today = getBerlinDateStr();
+            for (const d of dateRange(from, to)) {
+              if (d < assumeFrom || d > today || seen.has(d)) continue;
+              put('tracker', s.metricKey, d, 1);
+            }
           }
           break;
         }
