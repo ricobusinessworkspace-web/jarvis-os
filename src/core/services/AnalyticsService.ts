@@ -728,22 +728,44 @@ export class AnalyticsService {
    * nichts zu erfüllen. Off-Day ist, was die Matrix für *diese* Metrik als
    * Off-Day führt: der Sonntag zählt für Regeln mit, für den Rest nicht.
    */
-  static summarize(matrix: MetricMatrix, metricKey: string, from: string, to: string): MetricSummary {
+  static summarize(
+    matrix: MetricMatrix,
+    metricKey: string,
+    from: string,
+    to: string,
+    /**
+     * Ab wann Serie und Rekord zählen — früher als `from` erlaubt. Eine Quote
+     * beginnt am Phasenstart neu, eine Serie nicht: wer am Tag vor dem Schnitt
+     * trainiert hat, hat am Tag danach immer noch eine laufende Serie.
+     * Die Matrix muss diesen Zeitraum enthalten.
+     *
+     * `missIsFinal`: ein Verfehlen steht sofort fest, auch heute — bei Regeln
+     * ist ein eingetragener Rückfall endgültig. Sonst ist heute bis zum
+     * Tagesende offen, auch wenn ein Haken wieder entfernt wurde.
+     */
+    { streakFrom = from, missIsFinal = false }: { streakFrom?: string; missIsFinal?: boolean } = {}
+  ): MetricSummary {
     const cellOf = (d: string) => matrix[d]?.[metricKey];
     const off = (d: string) => {
       const cell = cellOf(d);
       return cell ? cell.state === 'offday' : isOffDay(d);
     };
     const fulfilled = (cell: DayMetric | undefined) => cell?.state === 'soll' || cell?.state === 'basis';
-    // Heute ohne Eintrag ist noch offen, nicht verfehlt — bricht keine Serie.
-    const stillOpen = (d: string) => d === to && (!cellOf(d) || cellOf(d)!.value === null);
+    // Heute noch nicht erfüllt heißt offen, nicht verfehlt — zählt nicht in
+    // die Quote und bricht keine Serie. Nur der echte heutige Tag: das letzte
+    // Datum einer vergangenen Woche ist vorbei.
+    const today = getBerlinDateStr();
+    const stillOpen = (d: string) => {
+      if (d !== today) return false;
+      const cell = cellOf(d);
+      if (fulfilled(cell)) return false;
+      return !missIsFinal || !cell || cell.value === null;
+    };
 
     let tracked = 0;
     let targeted = 0;
     let met = 0;
     let measured = 0;
-    let run = 0;
-    let bestStreak = 0;
 
     for (const date of dateRange(from, to)) {
       // Heute ohne Eintrag zählt weder für noch gegen die Quote — der Tag läuft.
@@ -753,21 +775,23 @@ export class AnalyticsService {
       // Ein Ziel galt, auch wenn es sich nicht auflösen ließ (`zielfehlt`).
       if (cell && (cell.base !== null || cell.targetHint)) targeted++;
 
-      if (fulfilled(cell)) {
-        run++;
-        bestStreak = Math.max(bestStreak, run);
-      } else {
-        run = 0;
-      }
-
       if (!cell || cell.value === null) continue;
       measured++;
       if (fulfilled(cell)) met++;
     }
 
+    // Rekord: längste Serie ab `streakFrom`.
+    let run = 0;
+    let bestStreak = 0;
+    for (const date of dateRange(streakFrom, to)) {
+      if (off(date) || stillOpen(date)) continue;
+      run = fulfilled(cellOf(date)) ? run + 1 : 0;
+      bestStreak = Math.max(bestStreak, run);
+    }
+
     // Streak rückwärts ab `to`; Off-Days werden übersprungen, nicht gewertet.
     let streak = 0;
-    for (let d = to; d >= from; d = addDays(d, -1)) {
+    for (let d = to; d >= streakFrom; d = addDays(d, -1)) {
       if (off(d)) continue;
       if (fulfilled(cellOf(d))) streak++;
       else if (stillOpen(d)) continue;

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService, type DayMetric, type MetricMatrix } from './AnalyticsService';
 
 /** Eine Zelle mit Ziel 1 — wie bei Regeln und Ursachen. */
@@ -9,6 +9,14 @@ const zelle = (value: number | null, state: DayMetric['state'], base: number | n
 
 const matrixAus = (key: string, tage: Record<string, DayMetric>): MetricMatrix =>
   Object.fromEntries(Object.entries(tage).map(([d, c]) => [d, { [key]: c }]));
+
+/** Welcher Tag „heute" ist — nur der echte heutige Tag kann noch offen sein. */
+const heute = (d: string) => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(`${d}T10:00:00.000Z`));
+};
+
+afterEach(() => vi.useRealTimers());
 
 describe('AnalyticsService.summarize', () => {
   // 2026-10-10 Sa, 11 So, 12 Mo, 13 Di
@@ -43,6 +51,7 @@ describe('AnalyticsService.summarize', () => {
   });
 
   it('heute ohne Eintrag zählt nicht in die Quote — der Tag läuft noch', () => {
+    heute('2026-10-13');
     const m = matrixAus('rule.x', {
       '2026-10-12': zelle(1, 'soll'),
       '2026-10-13': zelle(null, 'ungemessen'),
@@ -62,6 +71,7 @@ describe('AnalyticsService.summarize', () => {
   });
 
   it('ein gebrochener Tag reißt die Serie, der Rekord bleibt; heute offen bricht nichts', () => {
+    heute('2026-10-11');
     const m = matrixAus('rule.x', {
       '2026-10-07': zelle(1, 'soll'),
       '2026-10-08': zelle(1, 'soll'),
@@ -81,5 +91,53 @@ describe('AnalyticsService.summarize', () => {
     });
     const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-07', '2026-10-09');
     expect(s).toMatchObject({ streak: 1, bestStreak: 1 });
+  });
+
+  it('die Serie läuft über den Phasenschnitt, die Quote beginnt neu', () => {
+    heute('2026-10-07');
+    // Fr 02. verfehlt, Sa 03. + Mo 05. + Di 06. erfüllt, So 04. frei, Mi 07. (Phase 2) noch offen.
+    const m = matrixAus('training.sessions', {
+      '2026-10-02': zelle(0, 'unter'),
+      '2026-10-03': zelle(1, 'soll'),
+      '2026-10-04': zelle(null, 'offday'),
+      '2026-10-05': zelle(1, 'soll'),
+      '2026-10-06': zelle(1, 'soll'),
+      '2026-10-07': zelle(null, 'ungemessen'),
+    });
+    const s = AnalyticsService.summarize(m, 'training.sessions', '2026-10-07', '2026-10-07', {
+      streakFrom: '2026-10-01',
+    });
+    expect(s).toMatchObject({ streak: 3, bestStreak: 3, tracked: 0, adherence: null });
+  });
+
+  it('heute abgewählt bricht die Serie nicht — bei Ursachen läuft der Tag noch', () => {
+    heute('2026-10-07');
+    const m = matrixAus('training.sessions', {
+      '2026-10-05': zelle(1, 'soll'),
+      '2026-10-06': zelle(1, 'soll'),
+      '2026-10-07': zelle(0, 'unter'), // Haken gesetzt und wieder entfernt
+    });
+    const s = AnalyticsService.summarize(m, 'training.sessions', '2026-10-05', '2026-10-07');
+    expect(s).toMatchObject({ streak: 2, tracked: 2, adherence: 1 });
+  });
+
+  it('bei Regeln steht ein Rückfall sofort fest, auch heute', () => {
+    heute('2026-10-07');
+    const m = matrixAus('rule.x', {
+      '2026-10-06': zelle(1, 'soll'),
+      '2026-10-07': zelle(0, 'unter'),
+    });
+    const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-06', '2026-10-07', { missIsFinal: true });
+    expect(s).toMatchObject({ streak: 0, tracked: 2, met: 1 });
+  });
+
+  it('das letzte Datum einer vergangenen Woche ist nicht „heute"', () => {
+    heute('2026-10-20');
+    const m = matrixAus('training.sessions', {
+      '2026-10-12': zelle(1, 'soll'),
+      '2026-10-13': zelle(null, 'ungemessen'),
+    });
+    const s = AnalyticsService.summarize(m, 'training.sessions', '2026-10-12', '2026-10-13');
+    expect(s).toMatchObject({ tracked: 2, targeted: 2, adherence: 0.5, streak: 0 });
   });
 });

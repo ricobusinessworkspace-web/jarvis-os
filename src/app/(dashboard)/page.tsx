@@ -34,11 +34,13 @@ async function Today() {
 
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthEnd = lastDayOfMonth(today);
-  // Quoten und Serien zählen ab Beginn der laufenden Phase: der
-  // Systemwechsel am Phasenstart soll nicht in die neue Quote hineinrechnen.
+  // Quoten zählen ab Beginn der laufenden Phase: der Systemwechsel soll nicht
+  // in die neue Quote hineinrechnen. Serien laufen über den Schnitt weiter.
   const phase = currentPhase(today);
-  const summaryFrom = evaluationStart(block.beforeStart ? monthStart : block.blockStart, today);
-  const from = summaryFrom < monthStart ? summaryFrom : monthStart;
+  const blockFrom = block.beforeStart ? monthStart : block.blockStart;
+  const summaryFrom = evaluationStart(blockFrom, today);
+  // Geladen wird ab Blockstart: Serien laufen über den Phasenschnitt hinweg.
+  const from = blockFrom < monthStart ? blockFrom : monthStart;
 
   // Nacheinander, nicht parallel: der Supabase-Pooler gibt pro Instanz genau
   // eine Verbindung (connection_limit=1). Ein Promise.all lässt die Abfragen
@@ -50,10 +52,14 @@ async function Today() {
   // Welche Regeln es gibt, steht in der Datenbank (Domäne `rules`), nicht hier.
   const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
 
+  const ruleKeys = new Set(rules.map(r => r.key));
   const summaries = Object.fromEntries(
-    [...URSACHEN.map(m => m.key), ...rules.map(r => r.key)].map(key => [
+    [...URSACHEN.map(m => m.key), ...ruleKeys].map(key => [
       key,
-      AnalyticsService.summarize(matrix, key, summaryFrom, today),
+      AnalyticsService.summarize(matrix, key, summaryFrom, today, {
+        streakFrom: from,
+        missIsFinal: ruleKeys.has(key), // ein Rückfall steht sofort fest
+      }),
     ])
   );
 
@@ -147,7 +153,10 @@ async function Today() {
           targetHint={calls.targetHint}
           footLeft="Ziel aus CRM-Profil"
           footRight={
-            callsWeek ? `${callsWeek.met}/${callsWeek.targeted} Tage ${phase ? `in Phase ${phase.nummer}` : 'im Block'}` : undefined
+            // Am ersten Tag einer Phase ist noch kein Tag abgeschlossen — dann nichts statt „0/0".
+            callsWeek?.targeted
+              ? `${callsWeek.met}/${callsWeek.targeted} Tage ${phase ? `in Phase ${phase.nummer}` : 'im Block'}`
+              : undefined
           }
         />
 

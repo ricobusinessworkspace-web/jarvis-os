@@ -195,7 +195,9 @@ const performanceWochenverlauf: Werkzeug = {
         ...w,
         phasen: PHASES.filter(p => p.von <= w.bis && (p.bis === null || p.bis >= w.von)).map(p => p.nummer),
         kennzahlen: definitionen.map(d => {
-          const summary = AnalyticsService.summarize(matrix, d.key, w.von, w.bis);
+          const summary = AnalyticsService.summarize(matrix, d.key, w.von, w.bis, {
+            missIsFinal: d.domain === 'rules',
+          });
           const gemessen = dateRange(w.von, w.bis)
             .map(tag => matrix[tag]?.[d.key]?.value)
             .filter((wert): wert is number => wert !== null && wert !== undefined);

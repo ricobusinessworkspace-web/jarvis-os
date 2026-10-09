@@ -37,15 +37,23 @@ async function Health() {
   const phase = currentPhase(today);
   const monthStart = `${today.slice(0, 7)}-01`;
   const monthEnd = lastDayOfMonth(today);
-  const summaryFrom = evaluationStart(block.beforeStart ? monthStart : block.blockStart, today);
-  const from = summaryFrom < monthStart ? summaryFrom : monthStart;
+  const blockFrom = block.beforeStart ? monthStart : block.blockStart;
+  const summaryFrom = evaluationStart(blockFrom, today);
+  // Geladen wird ab Blockstart: Serien laufen über den Phasenschnitt hinweg.
+  const from = blockFrom < monthStart ? blockFrom : monthStart;
 
   const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
   const keys = [...FUNDAMENT.map(m => m.key), ...rules.map(r => r.key)];
   const matrix = await AnalyticsService.getMatrix(from, monthEnd, keys);
 
   const summaries = Object.fromEntries(
-    keys.map(key => [key, AnalyticsService.summarize(matrix, key, summaryFrom, today)])
+    keys.map(key => [
+      key,
+      AnalyticsService.summarize(matrix, key, summaryFrom, today, {
+        streakFrom: from,
+        missIsFinal: rules.some(r => r.key === key), // ein Rückfall steht sofort fest
+      }),
+    ])
   );
 
   const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
@@ -102,7 +110,7 @@ async function Health() {
           {shortDate(previous.von)}–{shortDate(previous.bis!)}) hat zusätzlich Schlaf, Kalorien und
           Gewicht bewertet. Seit Phase {phase!.nummer} sind die drei ohne Ziel: was Apple Health noch
           liefert, steht im Verlauf als <span className="text-foreground">erfasst</span>, die Wochen davor
-          bleiben vollständig lesbar — auch für ChatGPT. Quoten und Serien zählen ab dem Phasenstart.
+          bleiben vollständig lesbar — auch für ChatGPT. Quoten zählen ab dem Phasenstart, Serien laufen über den Schnitt hinweg weiter.
         </p>
       )}
     </>

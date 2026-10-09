@@ -21,6 +21,7 @@ export default defineConfig({
     },
     exclude: [
       'node_modules/**',
+      '.claude/**', // Worktrees paralleler Sessions bringen eigene node_modules mit
       '.next/**',
       'dist/**',
       'prisma/**',
