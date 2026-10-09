@@ -13,6 +13,13 @@ export const BLOCK_START = '2026-09-01';
 export const BLOCK_WEEKS = 12;
 export const TRACKED_WEEKDAYS = [1, 2, 3, 4, 5, 6]; // ISO: 1=Mo … 6=Sa
 export const OFF_WEEKDAY = 7; // Sonntag
+/**
+ * Der Sonntag rettet jede Serie (Rico, 09.10.). Für Ursachen und Routinen ist
+ * er ohnehin Off-Day; Regeln gelten auch sonntags — ein gehaltener Sonntag
+ * zählt in die Serie, ein gebrochener reißt sie nicht. Die Quote bleibt
+ * ehrlich: dort zählt der Rückfall voll.
+ */
+export const JOKER_WEEKDAY = OFF_WEEKDAY;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const BLOCK_DAYS = BLOCK_WEEKS * 7;
@@ -29,6 +36,10 @@ export function isoWeekday(dateStr: string): number {
 
 export function isOffDay(dateStr: string): boolean {
   return isoWeekday(dateStr) === OFF_WEEKDAY;
+}
+
+export function isJokerDay(dateStr: string): boolean {
+  return isoWeekday(dateStr) === JOKER_WEEKDAY;
 }
 
 export function addDays(dateStr: string, days: number): string {

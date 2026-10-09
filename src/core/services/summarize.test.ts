@@ -131,6 +131,62 @@ describe('AnalyticsService.summarize', () => {
     expect(s).toMatchObject({ streak: 0, tracked: 2, met: 1 });
   });
 
+  describe('Sonntag ist Joker', () => {
+    // 2026-10-10 Sa, 11 So, 12 Mo
+    it('ein gehaltener Sonntag zählt in die Serie (+1)', () => {
+      const m = matrixAus('rule.x', {
+        '2026-10-10': zelle(1, 'soll'),
+        '2026-10-11': zelle(1, 'soll'),
+        '2026-10-12': zelle(1, 'soll'),
+      });
+      const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-10', '2026-10-12');
+      expect(s).toMatchObject({ streak: 3, bestStreak: 3 });
+    });
+
+    it('ein gebrochener Sonntag reißt die Serie nicht — Quote und Rückfall bleiben', () => {
+      const m = matrixAus('rule.x', {
+        '2026-10-09': zelle(1, 'soll'),
+        '2026-10-10': zelle(1, 'soll'),
+        '2026-10-11': zelle(0, 'unter'),
+        '2026-10-12': zelle(1, 'soll'),
+      });
+      const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-09', '2026-10-12', { missIsFinal: true });
+      expect(s).toMatchObject({ streak: 3, bestStreak: 3, tracked: 4, measured: 4, met: 3, adherence: 0.75 });
+    });
+
+    it('auch ein Rückfall an einem heutigen Sonntag ist gerettet (`missIsFinal`)', () => {
+      heute('2026-10-11');
+      const m = matrixAus('rule.x', {
+        '2026-10-09': zelle(1, 'soll'),
+        '2026-10-10': zelle(1, 'soll'),
+        '2026-10-11': zelle(0, 'unter'),
+      });
+      const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-09', '2026-10-11', { missIsFinal: true });
+      expect(s).toMatchObject({ streak: 2, bestStreak: 2, tracked: 3, met: 2 });
+    });
+
+    it('ein Montag rettet nichts', () => {
+      const m = matrixAus('rule.x', {
+        '2026-10-10': zelle(1, 'soll'),
+        '2026-10-11': zelle(1, 'soll'),
+        '2026-10-12': zelle(0, 'unter'),
+        '2026-10-13': zelle(1, 'soll'),
+      });
+      const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-10', '2026-10-13');
+      expect(s).toMatchObject({ streak: 1, bestStreak: 2 });
+    });
+
+    it('`jokerWeekday: null` schaltet den Joker ab', () => {
+      const m = matrixAus('rule.x', {
+        '2026-10-10': zelle(1, 'soll'),
+        '2026-10-11': zelle(0, 'unter'),
+        '2026-10-12': zelle(1, 'soll'),
+      });
+      const s = AnalyticsService.summarize(m, 'rule.x', '2026-10-10', '2026-10-12', { jokerWeekday: null });
+      expect(s).toMatchObject({ streak: 1, bestStreak: 1 });
+    });
+  });
+
   it('das letzte Datum einer vergangenen Woche ist nicht „heute"', () => {
     heute('2026-10-20');
     const m = matrixAus('training.sessions', {

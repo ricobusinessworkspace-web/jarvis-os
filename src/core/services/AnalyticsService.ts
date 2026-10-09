@@ -1,6 +1,6 @@
 import { prisma } from '../db';
 import { getBerlinDateStr } from '@/lib/dateUtils';
-import { blockInfo, dateRange, isOffDay, isoWeekday, addDays } from '@/lib/blocks';
+import { blockInfo, dateRange, isOffDay, isoWeekday, addDays, JOKER_WEEKDAY } from '@/lib/blocks';
 
 /**
  * Semantic Layer — rechnet Tageswerte on-read aus den vorhandenen Quellen.
@@ -59,7 +59,10 @@ export interface MetricSummary {
   adherence: number | null;
   /** measured / tracked — 0…1. Eine hohe Adherence bei niedriger Coverage sagt etwas anderes. */
   coverage: number | null;
-  /** Aktuelle Serie erfüllter Tage, rückwärts ab `to`. Off-Days unterbrechen sie nicht. */
+  /**
+   * Aktuelle Serie erfüllter Tage, rückwärts ab `to`. Off-Days unterbrechen sie
+   * nicht, ein verfehlter Joker-Tag (Sonntag) auch nicht.
+   */
   streak: number;
   /** Längste Serie im Zeitraum. */
   bestStreak: number;
@@ -742,8 +745,17 @@ export class AnalyticsService {
      * `missIsFinal`: ein Verfehlen steht sofort fest, auch heute — bei Regeln
      * ist ein eingetragener Rückfall endgültig. Sonst ist heute bis zum
      * Tagesende offen, auch wenn ein Haken wieder entfernt wurde.
+     *
+     * `jokerWeekday`: an diesem Wochentag zählt ein erfüllter Tag in die Serie,
+     * ein verfehlter wird für Serie und Rekord übersprungen — auch ein
+     * endgültiger Rückfall (`missIsFinal`) an einem heutigen Sonntag. Die
+     * Quote betrifft das nicht. `null` schaltet den Joker ab.
      */
-    { streakFrom = from, missIsFinal = false }: { streakFrom?: string; missIsFinal?: boolean } = {}
+    {
+      streakFrom = from,
+      missIsFinal = false,
+      jokerWeekday = JOKER_WEEKDAY,
+    }: { streakFrom?: string; missIsFinal?: boolean; jokerWeekday?: number | null } = {}
   ): MetricSummary {
     const cellOf = (d: string) => matrix[d]?.[metricKey];
     const off = (d: string) => {
@@ -761,6 +773,9 @@ export class AnalyticsService {
       if (fulfilled(cell)) return false;
       return !missIsFinal || !cell || cell.value === null;
     };
+    // Verfehlter Joker-Tag: zählt nicht, reißt aber auch nichts.
+    const joker = (d: string) =>
+      jokerWeekday !== null && isoWeekday(d) === jokerWeekday && !fulfilled(cellOf(d));
 
     let tracked = 0;
     let targeted = 0;
@@ -784,15 +799,16 @@ export class AnalyticsService {
     let run = 0;
     let bestStreak = 0;
     for (const date of dateRange(streakFrom, to)) {
-      if (off(date) || stillOpen(date)) continue;
+      if (off(date) || stillOpen(date) || joker(date)) continue;
       run = fulfilled(cellOf(date)) ? run + 1 : 0;
       bestStreak = Math.max(bestStreak, run);
     }
 
-    // Streak rückwärts ab `to`; Off-Days werden übersprungen, nicht gewertet.
+    // Streak rückwärts ab `to`; Off-Days und verfehlte Joker-Tage werden
+    // übersprungen, nicht gewertet.
     let streak = 0;
     for (let d = to; d >= streakFrom; d = addDays(d, -1)) {
-      if (off(d)) continue;
+      if (off(d) || joker(d)) continue;
       if (fulfilled(cellOf(d))) streak++;
       else if (stillOpen(d)) continue;
       else break;

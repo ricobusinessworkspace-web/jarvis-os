@@ -348,6 +348,13 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **Sonntag ist Joker für jede Serie** (Rico, 09.10.). `summarize` überspringt
+  einen verfehlten Sonntag für Serie und Rekord (`jokerWeekday`, Standard
+  `JOKER_WEEKDAY` = 7 aus `blocks.ts`, `null` schaltet ab) — auch einen
+  endgültigen Rückfall an einem heutigen Sonntag. Ein gehaltener Sonntag zählt
+  +1. Quote und Rückfall-Zähler sehen den Rückfall voll. Für Ursachen/Routinen
+  ändert sich nichts (Sonntag ist dort Off-Day). Standard statt Aufrufer-Option,
+  damit kein Aufrufer (Dashboard, Health, Vertrieb, MCP) ihn vergisst.
 - **Heute ist offen, bis es erfüllt ist** — zählt nicht in die Quote, bricht
   keine Serie, auch wenn ein Haken wieder entfernt wurde (`not_done` heute).
   Nur der echte heutige Tag (`getBerlinDateStr`), nicht das letzte Datum einer
