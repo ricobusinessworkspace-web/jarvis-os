@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { getBerlinDateStr } from '@/lib/dateUtils';
+import { TrackingService } from './TrackingService';
 
 export class RoutineService {
   static async getGProjectScore() {
@@ -54,7 +55,8 @@ export class RoutineService {
     try {
       const today = new Date();
       const localTodayStr = getBerlinDateStr(today);
-      return await this.logTrackerItem(itemId, 'completed', localTodayStr);
+      await TrackingService.setzeSchritt(itemId, localTodayStr, 'completed');
+      return { success: true };
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : 'Unbekannter Fehler' };
     }
@@ -245,20 +247,6 @@ export class RoutineService {
       });
   
       return { success: true, data: updated };
-    } catch (error: unknown) {
-      return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
-    }
-  }
-
-  static async logTrackerItem(itemId: string, status: string, dateStr: string) {
-    try {
-      const date = new Date(`${dateStr}T00:00:00.000Z`);
-      const log = await prisma.trackerLog.upsert({
-        where: { itemId_date: { itemId, date } },
-        update: { status, completedAt: status === 'completed' ? new Date() : null },
-        create: { itemId, date, status, completedAt: status === 'completed' ? new Date() : null }
-      });
-      return { success: true, data: log };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
     }

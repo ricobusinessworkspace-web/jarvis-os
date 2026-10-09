@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidateTracking } from '@/lib/revalidate';
+import { TrackingService } from '@/core/services/TrackingService';
 
 /**
  * Werte eines einzelnen Tages nachtragen oder korrigieren.
@@ -99,29 +100,12 @@ export async function clearManualValue(metricKey: string, dateStr: string) {
 
 /**
  * Entfernt den Tageseintrag einer Ursache komplett — der Tag steht danach
- * wieder auf „nicht gemessen" statt auf „nicht geschafft".
+ * wieder auf „nicht gemessen" statt auf „nicht geschafft". Bei Regeln: der
+ * Rückfall ist zurückgenommen.
  */
 export async function clearCause(metricKey: string, dateStr: string) {
   try {
-    const source = await prisma.coreMetricSource.findFirst({
-      where: { metricKey, kind: 'tracker', isActive: true },
-      orderBy: { priority: 'desc' },
-    });
-    const config = (source?.config ?? {}) as Record<string, unknown>;
-    const trackerName = typeof config.tracker === 'string' ? config.tracker : '';
-    const itemTitle = typeof config.item === 'string' ? config.item : '';
-    if (!trackerName || !itemTitle) return { success: false, error: 'Keine manuelle Quelle hinterlegt.' };
-
-    const item = await prisma.trackerItem.findFirst({
-      where: { title: itemTitle, tracker: { name: trackerName } },
-      select: { id: true },
-    });
-    if (!item) return { success: false, error: 'Tracker-Eintrag fehlt.' };
-
-    await prisma.trackerLog.deleteMany({
-      where: { itemId: item.id, date: new Date(`${dateStr}T00:00:00.000Z`) },
-    });
-
+    await TrackingService.loescheUrsache(metricKey, dateStr);
     revalidateTracking();
     return { success: true };
   } catch (error) {

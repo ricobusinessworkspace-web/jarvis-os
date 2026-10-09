@@ -1,14 +1,13 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
+import { TrackingService } from '@/core/services/TrackingService';
 import { revalidateTracking } from '@/lib/revalidate';
 
 /**
- * Hakt eine Ursache für einen Tag ab — oder wieder ab.
+ * Hakt eine Ursache (oder Regel) für einen Tag ab — oder wieder ab.
  *
- * Geschrieben wird in den Tracker, den die Metrik als manuelle Quelle in
- * `core_metric_sources` führt. Welcher Tracker das ist, steht also in der
- * Konfiguration und nicht hier im Code.
+ * Dünne Hülle um `TrackingService.setzeUrsache`: derselbe Schreibweg wie für
+ * ChatGPT. In welchen Tracker geschrieben wird, steht in `core_metric_sources`.
  *
  * `not_done` ist ein bewusst gesetzter Zustand und etwas anderes als eine
  * fehlende Zeile: abgehakt-und-wieder-abgewählt heißt „heute nicht geschafft",
@@ -16,37 +15,7 @@ import { revalidateTracking } from '@/lib/revalidate';
  */
 export async function toggleCause(metricKey: string, dateStr: string, done: boolean) {
   try {
-    const source = await prisma.coreMetricSource.findFirst({
-      where: { metricKey, kind: 'tracker', isActive: true },
-      orderBy: { priority: 'desc' },
-    });
-
-    const config = (source?.config ?? {}) as Record<string, unknown>;
-    const trackerName = typeof config.tracker === 'string' ? config.tracker : '';
-    const itemTitle = typeof config.item === 'string' ? config.item : '';
-
-    if (!trackerName || !itemTitle) {
-      return { success: false, error: `Für ${metricKey} ist keine manuelle Quelle hinterlegt.` };
-    }
-
-    const item = await prisma.trackerItem.findFirst({
-      where: { title: itemTitle, tracker: { name: trackerName } },
-      select: { id: true },
-    });
-
-    if (!item) {
-      return { success: false, error: `Tracker-Eintrag „${trackerName} / ${itemTitle}" fehlt.` };
-    }
-
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
-    const status = done ? 'completed' : 'not_done';
-
-    await prisma.trackerLog.upsert({
-      where: { itemId_date: { itemId: item.id, date } },
-      update: { status, completedAt: done ? new Date() : null },
-      create: { itemId: item.id, date, status, completedAt: done ? new Date() : null },
-    });
-
+    await TrackingService.setzeUrsache(metricKey, dateStr, done);
     revalidateTracking();
     return { success: true };
   } catch (error) {

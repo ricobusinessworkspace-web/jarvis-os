@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { revalidateTracking } from '@/lib/revalidate';
+import { TrackingService, type HakenStatus } from '@/core/services/TrackingService';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -164,18 +165,14 @@ export async function savePersonalLog(data: any) {
   }
 }
 
+/** Ein Routine-Schritt für einen Tag — dünne Hülle um `TrackingService.setzeSchritt`. */
 export async function logTrackerItem(itemId: string, status: string, dateStr: string) {
   try {
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
-    const log = await prisma.trackerLog.upsert({
-      where: { itemId_date: { itemId, date } },
-      update: { status, completedAt: status === 'completed' ? new Date() : null },
-      create: { itemId, date, status, completedAt: status === 'completed' ? new Date() : null }
-    });
+    await TrackingService.setzeSchritt(itemId, dateStr, status as HakenStatus);
     revalidateTracking();
-    return { success: true, data: log };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' };
   }
 }
 

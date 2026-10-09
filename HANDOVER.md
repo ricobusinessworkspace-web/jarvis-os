@@ -348,6 +348,17 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **Ein Schreibweg für Haken: `TrackingService`** (09.10., Schritt 2).
+  `setzeUrsache` / `loescheUrsache` (Ursachen und Regeln, Haken aus
+  `core_metric_sources`), `setzeSchritt` (Routine, nur im Gültigkeitsfenster
+  `active_from`/`archived_on`), `schritteAm(datum)`. Jede Funktion meldet
+  `{ vorher, nachher, geaendert }` und schreibt nicht, wenn schon steht, was
+  soll (idempotent). Metriken, deren **vorrangige** Quelle kein Haken ist
+  (Calls → CRM), werden abgelehnt. `toggleCause`, `clearCause` und
+  `logTrackerItem` sind nur noch Hüllen mit `revalidateTracking()`;
+  `RoutineService.logTrackerItem` ist entfallen. Im Browser gegen echte Daten
+  geprüft (Post an/zurück, Routine-Schritt an/aus), Testzeile danach gelöscht,
+  Tag wieder ohne Haken.
 - **ChatGPT liest, was die Zahlen bedeuten** (09.10., Schritt 1 des Plans).
   `DatenbasisService` leitet je Metrik ab, was ein leerer Tag heißt
   (`gehalten` aus `assumeDoneFrom`, `null` aus `zeroFrom`/`impliesZero`, sonst
