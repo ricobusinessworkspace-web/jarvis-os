@@ -96,6 +96,6 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
 }
 
 function avg(rows: CauseRow[], key: 'adherence' | 'coverage'): number | null {
-  const values = rows.map(r => r[key]).filter((v): v is number => v !== null);
+  const values = rows.map(r => r[key]).filter((v): v is number => Number.isFinite(v));
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }

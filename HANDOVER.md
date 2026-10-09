@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-09
-last_agent: Claude Opus 5.5 — Phase 2: Regeln, Routine-Archiv, Körperwerte ohne Ziel
+last_agent: Claude Opus 5.5 — NaN-Konsolenfehler (RulesCard) behoben
 status: In Progress
 ---
 
@@ -361,6 +361,24 @@ Pipeline sind nur Folgen.
 
 ## Gelöste Probleme (nicht wiederholen)
 
+- **Problem:** Konsolenfehler „Received NaN for the `children` attribute",
+  scheinbar auf allen Reitern (auch `/mail`), im HTML kein NaN.
+  **Ursache (07.10.):** Nicht die Shell, sondern `RulesCard` — „Rückfälle"
+  war `rows.reduce((n, r) => n + r.broken, 0)` in einem `<span>` ohne
+  weitere Kinder. Beim Hot Reload (Commit `d2d45b8` hat `broken` eingeführt)
+  bekam die neue Karte noch Zeilen der alten Seite ohne das Feld:
+  `0 + undefined = NaN`. Belegt in `.next/dev/logs/next-development.log`:
+  einmalig, direkt nach „Compiled", Stack `commitUpdate` (Update, kein
+  Erst-Render). Dass es „auf allen Reitern" stand: das Dev-Overlay behält
+  den Fehler beim Wechsel per Client-Navigation.
+  **Lösung:** Summe wird `null`, sobald einer Zeile die Zahl fehlt → „–".
+  Serie in `HabitRow` zeigt „–" statt NaN (Tooltip entfällt dann), die Mittelwerte in Ursachen und
+  Regeln überspringen fehlende Werte (`Number.isFinite` statt `!== null`).
+  Test `RulesCard.test.tsx` spielt den Hot Reload nach.
+  **Warum wichtig:** Production war nie betroffen (`page.tsx` setzt `broken`
+  immer). Bei Dev-Fehlern ohne Komponentennamen zuerst die Dev-Log-Datei
+  lesen — sie hat Zeitpunkt und Stack, die Browser-Konsole oft nicht mehr.
+
 - **Problem:** Routine von 8 auf 6 Schritte gekürzt (nach dem 28.09.) — die
   Haken der gestrichenen Schritte waren weg, und alle vergangenen Tage wurden
   gegen die neue Schrittzahl bewertet.
@@ -577,9 +595,6 @@ Pipeline sind nur Folgen.
 
 ## Offene Entscheidungen
 
-- **Konsolenfehler „Received NaN … children"** auf allen Reitern (auch `/mail`),
-  im HTML steht kein NaN — kommt aus einer Client-Komponente der Shell. Als
-  eigene Aufgabe vorgeschlagen, nicht behoben.
 - **`core:seed` ist veraltet — nicht ausführen.** Er ersetzt *alle* Quellen
   durch seine Liste, kennt aber die CRM-Quellen (`crm_metrics`, seit 12.09.)
   und die Regeln nicht. Ein Lauf klemmt Calls, Trichter und Regeln ab.

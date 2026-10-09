@@ -47,7 +47,7 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
   const sinceLabel = new Date(`${since}T12:00:00Z`).toLocaleDateString('de-DE', {
     day: 'numeric', month: 'numeric', timeZone: 'UTC',
   });
-  const broken = rows.reduce((n, r) => n + r.broken, 0);
+  const relapses = sumRelapses(rows);
 
   return (
     <div className="crm-card h-full">
@@ -85,7 +85,7 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
           Gehalten <span className="font-mono text-foreground">{formatPercent(avg(rows))}</span>
         </span>
         <span>
-          Rückfälle <span className="font-mono text-foreground">{broken}</span>
+          Rückfälle <span className="font-mono text-foreground">{relapses ?? '–'}</span>
         </span>
       </div>
     </div>
@@ -93,6 +93,20 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
 }
 
 function avg(rows: RuleRow[]): number | null {
-  const values = rows.map(r => r.adherence).filter((v): v is number => v !== null);
+  const values = rows.map(r => r.adherence).filter((v): v is number => Number.isFinite(v));
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
+/**
+ * Fehlt einer Zeile die Zahl, ist die Summe unbekannt — dann „–" statt NaN.
+ * Passiert im Dev beim Hot Reload: die neue Karte bekommt noch die Zeilen der
+ * alten Seite, ohne `broken`, und `0 + undefined` landet als NaN im DOM.
+ */
+function sumRelapses(rows: RuleRow[]): number | null {
+  let sum = 0;
+  for (const r of rows) {
+    if (!Number.isFinite(r.broken)) return null;
+    sum += r.broken;
+  }
+  return sum;
 }
