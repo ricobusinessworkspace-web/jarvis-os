@@ -371,7 +371,7 @@ Pipeline sind nur Folgen.
   einmalig, direkt nach „Compiled", Stack `commitUpdate` (Update, kein
   Erst-Render). Dass es „auf allen Reitern" stand: das Dev-Overlay behält
   den Fehler beim Wechsel per Client-Navigation.
-  **Lösung:** Summe wird `null`, sobald einer Zeile die Zahl fehlt → „–".
+  **Lösung (live seit 09.10., `15d2ad7`):** Summe wird `null`, sobald einer Zeile die Zahl fehlt → „–".
   Serie in `HabitRow` zeigt „–" statt NaN (Tooltip entfällt dann), die Mittelwerte in Ursachen und
   Regeln überspringen fehlende Werte (`Number.isFinite` statt `!== null`).
   Test `RulesCard.test.tsx` spielt den Hot Reload nach.
