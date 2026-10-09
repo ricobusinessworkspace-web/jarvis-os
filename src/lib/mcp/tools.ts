@@ -10,6 +10,7 @@ import { EMPTY_METRIC, FEIERABEND_HOUR } from '@/lib/metricState';
 import { PHASES, phaseOf } from '@/lib/phases';
 import { WerkzeugFehler, type Werkzeug } from './protocol';
 import { DATENBASIS_WERKZEUGE } from './datenbasis';
+import { ABHAK_WERKZEUGE } from './abhaken';
 import { datenstand, ganzzahl, LIMIT_SCHEMA, metrik, nurErlaubt, NUR_LESEN, phasen, rund, zeichenkette } from './hilfen';
 
 /**
@@ -463,4 +464,5 @@ export const WERKZEUGE: Werkzeug[] = [
   zieleAnzeigen,
   mailWarteschlange,
   mailEntwurfSpeichern,
+  ...ABHAK_WERKZEUGE,
 ];

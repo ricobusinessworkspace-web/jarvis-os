@@ -33,7 +33,7 @@ async function main() {
     const { rows } = await client.query(
       `SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public'
-          AND (table_name LIKE 'core_%' OR table_name LIKE 'mail_%')
+          AND (table_name LIKE 'core_%' OR table_name LIKE 'mail_%' OR table_name LIKE 'mcp_%')
         ORDER BY table_name`
     );
     console.log('✓ Migriert:', rows.map(r => r.table_name).join(', '));

@@ -101,3 +101,18 @@ describe('Protokoll', () => {
     expect(await koerperBehandeln([{ jsonrpc: '2.0', method: 'notifications/initialized' }], werkzeuge)).toBeNull();
   });
 });
+
+describe('Aufrufkontext', () => {
+  it('reicht den Client an das Werkzeug durch — auch im Bündel', async () => {
+    const gesehen: unknown[] = [];
+    const spion: Werkzeug = {
+      name: 'spion', title: 'Spion', description: '', annotations: NUR_LESEN,
+      inputSchema: { type: 'object' },
+      async run(_args, kontext) { gesehen.push(kontext?.client); return {}; },
+    };
+    await koerperBehandeln(rpc('tools/call', { name: 'spion', arguments: {} }), [spion], undefined, { client: 'ChatGPT · chatgpt.com' });
+    await koerperBehandeln([rpc('tools/call', { name: 'spion', arguments: {} })], [spion], undefined, { client: 'Claude' });
+    await nachrichtBehandeln(rpc('tools/call', { name: 'spion', arguments: {} }), [spion]);
+    expect(gesehen).toEqual(['ChatGPT · chatgpt.com', 'Claude', 'unbekannt']);
+  });
+});

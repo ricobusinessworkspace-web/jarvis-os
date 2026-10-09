@@ -200,3 +200,25 @@ export function zugangPruefen(req: Request): Zugang {
   if (zeichen.scope !== SCOPE) return 'ungueltig';
   return 'ok';
 }
+
+/**
+ * Wer ruft? Für das Schreibprotokoll — nie für eine Zugangsentscheidung.
+ * Aus dem Zeichen: der Name, mit dem sich der Connector registriert hat, und
+ * der Host seiner Rücksprung-Adresse („ChatGPT · chatgpt.com"). Das Geheimnis
+ * direkt heißt: curl, Inspector oder Claude Code.
+ */
+export function clientKennung(req: Request): string {
+  const wert = (req.headers.get('authorization') ?? '').split(' ')[1]?.trim() ?? '';
+  if (!wert) return 'unbekannt';
+  if (geheimnisStimmt(wert)) return 'Zugangswort direkt';
+  const zeichen = macheAuf<{ client_id?: string }>(wert, 'zugang');
+  const kunde = zeichen?.client_id ? macheAuf<{ name?: string; redirect_uris?: string[] }>(zeichen.client_id, 'kunde') : null;
+  if (!kunde) return 'unbekannt';
+  let host = '';
+  try {
+    host = new URL(String(kunde.redirect_uris?.[0] ?? '')).host;
+  } catch {
+    // keine gültige Adresse — dann nur der Name
+  }
+  return [String(kunde.name ?? 'MCP Client').slice(0, 60), host].filter(Boolean).join(' · ');
+}

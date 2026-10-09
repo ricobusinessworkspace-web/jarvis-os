@@ -29,7 +29,17 @@ export interface DaySheetData {
     kind: 'morning' | 'evening';
     items: Array<{ id: string; title: string; done: boolean }>;
   }>;
+  /** Hat ChatGPT (MCP) an diesem Tag etwas eingetragen? Aus `mcp_write_log`, `null` = nein. */
+  ueberAssistent: { werkzeuge: string[]; clients: string[] } | null;
 }
+
+/** Was ein Schreibwerkzeug berührt — für den Hinweis im Verlauf. */
+const BEREICH: Record<string, string> = {
+  ursache_eintragen: 'Ursachen',
+  regel_rueckfall: 'Regeln',
+  routine_schritt: 'Routine',
+  routine_komplett: 'Routine',
+};
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -170,6 +180,16 @@ export function DaySheet({ data }: { data: DaySheetData }) {
         >
           {d.isToday ? 'Heute' : d.isFuture ? 'Zukunft' : d.isOffDay ? 'Off-Day' : 'Nachtragen möglich'}
         </span>
+        {d.ueberAssistent && (
+          <span
+            title={`Eingetragen über ${d.ueberAssistent.clients.join(', ')}: ${[
+              ...new Set(d.ueberAssistent.werkzeuge.map(w => BEREICH[w] ?? w)),
+            ].join(', ')}`}
+            className="rounded-md border border-border px-2 py-0.5 text-[10px] text-muted"
+          >
+            über {d.ueberAssistent.clients.every(c => c.toLowerCase().includes('chatgpt')) ? 'ChatGPT' : 'Assistent'}
+          </span>
+        )}
         <span className="ml-auto font-mono text-[11.5px] text-muted">
           Coverage {d.isOffDay ? '–' : `${Math.round((measured / 3) * 100)} %`}
         </span>

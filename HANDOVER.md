@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-09
-last_agent: Claude Opus 5.5 — NaN-Konsolenfehler (RulesCard) behoben
+last_agent: Claude Opus 5.5 — Plan Schritte 0–3 (Sonntags-Joker, ChatGPT liest/hakt ab); parallel: NaN-Fix RulesCard
 status: In Progress
 ---
 
@@ -348,6 +348,22 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **ChatGPT hakt ab** (09.10., Schritt 3, **lokal fertig, nicht gepusht**).
+  `ursache_eintragen`, `regel_rueckfall`, `routine_schritt`,
+  `routine_komplett` in `src/lib/mcp/abhaken.ts` — nur heute/gestern, über
+  `TrackingService`, Antwort vorher/nachher mit Serie/Rekord aus `summarize`
+  (Matrix ab Blockstart, wie das Dashboard). `neuer_rekord` nur bei echter
+  Handlung und ab 2 Tagen — ein zurückgenommener Rückfall stellt den alten
+  Rekord nur wieder her (im Echttest fiel genau das auf). Namen per
+  Wortanfang, mehrdeutig → Rückfrage. Calls/Körperwerte werden mit Grund
+  abgelehnt. Tabelle `mcp_write_log` (über `core:migrate`, **bereits in der
+  geteilten DB angelegt** — rein additiv, alter Code ignoriert sie); Client
+  kommt aus dem OAuth-Zeichen (`clientKennung`). Verlauf zeigt „über ChatGPT"
+  (bzw. „über Assistent" bei anderen Clients). Gegen echte Daten lokal geprüft,
+  alle Testhaken und Protokollzeilen danach gelöscht. **Offen:** Rico muss in
+  ChatGPT (Browser, chatgpt.com/plugins → Jarvis OS → Refresh) aktualisieren
+  und testen; ob ein privates Plus-Konto Schreibaktionen darf, ist laut
+  OpenAI-Quellen widersprüchlich (`docs/mcp-server.md` §6).
 - **Ein Schreibweg für Haken: `TrackingService`** (09.10., Schritt 2).
   `setzeUrsache` / `loescheUrsache` (Ursachen und Regeln, Haken aus
   `core_metric_sources`), `setzeSchritt` (Routine, nur im Gültigkeitsfenster
@@ -909,6 +925,7 @@ Semantic Layer.
    `npm run build` (prüft auch Typen), `npm test` (Vitest — 62 Prüfungen,
    darunter MCP ohne Datenbank), `npm run test:e2e`
    (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
+   Stand 09.10.: 100 Prüfungen.
 
 ## Dokumente
 

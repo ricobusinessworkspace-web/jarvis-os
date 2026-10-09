@@ -1,6 +1,7 @@
-import { zugangPruefen, wegweiser } from '@/lib/mcp/oauth';
+import { clientKennung, zugangPruefen, wegweiser } from '@/lib/mcp/oauth';
 import { koerperBehandeln } from '@/lib/mcp/protocol';
 import { WERKZEUGE } from '@/lib/mcp/tools';
+import { revalidateTracking } from '@/lib/revalidate';
 
 /**
  * MCP-Server von Jarvis OS — „Streamable HTTP", zustandslos.
@@ -49,7 +50,10 @@ export async function POST(req: Request) {
   }
 
   try {
-    const antwort = await koerperBehandeln(koerper, WERKZEUGE, text => console.warn(text));
+    const antwort = await koerperBehandeln(koerper, WERKZEUGE, text => console.warn(text), {
+      client: clientKennung(req),
+      nachSchreiben: revalidateTracking,
+    });
     // Nur Mitteilungen im Körper: angenommen, nichts zu antworten.
     if (antwort === null) return new Response(null, { status: 202, headers: KEIN_CACHE });
     return Response.json(antwort, { headers: KEIN_CACHE });

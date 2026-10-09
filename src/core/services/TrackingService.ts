@@ -1,4 +1,5 @@
 import { prisma } from '../db';
+import { AnalyticsService } from './AnalyticsService';
 
 /**
  * Der eine Schreibweg für Haken: Ursachen, Regeln und Routine-Schritte.
@@ -95,7 +96,7 @@ export class TrackingService {
    * Rückfall — und etwas anderes als keine Zeile.
    */
   static async setzeUrsache(metricKey: string, datum: string, done: boolean): Promise<Aenderung> {
-    const haken = await this.hakenFuer(metricKey);
+    const haken = await this.hakenImFenster(metricKey, datum);
     return this.schreibe(haken.id, datum, done ? 'completed' : 'not_done');
   }
 
@@ -104,8 +105,43 @@ export class TrackingService {
    * gemessen", eine Regel wieder auf gehalten (Rückfall zurückgenommen).
    */
   static async loescheUrsache(metricKey: string, datum: string): Promise<Aenderung> {
-    const haken = await this.hakenFuer(metricKey);
+    const haken = await this.hakenImFenster(metricKey, datum);
     return this.schreibe(haken.id, datum, null);
+  }
+
+  /** Eine Regel gibt es erst ab ihrem Starttag — davor wäre ein Rückfall unsichtbar. */
+  private static async hakenImFenster(metricKey: string, datum: string): Promise<Schritt> {
+    const haken = await this.hakenFuer(metricKey);
+    if (!giltAm(haken, datum)) throw new TrackingFehler(`„${haken.title}" galt am ${datum} noch nicht.`);
+    return haken;
+  }
+
+  /**
+   * Was sich von Hand abhaken lässt: aktive Metriken, deren vorrangige Quelle
+   * ein einzelner Haken ist — Ursachen wie Training und Post, und die Regeln.
+   * Abgeleitet aus `core_metric_sources`; Calls (CRM) fallen von selbst heraus.
+   */
+  static async abhakbar(): Promise<Array<{ key: string; label: string; domain: string }>> {
+    const { definitions, sources } = await AnalyticsService.getLayer();
+    return definitions
+      .filter(d => d.isActive)
+      .filter(d => {
+        const erste = sources.find(q => q.metricKey === d.key && q.isActive); // nach priority sortiert
+        const c = (erste?.config ?? {}) as Record<string, unknown>;
+        return erste?.kind === 'tracker' && Boolean(text(c.tracker)) && Boolean(text(c.item));
+      })
+      .map(d => ({ key: d.key, label: d.label, domain: d.domain }));
+  }
+
+  /** Die Metrik, die eine Routine zählt — über den Trackernamen in `core_metric_sources`. */
+  static async routineMetrik(trackerName: string): Promise<{ key: string; label: string } | null> {
+    const { definitions, sources } = await AnalyticsService.getLayer();
+    const q = sources.find(s => {
+      const c = (s.config ?? {}) as Record<string, unknown>;
+      return s.isActive && s.kind === 'tracker' && !text(c.item) && text(c.tracker).toLowerCase() === trackerName.toLowerCase();
+    });
+    const d = q && definitions.find(x => x.key === q.metricKey);
+    return d ? { key: d.key, label: d.label } : null;
   }
 
   /**
@@ -124,6 +160,11 @@ export class TrackingService {
       throw new TrackingFehler(`„${item.title}" galt am ${datum} nicht.`);
     }
     return this.schreibe(itemId, datum, status);
+  }
+
+  /** Nimmt den Haken eines Routine-Schritts ganz weg — der Schritt steht wieder offen. */
+  static async loescheSchritt(itemId: string, datum: string): Promise<Aenderung> {
+    return this.schreibe(itemId, datum, null);
   }
 
   /** Die Routine-Schritte, die an einem Tag galten, mit ihrem Haken — für Auswahl per Name. */

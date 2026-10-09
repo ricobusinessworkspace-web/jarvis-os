@@ -2,7 +2,9 @@
 
 Damit ChatGPT (auch per Sprache) und Claude mit Jarvis arbeiten können:
 Tagesüberblick, Aufgaben, Routinen, Ziele und Mail-Warteschlange lesen,
-Mail-Entwürfe speichern. **Senden und Freigeben geht nur in Jarvis selbst.**
+Mail-Entwürfe speichern, **Ursachen, Regel-Rückfälle und Routine-Schritte
+abhaken** (nur heute und gestern). **Senden und Freigeben geht nur in Jarvis
+selbst**, Ziele und Körperwerte ebenso.
 
 Der Lightning-CRM-Connector bleibt davon getrennt und unverändert. Leads,
 Anrufe und CRM-Änderungen laufen weiter über ihn.
@@ -85,7 +87,33 @@ Erwartet `401` (nicht `503` — das hieße: Variable fehlt oder nicht neu veröf
 npx @modelcontextprotocol/inspector --cli https://jarvis-os-indol.vercel.app/api/mcp --transport http --header "Authorization: Bearer DEIN_ZUGANGSWORT" --method tools/list
 ```
 
-Erwartet: sieben Werkzeuge (nach dem Refresh der ChatGPT-Verbindung).
+Erwartet: vierzehn Werkzeuge (seit 09.10.2026).
+
+## 6. Nach einer Änderung an den Werkzeugen: ChatGPT aktualisieren
+
+ChatGPT merkt sich die Werkzeugliste. Ein Deploy allein reicht nicht — neue
+Werkzeuge erscheinen erst nach **Refresh**. Das geht nur im **Browser** (nicht
+in der Handy-App), gilt danach aber im ganzen Konto, also auch auf dem Handy.
+Offizieller Ablauf: [OpenAI — Connect and test your plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata).
+
+1. Am Mac/PC `https://chatgpt.com/plugins` öffnen, mit dem privaten Konto.
+2. Den Eintrag **Jarvis OS** öffnen (selbst eingetragene Server stehen bei den
+   eigenen Plugins, nicht im öffentlichen Verzeichnis).
+3. **Refresh** wählen. Fragt ChatGPT nach Anmeldung: Zugangswort eingeben →
+   **Erlauben**.
+4. Prüfen, dass die neuen Werkzeuge in der Liste stehen
+   (`ursache_eintragen`, `regel_rueckfall`, `routine_schritt`,
+   `routine_komplett`, `jarvis_kontext`, `phasen_vergleich`,
+   `tage_anzeigen`). Lassen sich Werkzeuge einzeln an- und ausschalten: die
+   neuen einschalten — neue Aktionen sind dort teils standardmäßig aus.
+5. **Neue Unterhaltung** beginnen — alte Unterhaltungen behalten die alte Liste.
+6. Erst danach auf dem Handy testen (App ggf. einmal schließen und neu öffnen).
+
+**Offene Frage (09.10.2026):** Laut OpenAI-Hilfe sind Schreibaktionen über
+eigene MCP-Server offiziell für Business/Enterprise/Edu freigegeben; für
+private Plus-Konten widersprechen sich die Quellen. Lehnt ChatGPT ein
+Schreibwerkzeug ab oder bietet es gar nicht an, liegt das am Tarif, nicht an
+Jarvis — die Lesewerkzeuge funktionieren dann trotzdem.
 
 ---
 
@@ -103,9 +131,21 @@ Erwartet: sieben Werkzeuge (nach dem Refresh der ChatGPT-Verbindung).
 | `ziele_anzeigen` | liest | `GoalService.getGoalsPage` — mit Herkunft Jarvis/CRM/Apple Health |
 | `mail_warteschlange_anzeigen` | liest | `MailService.getQueueMitStatus`, `getLooseDrafts` |
 | `mail_entwurf_speichern` | schreibt | `MailService.entwurfSpeichern` — nur Betreff und Text |
+| `ursache_eintragen` | schreibt | `TrackingService.setzeUrsache` / `loescheUrsache` — Training, Post: erledigt · nicht erledigt · zurücksetzen. Calls nie (CRM) |
+| `regel_rueckfall` | schreibt | `TrackingService.setzeUrsache(…, false)` / `loescheUrsache` — Rückfall eintragen oder zurücknehmen |
+| `routine_schritt` | schreibt | `TrackingService.setzeSchritt` / `loescheSchritt` — per Name, nur Schritte, die an dem Tag galten; mehrdeutig → Rückfrage |
+| `routine_komplett` | schreibt | `TrackingService.setzeSchritt` für alle Schritte der Routine |
 
-**Bewusst nicht dabei:** Freigeben, Senden, Löschen, Status ändern, Routinen
-abhaken, irgendetwas am CRM. Vor einem Status- oder Sendewerkzeug muss
+**Regeln für alle Abhak-Werkzeuge:** nur heute und gestern (Berlin), sonst
+„bitte im Verlauf"; Antwort mit vorher/nachher, Serie, Rekord und
+`neuer_rekord` (nur bei echter Handlung, ab 2 Tagen); idempotent
+(`unveraendert` ohne Schreibvorgang); jede echte Änderung landet in
+`mcp_write_log` (Werkzeug, Argumente, vorher/nachher, Client) und der Tag
+bekommt im Verlauf den Hinweis „über ChatGPT". Immer freigeschaltet — kein
+eigener Scope.
+
+**Bewusst nicht dabei:** Freigeben, Senden, Löschen, Status ändern, Ziele,
+Körperwerte, Tagesnotiz, irgendetwas am CRM. Vor einem Status- oder Sendewerkzeug muss
 `MailService.setStatus()` die Zustandsfolge `offen → entwurf → freigegeben →
 gesendet` erst erzwingen (heute prüft es nur Pflichtfelder).
 
@@ -122,6 +162,12 @@ gesendet` erst erzwingen (heute prüft es nur Pflichtfelder).
 - „Welche Mails muss ich heute schreiben?" → `mail_warteschlange_anzeigen`
 - „Schreib einen Entwurf für die erste Mail." → erst Warteschlange, dann
   `mail_entwurf_speichern` — ChatGPT fragt vor dem Speichern nach.
+- **Abnahme per Sprache:** „Ich hab trainiert und gepostet, Morgenroutine ist
+  durch." → `ursache_eintragen` (Training), `ursache_eintragen` (Post),
+  `routine_komplett` (Morgen); ChatGPT nennt die neuen Serien. Danach zeigt
+  das Dashboard es beim nächsten Laden, der Verlauf den Hinweis „über ChatGPT".
+- „Ich hatte gestern einen Rückfall beim Scrolling." → `regel_rueckfall` mit `datum: gestern`.
+- „Trag Training für Montag letzte Woche ein." → Ablehnung: nur heute/gestern, bitte im Verlauf.
 
 ## Fehlerbilder
 
@@ -149,5 +195,7 @@ neu veröffentlichen. Jedes ausgestellte Zeichen ist damit wertlos.
   CRM-Zeichen sind hier ungültig, auch bei gleichem Geheimnis.
 - Einzelplatz: Nutzer ist fest `Rico` (`NUTZER` in `src/lib/mcp/tools.ts`),
   nie ein Werkzeug-Parameter.
-- Tests: `npm test` (OAuth, Protokoll, Mail-Entwurf gegen eine Datenbank im
-  Speicher — nie gegen Supabase).
+- Tests: `npm test` (OAuth, Protokoll, Mail-Entwurf, Abhak-Werkzeuge und
+  `TrackingService` gegen eine Datenbank im Speicher — nie gegen Supabase).
+- Schreibprotokoll ansehen: Supabase → Table Editor → `mcp_write_log`
+  (neueste zuerst nach `created_at`).

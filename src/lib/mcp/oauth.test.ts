@@ -11,7 +11,7 @@ import { POST as token } from '@/app/api/oauth/token/route';
 import { POST as mcpPost, GET as mcpGet } from '@/app/api/mcp/route';
 import { GET as resourceMeta } from '@/app/.well-known/oauth-protected-resource/[[...rest]]/route';
 import { GET as serverMeta } from '@/app/.well-known/oauth-authorization-server/[[...rest]]/route';
-import { rueckSprungErlaubt, zugangPruefen, packe } from './oauth';
+import { rueckSprungErlaubt, zugangPruefen, packe, clientKennung } from './oauth';
 
 const BASIS = 'https://jarvis.example.app';
 const MCP = `${BASIS}/api/mcp`;
@@ -276,6 +276,14 @@ describe('MCP-Zugang', () => {
     const { zeichen } = await anmelden();
     vi.stubEnv('JARVIS_MCP_SECRET', `${GEHEIMNIS}-neu`);
     expect(zugangPruefen(mcpAnfrage(zeichen.access_token))).toBe('ungueltig');
+  });
+
+  it('nennt fürs Schreibprotokoll den Client aus dem Zeichen', async () => {
+    const { zeichen } = await anmelden();
+    expect(clientKennung(mcpAnfrage(zeichen.access_token))).toBe('ChatGPT · chatgpt.com');
+    expect(clientKennung(mcpAnfrage(GEHEIMNIS))).toBe('Zugangswort direkt');
+    expect(clientKennung(mcpAnfrage('abc.def'))).toBe('unbekannt');
+    expect(clientKennung(mcpAnfrage(null))).toBe('unbekannt');
   });
 
   it('GET auf /api/mcp ist 405 (kein Ereignisstrom)', () => {

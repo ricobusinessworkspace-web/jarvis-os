@@ -192,3 +192,27 @@ ALTER TABLE jarvis_tracker_items
 ALTER TABLE jarvis_tracker_items
   ADD COLUMN IF NOT EXISTS active_from DATE,
   ADD COLUMN IF NOT EXISTS archived_on DATE;
+
+-- ============================================================
+--  Was hat ChatGPT geändert? (09.10.2026)
+--
+--  Jeder Schreibvorgang über den MCP-Server, der wirklich etwas geändert
+--  hat, landet hier — mit Werkzeug, Argumenten, Zustand vorher/nachher und
+--  dem Client. Sonst lässt sich ein unerklärlicher Haken nicht
+--  zurückverfolgen. `tag` ist der Tag, an dem der Haken steht (nicht der
+--  Zeitpunkt des Aufrufs); der Verlauf markiert ihn mit „über ChatGPT".
+--  Nur anhängen, nie ändern.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS mcp_write_log (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  werkzeug   TEXT        NOT NULL,
+  tag        DATE        NOT NULL,
+  argumente  JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  vorher     JSONB,
+  nachher    JSONB,
+  client     TEXT        NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS mcp_write_log_tag_idx ON mcp_write_log (tag);

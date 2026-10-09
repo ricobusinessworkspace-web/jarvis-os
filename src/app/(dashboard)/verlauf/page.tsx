@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { RoutineService } from '@/core/services/RoutineService';
+import { SchreibProtokollService } from '@/core/services/SchreibProtokollService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { addDays, dateRange, isOffDay } from '@/lib/blocks';
 import { PHASE_2_START } from '@/lib/phases';
@@ -29,6 +30,7 @@ async function Verlauf({ selected }: { selected: string }) {
     ...URSACHEN, ...rules.map(r => r.key), 'body.sleep_hours', 'body.weight', 'body.calories',
   ]);
   const routines = await RoutineService.getRoutineBlocks(selected);
+  const ueberAssistent = await SchreibProtokollService.tag(selected);
 
   const row = matrix[selected] ?? {};
   const data: DaySheetData = {
@@ -64,6 +66,7 @@ async function Verlauf({ selected }: { selected: string }) {
         ? []
         : rules.map(r => ({ metricKey: r.key, label: r.label, state: row[r.key]?.state ?? 'ungemessen' })),
     routines,
+    ueberAssistent,
   };
 
   const stripDays = dateRange(stripFrom, today);

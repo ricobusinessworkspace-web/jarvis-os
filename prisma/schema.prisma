@@ -592,3 +592,20 @@ model MailDraft {
   @@map("mail_drafts")
   @@schema("public")
 }
+
+/// Was ChatGPT (oder ein anderer MCP-Client) geändert hat — nur anhängen.
+/// `tag` ist der Tag des Hakens, nicht der Zeitpunkt des Aufrufs.
+model McpWriteLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  werkzeug  String
+  tag       DateTime @db.Date
+  argumente Json     @default("{}")
+  vorher    Json?
+  nachher   Json?
+  client    String   @default("")
+
+  @@index([tag])
+  @@map("mcp_write_log")
+  @@schema("public")
+}
