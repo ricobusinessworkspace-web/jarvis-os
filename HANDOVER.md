@@ -348,6 +348,21 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **ChatGPT liest, was die Zahlen bedeuten** (09.10., Schritt 1 des Plans).
+  `DatenbasisService` leitet je Metrik ab, was ein leerer Tag heißt
+  (`gehalten` aus `assumeDoneFrom`, `null` aus `zeroFrom`/`impliesZero`, sonst
+  `nicht_gemessen`), alle Zielfassungen und die Lücken (Ziel endete, kam später,
+  Erfassung erst ab). Fester Text nur für die gelöschten Routine-Haken vor
+  28.09. Datenqualität einer Woche/Phase misst nur Metriken mit
+  `nicht_gemessen` — Calls und Regeln sind nie leer und würden schönrechnen.
+  Neue MCP-Werkzeuge `jarvis_kontext`, `phasen_vergleich`, `tage_anzeigen`
+  (`src/lib/mcp/datenbasis.ts`; geteilte Bausteine in `src/lib/mcp/hilfen.ts`).
+- **Kein Ziel vor der ersten Fassung, wenn die Metrik später eingeführt wurde.**
+  `getMatrix` nahm vor der ältesten Zielfassung immer die älteste an — für die
+  Regeln (erste Fassung 07.10.) hieß das: Phase 1 stand mit Ziel 1 und Wert
+  `null` da, der Wochenverlauf meldete Quote 0 statt `null`. Jetzt gilt die
+  Rückwärts-Regel nur noch für Fassungen, die spätestens am Planbeginn
+  (`BLOCK_START`) starten.
 - **Sonntag ist Joker für jede Serie** (Rico, 09.10.). `summarize` überspringt
   einen verfehlten Sonntag für Serie und Rekord (`jokerWeekday`, Standard
   `JOKER_WEEKDAY` = 7 aus `blocks.ts`, `null` schaltet ab) — auch einen

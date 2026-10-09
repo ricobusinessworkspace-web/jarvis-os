@@ -94,7 +94,10 @@ Erwartet: sieben Werkzeuge (nach dem Refresh der ChatGPT-Verbindung).
 | Werkzeug | Art | Quelle im Code |
 |---|---|---|
 | `heute_ueberblick` | liest | `AnalyticsService.getMatrix` — dieselben Zahlen wie „Heute" |
-| `performance_wochenverlauf` | liest | `AnalyticsService.getMatrix` und `summarize` — abgeschlossene Blockwochen plus laufende Woche |
+| `jarvis_kontext` | liest | `DatenbasisService.metriken` / `datenluecken` — Handbuch: Phasen, je Kennzahl Quelle, Ziel heute, seit wann bewertet, was ein leerer Tag heißt, bekannte Lücken |
+| `phasen_vergleich` | liest | `DatenbasisService.phasenVergleich` — je Phase und Kennzahl Quote, Abdeckung, beste Serie, `aussagekraeftig` (Abdeckung ≥ 0,7) |
+| `tage_anzeigen` | liest | `DatenbasisService.tage` — tagesgenau, höchstens 31 Tage, mit Phase je Tag |
+| `performance_wochenverlauf` | liest | `AnalyticsService.getMatrix` und `summarize` — bis zu 12 abgeschlossene Blockwochen plus laufende Woche, je Woche `datenqualitaet` („lueckenhaft" unter 0,5 Abdeckung) |
 | `aufgaben_anzeigen` | liest | `TaskInboxService.getCrmTasksMitStatus`, `getReminders` |
 | `routinen_anzeigen` | liest | `RoutineService.getRoutineBlocks` + Routine-Metriken |
 | `ziele_anzeigen` | liest | `GoalService.getGoalsPage` — mit Herkunft Jarvis/CRM/Apple Health |
@@ -110,6 +113,8 @@ gesendet` erst erzwingen (heute prüft es nur Pflichtfelder).
 
 - „Wie läuft mein Tag?" → `heute_ueberblick`
 - „Wie lief meine Performance in den letzten vier Wochen?" → `performance_wochenverlauf`; Blockwochen sind Dienstag bis Montag, die laufende Woche ist unvollständig.
+- „Wie lief der September im Vergleich zu dieser Woche?" → `jarvis_kontext` + `phasen_vergleich`; die Antwort nennt die Phasen und Datenlücken und wertet Phase 1 nicht als Leistungsabfall.
+- „Wie sahen meine Tage vom 1. bis 5. Oktober aus?" → `tage_anzeigen`
 - „Wie viele Calls habe ich heute, und was ist das Ziel?" → `heute_ueberblick`
 - „Was steht an Aufgaben an?" → `aufgaben_anzeigen`
 - „Wie weit bin ich mit der Abendroutine?" → `routinen_anzeigen`

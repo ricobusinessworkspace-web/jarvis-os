@@ -1,6 +1,6 @@
 import { prisma } from '../db';
 import { getBerlinDateStr } from '@/lib/dateUtils';
-import { blockInfo, dateRange, isOffDay, isoWeekday, addDays, JOKER_WEEKDAY } from '@/lib/blocks';
+import { blockInfo, dateRange, isOffDay, isoWeekday, addDays, BLOCK_START, JOKER_WEEKDAY } from '@/lib/blocks';
 
 /**
  * Semantic Layer — rechnet Tageswerte on-read aus den vorhandenen Quellen.
@@ -188,6 +188,7 @@ async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promis
 }
 
 const DEFAULT_LOOKBACK_DAYS = 45;
+const PLAN_START = new Date(`${BLOCK_START}T00:00:00.000Z`);
 
 export class AnalyticsService {
   // ── Rohdaten pro Quellenart, jeweils in einer Abfrage über den ganzen Zeitraum ──
@@ -649,10 +650,14 @@ export class AnalyticsService {
         if (!hit || i.validFrom > hit.validFrom) hit = i;
       }
       // Vor der ältesten Fassung galt schon immer die älteste — so war es,
-      // bevor Ziele historisiert wurden, und so bleibt es.
+      // bevor Ziele historisiert wurden, und so bleibt es. Ausnahme: eine
+      // Metrik, deren erste Fassung erst nach Planbeginn startet, wurde
+      // bewusst später eingeführt (die Regeln ab Phase 2). Davor gab es kein
+      // Ziel — sonst stünde jeder Tag davor als verfehlt in der Quote.
       if (!hit && versions.length) {
         hit = versions.reduce((a, b) => (b.validFrom < a.validFrom ? b : a));
         if (hit.validFrom < day) hit = undefined; // Lücke zwischen Fassungen: nichts erfinden
+        else if (hit.validFrom > PLAN_START) hit = undefined; // gab es noch nicht
       }
       return hit;
     };
@@ -846,6 +851,16 @@ export class AnalyticsService {
   /** Metrik-Definitionen (Name, Einheit) — aus dem Cache des Semantic Layer, meist ohne Abfrage. */
   static async getDefinitions() {
     return (await loadSemanticConfig()).definitions;
+  }
+
+  /**
+   * Der Semantic Layer selbst — Metriken, Quellen und **alle** Fassungen der
+   * Ziele (auch beendete). Für Erklärungen, was eine Zahl bedeutet und seit
+   * wann sie wie bewertet wird; aus dem Cache, meist ohne Abfrage.
+   */
+  static async getLayer() {
+    const { definitions, sources, intentions } = await loadSemanticConfig();
+    return { definitions, sources, intentions };
   }
 
   /** Ziele — inklusive der bewusst zielwertlosen („Messphase"). */

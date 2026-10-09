@@ -1,13 +1,16 @@
-import { AnalyticsService, type DayMetric } from '@/core/services/AnalyticsService';
+import { AnalyticsService } from '@/core/services/AnalyticsService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
 import { GoalService } from '@/core/services/GoalService';
 import { MailService, MailRegelFehler, ENTWURF_GRENZEN, type DraftView } from '@/core/services/MailService';
+import { DatenbasisService, datenqualitaet, LUECKENHAFT_UNTER } from '@/core/services/DatenbasisService';
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { addDays, blockInfo, blockWeekRange, dateRange, BLOCK_START, BLOCK_WEEKS } from '@/lib/blocks';
-import { STATE_LABEL, EMPTY_METRIC, FEIERABEND_HOUR, SOURCE_LABEL } from '@/lib/metricState';
+import { EMPTY_METRIC, FEIERABEND_HOUR } from '@/lib/metricState';
 import { PHASES, phaseOf } from '@/lib/phases';
 import { WerkzeugFehler, type Werkzeug } from './protocol';
+import { DATENBASIS_WERKZEUGE } from './datenbasis';
+import { datenstand, ganzzahl, LIMIT_SCHEMA, metrik, nurErlaubt, NUR_LESEN, phasen, rund, zeichenkette } from './hilfen';
 
 /**
  * Die Werkzeuge des Jarvis-MCP-Servers.
@@ -23,73 +26,6 @@ import { WerkzeugFehler, type Werkzeug } from './protocol';
  * je Person, nicht ein Feld im Werkzeug.
  */
 const NUTZER = 'Rico';
-const ZEITZONE = 'Europe/Berlin';
-
-// ── Eingaben prüfen ──────────────────────────────────────────────────────────
-// Das Schema in `inputSchema` ist eine Bitte an den Client; geprüft wird hier.
-
-function nurErlaubt(args: Record<string, unknown>, erlaubt: string[]) {
-  const fremd = Object.keys(args).filter(k => !erlaubt.includes(k));
-  if (fremd.length) throw new WerkzeugFehler(`Unbekannter Parameter: ${fremd.join(', ')}.`);
-}
-
-function ganzzahl(wert: unknown, name: string, min: number, max: number, standard: number): number {
-  if (wert === undefined || wert === null) return standard;
-  if (typeof wert !== 'number' || !Number.isInteger(wert) || wert < min || wert > max) {
-    throw new WerkzeugFehler(`${name} muss eine ganze Zahl von ${min} bis ${max} sein.`);
-  }
-  return wert;
-}
-
-function zeichenkette(wert: unknown, name: string, max: number): string {
-  if (typeof wert !== 'string') throw new WerkzeugFehler(`${name} fehlt oder ist kein Text.`);
-  if (wert.length > max) throw new WerkzeugFehler(`${name} ist länger als ${max} Zeichen.`);
-  return wert;
-}
-
-const LIMIT_SCHEMA = (beschreibung: string, standard: number, max: number) => ({
-  type: 'integer', minimum: 1, maximum: max, default: standard, description: beschreibung,
-});
-
-const NUR_LESEN = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
-
-/** Wann die Antwort entstand — jede Antwort trägt das. */
-function datenstand() {
-  return { erzeugt_um: new Date().toISOString(), zeitzone: ZEITZONE, datum: getBerlinDateStr() };
-}
-
-const ZUSTAND_TEXT = STATE_LABEL;
-
-/** Abgeleitete Ziele sind Fließkomma (3168.0000000000005) — vorgelesen wird gerundet. */
-const rund = (v: number | null) => (v === null ? null : Math.round(v * 100) / 100);
-
-/** Eine Metrik so, dass sie vorgelesen werden kann, ohne dass etwas erfunden wird. */
-function metrik(key: string, m: DayMetric, def: { label: string; unit: string } | undefined, tagVorbei: boolean) {
-  const laeuft = m.state === 'unter' && !tagVorbei;
-  return {
-    key,
-    name: def?.label ?? key,
-    einheit: def?.unit ?? null,
-    /** `null` = nicht gemessen. Nie als 0 lesen. */
-    wert: rund(m.value),
-    basis: rund(m.base),
-    soll: rund(m.stretch),
-    zustand: m.state,
-    zustand_text: ZUSTAND_TEXT[m.state],
-    /** Wie `zustand`, aber „läuft noch" statt „unter Basis", solange der Tag nicht vorbei ist. */
-    urteil: laeuft ? 'laeuft' : m.state,
-    urteil_text: laeuft ? 'Tag läuft noch' : ZUSTAND_TEXT[m.state],
-    quelle: m.source ? (SOURCE_LABEL[m.source] ?? m.source) : null,
-    hinweis: m.targetHint ?? null,
-  };
-}
-
-/**
- * Die Phasen des Plans. Jede Antwort, die über Tage hinweg vergleicht, trägt
- * sie mit — sonst liest ein Modell einen Systemwechsel (andere Ziele, andere
- * Routine) als Leistungsänderung.
- */
-const phasen = () => PHASES.map(p => ({ ...p }));
 
 // ── 1. Tagesüberblick ────────────────────────────────────────────────────────
 
@@ -155,20 +91,20 @@ const performanceWochenverlauf: Werkzeug = {
   name: 'performance_wochenverlauf',
   title: 'Performance der letzten Wochen',
   description:
-    'Jarvis-Kennzahlen für bis zu acht abgeschlossene Blockwochen (Dienstag bis Montag) ' +
+    'Jarvis-Kennzahlen für bis zu zwölf abgeschlossene Blockwochen (Dienstag bis Montag, ganzer Block) ' +
     'und die laufende Woche. Zeigt je Kennzahl Wochenwert, erfüllte und gemessene Tage ' +
-    'sowie Zielquote, dazu die Phase jeder Woche. Am 07.10.2026 begann Phase 2 mit anderen ' +
-    'Tageszielen (Regeln statt Körperwerte) — Wochen verschiedener Phasen nur mit Blick auf ' +
-    '`phasen` vergleichen. Für Rückblicke und Trends; nur lesend.',
+    'sowie Zielquote, dazu die Phase und die Datenqualität jeder Woche. Am 07.10.2026 begann Phase 2 ' +
+    'mit anderen Tageszielen (Regeln statt Körperwerte) — Wochen verschiedener Phasen nur mit Blick auf ' +
+    '`phasen` vergleichen, lückenhafte Wochen nicht als Leistung werten. Für Rückblicke und Trends; nur lesend.',
   inputSchema: {
     type: 'object',
-    properties: { wochen: LIMIT_SCHEMA('Anzahl abgeschlossener Wochen vor der laufenden Woche.', 4, 8) },
+    properties: { wochen: LIMIT_SCHEMA('Anzahl abgeschlossener Wochen vor der laufenden Woche.', 4, 12) },
     additionalProperties: false,
   },
   annotations: NUR_LESEN,
   async run(args) {
     nurErlaubt(args, ['wochen']);
-    const anzahl = ganzzahl(args.wochen, 'wochen', 1, 8, 4);
+    const anzahl = ganzzahl(args.wochen, 'wochen', 1, 12, 4);
     const heute = getBerlinDateStr();
     const [aktuellVon] = blockWeekRange(heute);
     const zeitraeume: Array<{ von: string; bis: string; abgeschlossen: boolean }> = [];
@@ -186,36 +122,43 @@ const performanceWochenverlauf: Werkzeug = {
     }
 
     // Ein Datenlauf für den gesamten Zeitraum; dieselbe historische Zielberechnung wie im Dashboard.
+    const definitionen = await DatenbasisService.metriken();
     const matrix = await AnalyticsService.getMatrix(zeitraeume[0].von, heute);
-    const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
     return {
       datenstand: datenstand(),
       phasen: phasen(),
-      wochen: zeitraeume.map(w => ({
-        ...w,
-        phasen: PHASES.filter(p => p.von <= w.bis && (p.bis === null || p.bis >= w.von)).map(p => p.nummer),
-        kennzahlen: definitionen.map(d => {
-          const summary = AnalyticsService.summarize(matrix, d.key, w.von, w.bis, {
-            missIsFinal: d.domain === 'rules',
-          });
-          const gemessen = dateRange(w.von, w.bis)
-            .map(tag => matrix[tag]?.[d.key]?.value)
-            .filter((wert): wert is number => wert !== null && wert !== undefined);
-          const letzterWert = gemessen.at(-1) ?? null;
-          const wochenwert = gemessen.length === 0 ? null
-            : d.aggregation === 'last' ? letzterWert
-              : d.aggregation === 'avg' || d.aggregation === 'ratio'
-                ? gemessen.reduce((a, b) => a + b, 0) / gemessen.length
-                : gemessen.reduce((a, b) => a + b, 0);
-          return {
-            key: d.key, name: d.label, einheit: d.unit,
-            aggregation: d.aggregation, wochenwert: rund(wochenwert),
-            erfuellte_tage: summary.met, gemessene_tage: summary.measured,
-            getrackte_tage: summary.tracked, ziel_galt_an_tagen: summary.targeted,
-            zielquote: rund(summary.adherence), datenabdeckung: rund(summary.coverage),
-          };
-        }),
-      })),
+      wochen: zeitraeume.map(w => {
+        const summaries = definitionen.map(d => ({
+          d,
+          fehlendHeisst: d.fehlendHeisst,
+          summary: AnalyticsService.summarize(matrix, d.key, w.von, w.bis, { missIsFinal: d.domain === 'rules' }),
+        }));
+        const q = datenqualitaet(summaries);
+        return {
+          ...w,
+          phasen: PHASES.filter(p => p.von <= w.bis && (p.bis === null || p.bis >= w.von)).map(p => p.nummer),
+          datenqualitaet: q.qualitaet,
+          datenabdeckung: rund(q.abdeckung),
+          kennzahlen: summaries.map(({ d, summary }) => {
+            const gemessen = dateRange(w.von, w.bis)
+              .map(tag => matrix[tag]?.[d.key]?.value)
+              .filter((wert): wert is number => wert !== null && wert !== undefined);
+            const letzterWert = gemessen.at(-1) ?? null;
+            const wochenwert = gemessen.length === 0 ? null
+              : d.aggregation === 'last' ? letzterWert
+                : d.aggregation === 'avg' || d.aggregation === 'ratio'
+                  ? gemessen.reduce((a, b) => a + b, 0) / gemessen.length
+                  : gemessen.reduce((a, b) => a + b, 0);
+            return {
+              key: d.key, name: d.label, einheit: d.unit,
+              aggregation: d.aggregation, wochenwert: rund(wochenwert),
+              erfuellte_tage: summary.met, gemessene_tage: summary.measured,
+              getrackte_tage: summary.tracked, ziel_galt_an_tagen: summary.targeted,
+              zielquote: rund(summary.adherence), datenabdeckung: rund(summary.coverage),
+            };
+          }),
+        };
+      }),
       lesehilfe:
         'Abgeschlossene Blockwochen laufen Dienstag bis Montag. Die laufende Woche endet heute und ist ' +
         'nur eingeschränkt vergleichbar. Sonntag zählt nicht zur Zielquote — außer bei den Regeln, die ' +
@@ -223,7 +166,10 @@ const performanceWochenverlauf: Werkzeug = {
         'Zielquote = erfüllte Tage / Tage, an denen ein Ziel galt (ziel_galt_an_tagen); null = in der ' +
         'Woche galt kein Ziel (z. B. Schlaf/Kalorien/Gewicht ab Phase 2, Regeln vor Phase 2). ' +
         'Datenabdeckung = gemessene / getrackte Tage. Wochenwert folgt der Aggregation der Metrik. ' +
-        'Jede Woche nennt ihre Phase(n); was eine Phase bewertet hat, steht in phasen.',
+        'Jede Woche nennt ihre Phase(n); was eine Phase bewertet hat, steht in phasen. ' +
+        `datenqualitaet "lueckenhaft" = weniger als ${LUECKENHAFT_UNTER * 100} % der Tage mit Ziel wurden überhaupt ` +
+        'eingetragen (ohne Calls und Regeln, die nie leer sind) — dann Zielquoten nicht als Leistung werten, ' +
+        'sondern als Tracking-Lücke benennen. Bedeutung jeder Kennzahl: jarvis_kontext.',
     };
   },
 };
@@ -510,6 +456,7 @@ const mailEntwurfSpeichern: Werkzeug = {
 
 export const WERKZEUGE: Werkzeug[] = [
   heuteUeberblick,
+  ...DATENBASIS_WERKZEUGE,
   performanceWochenverlauf,
   aufgabenAnzeigen,
   routinenAnzeigen,

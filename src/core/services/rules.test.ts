@@ -57,6 +57,7 @@ describe('Regeln — gehalten bis zum Rückfall', () => {
     const v = (d: string) => [m[d]['rule.x'].value, m[d]['rule.x'].state];
 
     expect(v('2026-10-06')).toEqual([null, 'ungemessen']); // vor dem Start: nichts angenommen
+    expect(m['2026-10-06']['rule.x'].base).toBeNull(); // … und kein Ziel: die Regel gab es noch nicht
     expect(v('2026-10-07')).toEqual([1, 'soll']);
     expect(v('2026-10-09')).toEqual([0, 'unter']); // eingetragener Rückfall
     expect(v('2026-10-11')).toEqual([1, 'soll']); // Sonntag zählt
