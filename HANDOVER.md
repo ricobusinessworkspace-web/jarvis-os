@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-07
+last_updated: 2026-10-09
 last_agent: Claude Opus 5.5 — Phase 2: Regeln, Routine-Archiv, Körperwerte ohne Ziel
 status: In Progress
 ---
@@ -173,8 +173,12 @@ Pipeline sind nur Folgen.
   ohne dass die Daten kaputtgehen. Umgesetzt als **Schnitt in der Bewertung,
   nicht in den Daten**:
   - `src/lib/phases.ts`: Phase 1 „Aufbau" 01.09.–06.10., Phase 2 ab 07.10.,
-    je mit Klartext, was bewertet wurde. Dashboard und Health rechnen Quoten
-    und Serien ab Phasenstart (`evaluationStart`), der Verlauf zeigt alles.
+    je mit Klartext, was bewertet wurde. Dashboard und Health rechnen
+    **Quoten** ab Phasenstart (`evaluationStart`); **Serien und Rekord laufen
+    über den Schnitt** (`summarize(…, { streakFrom })`, Matrix ab Blockstart
+    geladen). Zuerst waren auch die Serien gekappt — Training stand am 07.10.
+    auf 0 statt 3. Der Verlauf zeigt alles. Vitest schließt `.claude/**` aus
+    (Worktrees paralleler Sessions brachten sonst fremde Tests mit).
   - **Drei Regeln** „No Jerking", „Keine Drogen", „Kein Scrolling"
     (`rule.nofap`, `rule.substances`, `rule.scrolling`, Domäne `rules`,
     Tracker „Regeln" Typ `rules`): Ziel 1, `active_weekdays` 1–7 — **gelten
@@ -342,8 +346,14 @@ Pipeline sind nur Folgen.
 - **Implizite Werte brauchen ein Anfangsdatum und enden heute.** `impliesZero`
   (Calls), `zeroFrom` (Stufen) und jetzt `assumeDoneFrom` (Regeln) — und alle
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
-- **Quote nur über Tage mit Ziel** (`targeted`), heute ohne Eintrag zählt
-  gar nicht (läuft noch). Ohne Ziel ist die Quote `null`, nie 0 %.
+- **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
+  `null`, nie 0 %.
+- **Heute ist offen, bis es erfüllt ist** — zählt nicht in die Quote, bricht
+  keine Serie, auch wenn ein Haken wieder entfernt wurde (`not_done` heute).
+  Nur der echte heutige Tag (`getBerlinDateStr`), nicht das letzte Datum einer
+  vergangenen Woche. **Ausnahme Regeln** (`missIsFinal`): ein Rückfall steht
+  sofort fest. Vorher brach ein heute an- und wieder abgewählter Haken die
+  Trainingsserie (07.10.: 0 statt 3).
 - **Routine-Schritte haben ein Gültigkeitsfenster** (`active_from`,
   `archived_on`). Entfernen archiviert ab heute (Schritte ohne je einen Haken
   werden echt gelöscht), Hinzufügen zählt ab heute. Die Schrittzahl und die
@@ -731,6 +741,56 @@ keine Laufzeit. Auf derselben Grundlage soll später die Sprach-Kaskade laufen.
 existiert im Repo nicht.** Die ElevenLabs-Anbindung sieht halb fertig aus, ist
 aber tot. Vor jeder Sprach-Arbeit entweder wiederherstellen oder entfernen.
 
+## Infrastruktur — Jarvis und CRM zusammen (Stand 09.10.2026)
+
+Dieselbe Übersicht steht im CRM-Handover. Wer etwas daran ändert, zieht beide nach.
+
+| Teil | Wo | Adresse / Stand |
+|---|---|---|
+| Jarvis OS | Vercel-Projekt `jarvis-os`, Repo `ricobusinessworkspace-web/jarvis-os`, Branch `main` | `https://jarvis-os-indol.vercel.app` (einzige Production-Domain, 06.10. bei Vercel geprüft) |
+| Lightning CRM | Vercel-Projekt `calling-station`, Repo `ricobusinessworkspace-web/Lightning-CRM`, Branch `master` | `https://calling-station.vercel.app` |
+| Datenbank | **ein** Supabase-Projekt `duzmanqvyhqurxlpxrrg` (London) für Jarvis, CRM und G-Projekt | Dev = Production, kostenloser Tarif ohne zurückspielbare Sicherung |
+| Jarvis-MCP | `/api/mcp`, eigene OAuth, Geheimnis `JARVIS_MCP_SECRET` | **live**, antwortet ohne Anmeldung mit 401 (09.10. geprüft) |
+| CRM-MCP | `/api/mcp`, eigene OAuth, Geheimnis `MCP_TOKEN` | live; OAuth erlaubt nur Claude-Rücksprünge → **ChatGPT kann sich dort nicht anmelden**, Fix gehört ins CRM |
+
+**Wer redet mit wem:**
+```
+ChatGPT-App (Handy/Mac, Sprache) ─┬─> Jarvis-MCP ─> Jarvis-Services ─> Supabase (liest crm_* nach Lesevertrag)
+Claude                            └─> CRM-MCP ────> crm_* (lesen und schreiben)
+```
+- ChatGPT/Claude rechnen nichts selbst und lesen keine Datenbank. Sie rufen
+  Werkzeuge auf; Jarvis holt auch die CRM-Zahlen selbst aus der gemeinsamen
+  Datenbank. Den CRM-Connector braucht es nur, um am CRM etwas zu **ändern**.
+- Das Plugin wird einmal im Browser unter `chatgpt.com/plugins` eingetragen und
+  gilt dann im selben Konto auch in der Handy-App. Privat- und Work-Konto sind
+  getrennt; im Work-Konto muss eigene Plugins ggf. der Admin erlauben.
+- **Bauen** (Codex, Claude Code) und **benutzen** (ChatGPT-App, Claude) sind
+  getrennt. Jarvis wird abwechselnd von Codex und Claude gebaut, das CRM von
+  Claude. Abgestimmt wird nur über die Handovers und den Lesevertrag.
+
+**Zugangswort:** `JARVIS_MCP_SECRET` hat Claude am 06.10. erzeugt und bei Vercel
+(Production) gesetzt, ohne es auszugeben. Eine Kopie liegt in
+`~/jarvis-mcp-zugangswort.txt` (nur für Rico lesbar). Die Datei soll in den
+Passwort-Manager und dann gelöscht werden. Sperren aller Verbindungen: Wert
+bei Vercel ändern, neu veröffentlichen.
+
+**Die Grenze zwischen den Projekten ist nur eine Absprache.** Jarvis meldet
+sich als `postgres` an, für Jarvis gelten also keine Zugriffsregeln. „Jarvis
+schreibt nie in `crm_*`" steht im Lesevertrag, verhindert wird es nicht.
+Empfehlung (offen): eine eigene Datenbank-Rolle für Jarvis, die `crm_*` nur
+lesen darf. Spätestens nötig, wenn das CRM verkauft wird. Dann braucht es
+ohnehin ein eigenes Supabase-Projekt.
+
+**Offene Sicherheitspunkte (am 06./09.10. von außen geprüft, von Rico zu entscheiden):**
+- Beide GitHub-Repos sind **öffentlich**. In der Historie stehen ein altes
+  DB-Passwort (Jarvis) und ein Google-Schlüssel (CRM). Ob beide inzwischen
+  rotiert sind, ist nicht bestätigt.
+- Das **Jarvis-Dashboard hat keinen Login**. `/`, `/health`, `/vertrieb` und
+  `/mail` zeigen echte Daten für jeden, der die Adresse kennt.
+- 11 Jarvis-Tabellen (`core_*`, `ingest_*`, `mail_*`) sind ohne Zugriffsregeln.
+  Die CRM-Sicht `lead_timeline` umgeht die Regeln (Supabase-Prüfung vom 06.10.).
+  Runbook: `~/dev/Lightning CRM/docs/ungeschuetzte-tabellen.md`.
+
 ## Tech Stack & Key Dependencies
 
 - **Next.js 16.2** (App Router) — weicht von Trainingsdaten ab, Docs liegen unter
@@ -774,7 +834,13 @@ Semantic Layer.
   handeln — z.B. bei der Abendroutine den Kalender für die Tagesplanung öffnen.
 
 ## Für nächsten Agent
-
+0. **Nächste Arbeit steht in `docs/plan-chatgpt-schreiben-und-motivation.md`**
+   (09.10., Ricos Entscheidungen eingearbeitet): Sonntag als Joker für
+   Regel-Serien, ChatGPT liest Phasen richtig und darf abhaken (Ursachen,
+   Routine-Schritte, Regel-Rückfälle; nur heute/gestern; immer freigeschaltet),
+   Motivationssystem in Gold (Ton, Tagesringe, perfekter Tag, Serienstufen,
+   Ziele-Seite als Zielbild), Erinnerung per Kurzbefehl statt Web Push.
+   Streak-Fix ist live (`95950af`).
 1. **Zuerst `AGENTS.md`** — Next.js 16 verhält sich anders als du denkst.
 2. **Nie `prisma db push`.** Die Datenbank enthält Tabellen fremder Apps
    (`crm_*`, `g_*`, `lead_*`, `user_profiles`), die nicht in `schema.prisma`
@@ -792,7 +858,7 @@ Semantic Layer.
 5. **`/routines` und `/vertrieb` nicht kaputtmachen** — beides sind Tippziele der
    iPhone-Widgets (`docs/ios-widget.md`).
 6. Befehle: `npm run core:check` (Daten prüfen), `core:migrate`, `core:seed`,
-   `npm run build` (prüft auch Typen), `npm test` (Vitest — 58 Prüfungen,
+   `npm run build` (prüft auch Typen), `npm test` (Vitest — 62 Prüfungen,
    darunter MCP ohne Datenbank), `npm run test:e2e`
    (Playwright-Rauchtest gegen den Dev-Server — **Achtung, Dev = Production-DB**).
 
@@ -809,6 +875,7 @@ Semantic Layer.
 | `docs/orb-animation.md` | Start-/Ladeanimation (Jarvis-Orb): Vertrag, Regeln, Zahlen, Portierung auf Lightning CRM, Abnahmeliste | beim Anfassen des Orbs oder wenn er ins CRM soll |
 | `docs/bank-sync.md` | Bank-Sync über n8n | beim Anfassen des Bank-Imports |
 | `docs/mcp-server.md` | MCP-Server: Adresse, Vercel-Variablen, ChatGPT/Claude verbinden, Testfragen, Fehlerbilder | beim Verbinden oder wenn der Connector klemmt |
+| `docs/plan-chatgpt-schreiben-und-motivation.md` | Plan: ChatGPT-Schreibwerkzeuge, Datenbasis vor/nach Phase 2, Motivationssystem und Push; Reihenfolge und offene Entscheidungen | vor der nächsten größeren Arbeit |
 | `docs/chatgpt-voice-plan.md`, `docs/CLAUDE-MCP-HANDOVER.md` | Planung und Auftrag für den MCP-Weg (Codex, 06.10.) | nur als Hintergrund — Stand steht hier |
 
 `~/dev/coding-workflow-standards.md` (außerhalb des Repos) gilt projektübergreifend.
