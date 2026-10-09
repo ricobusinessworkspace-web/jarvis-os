@@ -66,6 +66,11 @@ export interface MetricSummary {
   streak: number;
   /** Längste Serie im Zeitraum. */
   bestStreak: number;
+  /**
+   * Erster Tag der laufenden Serie, `null` bei Serie 0. Kennzeichnet einen
+   * Lauf eindeutig — reißt die Serie und beginnt neu, ist es ein anderer Tag.
+   */
+  streakStart: string | null;
 }
 
 /** Ein Tag darf pro Metrik nur einmal in der Map stehen. */
@@ -812,10 +817,13 @@ export class AnalyticsService {
     // Streak rückwärts ab `to`; Off-Days und verfehlte Joker-Tage werden
     // übersprungen, nicht gewertet.
     let streak = 0;
+    let streakStart: string | null = null;
     for (let d = to; d >= streakFrom; d = addDays(d, -1)) {
       if (off(d) || joker(d)) continue;
-      if (fulfilled(cellOf(d))) streak++;
-      else if (stillOpen(d)) continue;
+      if (fulfilled(cellOf(d))) {
+        streak++;
+        streakStart = d;
+      } else if (stillOpen(d)) continue;
       else break;
     }
 
@@ -829,6 +837,7 @@ export class AnalyticsService {
       coverage: tracked ? measured / tracked : null,
       streak,
       bestStreak,
+      streakStart,
     };
   }
 

@@ -5,6 +5,7 @@ import { DatenbasisService } from '@/core/services/DatenbasisService';
 import { addDays, blockInfo, isJokerDay } from '@/lib/blocks';
 import { getBerlinDateStr } from '@/lib/dateUtils';
 import { SOURCE_LABEL } from '@/lib/metricState';
+import { REKORD_AB } from '@/lib/motivation';
 import { WerkzeugFehler, type Aufrufkontext, type Werkzeug } from './protocol';
 import { datenstand, datum, nurErlaubt, rund, zeichenkette, ZUSTAND_TEXT } from './hilfen';
 
@@ -20,9 +21,6 @@ import { datenstand, datum, nurErlaubt, rund, zeichenkette, ZUSTAND_TEXT } from 
  * - **Protokoll:** jede echte Änderung landet in `mcp_write_log`.
  * - **Mehrdeutig heißt nachfragen**, nicht raten.
  */
-
-/** Ab dieser Länge ist eine Serie ein Rekord, der ausdrücklich gefeiert wird. */
-const REKORD_AB = 2;
 
 const SCHREIBEN = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 

@@ -348,6 +348,9 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **Motivationssystem (Schritte 4–8)**: Arbeitsplan mit Häkchen in
+  `docs/umsetzung-motivation.md`. Schritt 4 halb fertig, **lokal committet,
+  nicht gepusht** (Nutzungslimit) — Stand und Rest unter „Fortschritt" dort.
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).

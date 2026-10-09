@@ -22,6 +22,9 @@
   --primitive-orange-400:   #ff9f0a;
   --primitive-red-400:      #ff453a;
   --primitive-red-500:      #ff3b30;
+  /* Einzige Belohnungsfarbe: erreichte Stufen (ab 7), Rekorde, geschlossene
+     Ringe, perfekter Tag. Nirgends sonst — sonst ist Gold nichts mehr wert. */
+  --primitive-gold-400:     #e3b958;
 
   /* ── 2. GLOBAL SEMANTICS ──────── */
   --color-bg-base:          var(--primitive-black);
@@ -44,6 +47,8 @@
   --color-intent-info:      var(--primitive-blue-400);
   --color-intent-info-bg:    rgba(10, 132, 255, 0.10);
   --color-intent-muted:     var(--primitive-gray-400);
+  --color-reward:           var(--primitive-gold-400);
+  --color-reward-glow:      rgba(227, 185, 88, 0.35);
 
   /* Shadows & Glass */
   --shadow-sm:              0 2px 8px rgba(0, 0, 0, 0.50);
@@ -85,6 +90,8 @@
   --color-warning: var(--color-intent-warning);
   --color-error: var(--color-intent-danger);
   --color-info: var(--color-intent-info);
+  --color-gold: var(--color-reward);
+  --color-gold-glow: var(--color-reward-glow);
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
 }
