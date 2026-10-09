@@ -348,7 +348,9 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
-- **ChatGPT hakt ab** (09.10., Schritt 3, **lokal fertig, nicht gepusht**).
+- **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
+  geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
+  Post an/zurück über Production, Protokollzeilen danach gelöscht).
   `ursache_eintragen`, `regel_rueckfall`, `routine_schritt`,
   `routine_komplett` in `src/lib/mcp/abhaken.ts` — nur heute/gestern, über
   `TrackingService`, Antwort vorher/nachher mit Serie/Rekord aus `summarize`
