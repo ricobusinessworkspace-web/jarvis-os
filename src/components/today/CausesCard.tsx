@@ -4,7 +4,9 @@ import { useOptimistic, useTransition } from 'react';
 import { toggleCause } from '@/actions/today';
 import { formatPercent } from '@/lib/metricState';
 import type { MetricState } from '@/core/services/AnalyticsService';
+import type { Ausblick } from '@/lib/motivation';
 import { HabitRow } from './HabitRow';
+import { useFeier } from './useFeier';
 
 export interface CauseRow {
   metricKey: string;
@@ -18,6 +20,8 @@ export interface CauseRow {
   coverage: number | null;
   /** Nur Metriken mit manueller Quelle lassen sich hier abhaken. */
   toggleable: boolean;
+  /** Serie und Rekord für beide Fälle des heutigen Hakens — vom Server gerechnet. */
+  ausblick?: Ausblick;
 }
 
 const isDone = (state: MetricState) => state === 'soll' || state === 'basis';
@@ -40,14 +44,27 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
    */
   const [optimisticRows, applyOptimistic] = useOptimistic(
     rows,
-    (state: CauseRow[], patch: { metricKey: string; state: MetricState }) =>
-      state.map(r => (r.metricKey === patch.metricKey ? { ...r, state: patch.state } : r))
+    (state: CauseRow[], patch: { metricKey: string; state: MetricState; streak?: number; bestStreak?: number }) =>
+      state.map(r =>
+        r.metricKey === patch.metricKey
+          ? { ...r, state: patch.state, streak: patch.streak ?? r.streak, bestStreak: patch.bestStreak ?? r.bestStreak }
+          : r
+      )
   );
+  const { feiern, ausloesen } = useFeier();
 
   const toggle = (row: CauseRow) => {
     const done = !isDone(row.state);
+    // Die Zahlen für danach hat der Server schon gerechnet.
+    const nachher = row.ausblick ? (done ? row.ausblick.wennErfuellt : row.ausblick.wennNicht) : null;
+    if (nachher && row.ausblick) ausloesen(row.metricKey, row.label, row.ausblick, nachher, done);
     startTransition(async () => {
-      applyOptimistic({ metricKey: row.metricKey, state: done ? 'soll' : 'unter' });
+      applyOptimistic({
+        metricKey: row.metricKey,
+        state: done ? 'soll' : 'unter',
+        streak: nachher?.serie,
+        bestStreak: nachher?.rekord,
+      });
       const res = await toggleCause(row.metricKey, date, done);
       if (!res?.success) console.error('[Ursachen]', res?.error);
     });
@@ -78,6 +95,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
               streak={row.streak}
               onToggle={row.toggleable ? () => toggle(row) : undefined}
               toggleLabel={done ? `${row.label}: Haken entfernen` : `${row.label} abhaken`}
+              feier={feiern[row.metricKey] ?? null}
             />
           );
         })}

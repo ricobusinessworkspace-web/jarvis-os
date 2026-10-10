@@ -56,21 +56,21 @@ Handover-Delta.
 
 ## Schritt 4 — C1 + C4: Feedback, Ton, Serienstufen, Gold
 
-- [ ] Gold-Token in `globals.css`
-- [ ] `src/lib/motivation.ts`: `MEILENSTEINE`, `stufe(serie)`, `naechsteStufe`,
+- [x] Gold-Token in `globals.css`
+- [x] `src/lib/motivation.ts`: `MEILENSTEINE`, `stufe(serie)`, `naechsteStufe`,
       `serieMitHeute(matrix, key, heute, zelle, opts)` (Was-wäre-wenn über `summarize`)
-- [ ] `src/lib/sound.ts`: `tick()`, `fanfare()` (zwei Sinus, ~80 ms, Hüllkurve),
+- [x] `src/lib/sound.ts`: `tick()`, `fanfare()` (zwei Sinus, ~80 ms, Hüllkurve),
       `toeneAn()/setToene()` über `localStorage`
-- [ ] Dashboard-Seite liefert je Ursache/Regel: `streakIfDone`, `streakIfNot`,
+- [x] Dashboard-Seite liefert je Ursache/Regel: `streakIfDone`, `streakIfNot`,
       `bestIfDone`, `runStart` (für „schon gefeiert")
-- [ ] `HabitRow` mit framer-motion: Kästchen ploppt, Flamme zuckt, Zahl zählt
+- [x] `HabitRow` mit framer-motion: Kästchen ploppt, Flamme zuckt, Zahl zählt
       (Schlüssel-Wechsel), Flamme wächst mit der Stufe, ab 7 Gold; „Neuer
       Rekord" als kurzer Gold-Glanz; Sonntag-Joker-Hinweis bei Regeln
-- [ ] `RoutineCard`: Haken ploppt, Ton beim Abhaken
-- [ ] Meilenstein-Toast (Gold) einmal je Lauf und Stufe
-- [ ] ⌘K-Befehl „Töne an/aus"
-- [ ] Tests: `motivation.test.ts` (Stufen, Was-wäre-wenn inkl. Joker und Regeln)
-- [ ] Browser: Training an/aus mit Rücknahme + DB-Check; 375 px
+- [x] `RoutineCard`: Haken ploppt, Ton beim Abhaken
+- [x] Meilenstein-Feier (Gold, in der Zeile statt Toast) einmal je Lauf und Stufe
+- [x] ⌘K-Befehl „Töne an/aus"
+- [x] Tests: `motivation.test.ts` (Stufen, Was-wäre-wenn inkl. Joker und Regeln)
+- [x] Browser: Training an/aus mit Rücknahme + DB-Check; 375 px
 
 ## Schritt 5 — C2 + C3: Tagesringe, perfekter Tag
 
@@ -126,11 +126,10 @@ Handover-Delta.
 
 ## Fortschritt
 
-- **09.10., Schritt 4 begonnen (lokal committet, nicht gepusht — Nutzungslimit):**
-  erledigt: Gold-Token (`--color-gold`), `summarize` liefert `streakStart`,
-  `src/lib/motivation.ts` (Stufen, `feierFuer`), `src/core/services/MotivationService.ts`
-  (`ausblick` — Serie für „erledigt"/„nicht"), `src/lib/sound.ts` (Tick, Fanfare,
-  Schalter), `src/lib/gefeiert.ts`, `HabitRow` mit Animationen + Gold + Feier-Zeile.
-  **Offen in Schritt 4:** Dashboard-Seite muss `ausblick` je Ursache/Regel liefern,
-  `CausesCard`/`RulesCard` müssen optimistisch Serie umschalten, Ton + Feier auslösen;
-  `RoutineCard` Tick; ⌘K „Töne an/aus"; Tests `motivation.test.ts`; Browser-Check; Push.
+- **10.10., Schritt 4 fertig und live.** Dashboard liefert je Ursache/Regel den
+  `ausblick` (Serie für beide Fälle); Karten schalten Serie optimistisch um,
+  `useFeier` spielt Tick bzw. Doppelton und zeigt „Stufe N erreicht" /
+  „Neuer Rekord" in Gold (Stufe einmal je Lauf, `localStorage`). Regel-Rückfälle
+  ohne Ton; am Sonntag „Sonntag ist Joker, Serie bleibt". Routine: Tick beim
+  Abhaken. ⌘K: „Töne an/aus" (`useToene`). Getestet: 108 Tests; im Browser Post
+  an (Serie 0→1 sofort) und zurück, DB danach wie vorher (Ricos echte Haken unberührt).

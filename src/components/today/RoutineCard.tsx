@@ -7,6 +7,7 @@ import {
   addRoutineItem, renameRoutineItem, deleteRoutineItem, moveRoutineItem, renameRoutine,
 } from '@/actions/routines';
 import { cn } from '@/lib/utils';
+import { tick } from '@/lib/sound';
 
 export interface RoutineItem {
   id: string;
@@ -58,6 +59,7 @@ export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: st
   );
 
   const toggle = (item: RoutineItem, startTransition: React.TransitionStartFunction) => {
+    if (!item.done) tick(); // nur beim Abhaken, aus dem Klick heraus
     startTransition(async () => {
       applyOptimistic({ id: item.id, done: !item.done });
       await logTrackerItem(item.id, !item.done ? 'completed' : 'not_done', date);

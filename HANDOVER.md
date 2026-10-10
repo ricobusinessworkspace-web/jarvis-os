@@ -349,8 +349,11 @@ Pipeline sind nur Folgen.
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
 - **Motivationssystem (Schritte 4–8)**: Arbeitsplan mit Häkchen in
-  `docs/umsetzung-motivation.md`. Schritt 4 halb fertig, **lokal committet,
-  nicht gepusht** (Nutzungslimit) — Stand und Rest unter „Fortschritt" dort.
+  `docs/umsetzung-motivation.md` (Häkchen + „Fortschritt"). **Schritt 4 live**
+  (10.10.): Gold-Token, Stufen 3/7/14/21/30/50/100, animierte Zeilen, Ton,
+  Feier aus Server-Zahlen (`MotivationService.ausblick`, `summarize` kennt
+  `streakStart`). Regel: der Browser zählt nie selbst, er wählt nur zwischen
+  den vorab gerechneten Fällen.
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).

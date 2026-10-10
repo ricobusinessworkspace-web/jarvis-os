@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
+import { ausblick } from '@/core/services/MotivationService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
@@ -80,9 +81,14 @@ async function Today() {
     ...rules.map(r => ({ key: r.key, label: r.label, sub: 'jeden Tag', since: phase?.von })),
   ];
 
+  // Serie für beide Fälle des heutigen Hakens — der Browser wählt beim
+  // Antippen nur aus, er zählt nicht selbst.
+  const ausblickFuer = (key: string) => ausblick(matrix, key, today, { serieAb: from, regel: ruleKeys.has(key) });
+
   const ruleRows: RuleRow[] = rules.map(r => {
     const s = summaries[r.key];
     return {
+      ausblick: ausblickFuer(r.key),
       metricKey: r.key,
       label: r.label,
       state: cell(r.key).state,
@@ -98,6 +104,7 @@ async function Today() {
     const c = cell(m.key);
     const s = summaries[m.key];
     return {
+      ausblick: ausblickFuer(m.key),
       metricKey: m.key,
       label: m.label === 'Post' ? 'Personal Brand Post' : m.label === 'Training' ? 'Trainingseinheit' : m.label,
       state: c.state,

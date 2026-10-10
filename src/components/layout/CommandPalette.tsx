@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/ui/command';
-import { Sun, CalendarDays, PhoneCall, HeartPulse, Target, CornerDownLeft } from 'lucide-react';
+import { Sun, CalendarDays, PhoneCall, HeartPulse, Target, CornerDownLeft, Volume2, VolumeX } from 'lucide-react';
+import { useToene } from '@/hooks/useToene';
+import { tick } from '@/lib/sound';
 
 /**
  * ⌘K — Sprungmarken statt Suchfeld.
@@ -34,6 +36,7 @@ const PAGES = [
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const [toene, setToene] = useToene();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -84,6 +87,24 @@ export function CommandPalette() {
           <CommandItem value="vorgestern nachtragen" onSelect={() => go(`/verlauf?d=${shiftDay(-2)}`)}>
             <CalendarDays className="mr-2.5 h-4 w-4 shrink-0 text-muted" />
             <span>Vorgestern nachtragen</span>
+          </CommandItem>
+        </CommandGroup>
+
+        <CommandGroup heading="Einstellungen">
+          <CommandItem
+            value="töne ton sound an aus"
+            onSelect={() => {
+              setToene(!toene);
+              if (!toene) tick(); // Probe beim Einschalten — der Klick erlaubt den Ton
+            }}
+          >
+            {toene ? (
+              <Volume2 className="mr-2.5 h-4 w-4 shrink-0 text-muted" />
+            ) : (
+              <VolumeX className="mr-2.5 h-4 w-4 shrink-0 text-muted" />
+            )}
+            <span>Töne {toene ? 'ausschalten' : 'einschalten'}</span>
+            <span className="ml-auto text-[11px] text-muted">beim Abhaken · {toene ? 'an' : 'aus'}</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

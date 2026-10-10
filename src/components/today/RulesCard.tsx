@@ -5,6 +5,8 @@ import { toggleCause } from '@/actions/today';
 import { clearCause } from '@/actions/verlauf';
 import { formatPercent } from '@/lib/metricState';
 import type { MetricState } from '@/core/services/AnalyticsService';
+import { isJokerDay } from '@/lib/blocks';
+import type { Ausblick } from '@/lib/motivation';
 import { HabitRow } from './HabitRow';
 
 export interface RuleRow {
@@ -16,6 +18,8 @@ export interface RuleRow {
   adherence: number | null;
   /** Tage im Zeitraum, an denen die Regel gebrochen wurde. */
   broken: number;
+  /** Serie und Rekord für „gehalten" und „gebrochen" heute — vom Server gerechnet. */
+  ausblick?: Ausblick;
 }
 
 /**
@@ -33,13 +37,24 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
 
   const [optimisticRows, applyOptimistic] = useOptimistic(
     rows,
-    (state: RuleRow[], patch: { metricKey: string; state: MetricState }) =>
-      state.map(r => (r.metricKey === patch.metricKey ? { ...r, state: patch.state } : r))
+    (state: RuleRow[], patch: { metricKey: string; state: MetricState; streak?: number; bestStreak?: number }) =>
+      state.map(r =>
+        r.metricKey === patch.metricKey
+          ? { ...r, state: patch.state, streak: patch.streak ?? r.streak, bestStreak: patch.bestStreak ?? r.bestStreak }
+          : r
+      )
   );
 
+  // Kein Ton, keine Feier: einen Rückfall eintragen oder zurücknehmen ist keine Leistung.
   const toggle = (row: RuleRow, broken: boolean) =>
     startTransition(async () => {
-      applyOptimistic({ metricKey: row.metricKey, state: broken ? 'soll' : 'unter' });
+      const nachher = row.ausblick ? (broken ? row.ausblick.wennErfuellt : row.ausblick.wennNicht) : null;
+      applyOptimistic({
+        metricKey: row.metricKey,
+        state: broken ? 'soll' : 'unter',
+        streak: nachher?.serie,
+        bestStreak: nachher?.rekord,
+      });
       const res = broken ? await clearCause(row.metricKey, date) : await toggleCause(row.metricKey, date, false);
       if (!res?.success) console.error('[Regeln]', res?.error);
     });
@@ -48,6 +63,7 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
     day: 'numeric', month: 'numeric', timeZone: 'UTC',
   });
   const relapses = sumRelapses(rows);
+  const joker = isJokerDay(date);
 
   return (
     <div className="crm-card h-full">
@@ -66,7 +82,8 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
               sub={
                 <>
                   {isBroken ? 'gebrochen' : 'gehalten'}
-                  {row.bestStreak > 0 && <span className="text-muted"> · Rekord {row.bestStreak}</span>}
+                  {isBroken && joker && <span className="text-muted"> · Sonntag ist Joker, Serie bleibt</span>}
+                  {!(isBroken && joker) && row.bestStreak > 0 && <span className="text-muted"> · Rekord {row.bestStreak}</span>}
                 </>
               }
               subTone={isBroken ? 'error' : 'muted'}
