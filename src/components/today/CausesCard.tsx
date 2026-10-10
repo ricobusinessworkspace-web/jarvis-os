@@ -1,12 +1,12 @@
 'use client';
 
-import { useOptimistic, useTransition } from 'react';
 import { toggleCause } from '@/actions/today';
 import { formatPercent } from '@/lib/metricState';
 import type { MetricState } from '@/core/services/AnalyticsService';
 import type { Ausblick } from '@/lib/motivation';
 import { HabitRow } from './HabitRow';
 import { useFeier } from './useFeier';
+import { useHeute } from './TodayProvider';
 
 export interface CauseRow {
   metricKey: string;
@@ -34,23 +34,9 @@ const isDone = (state: MetricState) => state === 'soll' || state === 'basis';
  */
 const shown = (state: MetricState): MetricState => (state === 'ungemessen' ? 'unter' : state);
 
-export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
-  const [, startTransition] = useTransition();
-
-  /**
-   * Der Haken sitzt sofort und bleibt sitzen, bis die neuen Server-Daten da
-   * sind — `useOptimistic` löst ihn genau dann ab. Eigener State hatte den
-   * Wert zu früh verworfen, wodurch die Anzeige kurz zurücksprang.
-   */
-  const [optimisticRows, applyOptimistic] = useOptimistic(
-    rows,
-    (state: CauseRow[], patch: { metricKey: string; state: MetricState; streak?: number; bestStreak?: number }) =>
-      state.map(r =>
-        r.metricKey === patch.metricKey
-          ? { ...r, state: patch.state, streak: patch.streak ?? r.streak, bestStreak: patch.bestStreak ?? r.bestStreak }
-          : r
-      )
-  );
+export function CausesCard({ date }: { date: string }) {
+  const { stand, anwenden } = useHeute();
+  const rows = stand.causes;
   const { feiern, ausloesen } = useFeier();
 
   const toggle = (row: CauseRow) => {
@@ -58,16 +44,16 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
     // Die Zahlen für danach hat der Server schon gerechnet.
     const nachher = row.ausblick ? (done ? row.ausblick.wennErfuellt : row.ausblick.wennNicht) : null;
     if (nachher && row.ausblick) ausloesen(row.metricKey, row.label, row.ausblick, nachher, done);
-    startTransition(async () => {
-      applyOptimistic({
-        metricKey: row.metricKey,
-        state: done ? 'soll' : 'unter',
-        streak: nachher?.serie,
-        bestStreak: nachher?.rekord,
-      });
-      const res = await toggleCause(row.metricKey, date, done);
-      if (!res?.success) console.error('[Ursachen]', res?.error);
-    });
+    anwenden(
+      {
+        art: 'zeile', liste: 'causes', metricKey: row.metricKey,
+        state: done ? 'soll' : 'unter', streak: nachher?.serie, bestStreak: nachher?.rekord,
+      },
+      async () => {
+        const res = await toggleCause(row.metricKey, date, done);
+        if (!res?.success) console.error('[Ursachen]', res?.error);
+      }
+    );
   };
 
   return (
@@ -77,7 +63,7 @@ export function CausesCard({ rows, date }: { rows: CauseRow[]; date: string }) {
       </div>
 
       <div className="flex flex-col">
-        {optimisticRows.map(row => {
+        {rows.map(row => {
           const done = isDone(row.state);
           const status = row.state === 'offday' ? 'Off-Day' : done ? 'erledigt' : 'offen';
           return (

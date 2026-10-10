@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
-import { ausblick } from '@/core/services/MotivationService';
+import { ausblick, perfekteTage } from '@/core/services/MotivationService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
@@ -11,7 +11,9 @@ import { TaskInbox } from '@/components/today/TaskInbox';
 import { ActivityGrid } from '@/components/today/ActivityGrid';
 import { RoutineCard } from '@/components/today/RoutineCard';
 import { RulesCard, type RuleRow } from '@/components/today/RulesCard';
-import { currentPhase, evaluationStart } from '@/lib/phases';
+import { currentPhase, evaluationStart, PHASE_2_START } from '@/lib/phases';
+import { TodayProvider } from '@/components/today/TodayProvider';
+import { DayRings } from '@/components/today/DayRings';
 import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
 import { RouteLoading } from '@/components/layout/RouteLoading';
 
@@ -69,8 +71,18 @@ async function Today() {
   // Die Basis der Routine kommt aus der Metrik (`maxSkip` in der Intention).
   const routineBlocks = routines.map(b => {
     const m = cell(`routine.${b.kind}`);
-    return { ...b, base: m.base, targetHint: m.targetHint };
+    return { ...b, base: m.base, targetHint: m.targetHint, offDay: m.state === 'offday' };
   });
+
+  // Perfekte Tage zählen ab Phase 2 — erst seitdem gibt es die Regeln, die
+  // dazugehören. Beide Fälle für heute, der Browser wählt nur aus.
+  const perfektAb = PHASE_2_START > from ? PHASE_2_START : from;
+  const regelKeys = [...ruleKeys];
+  const nurZahlen = (p: ReturnType<typeof perfekteTage>) => ({ anzahl: p.anzahl, serie: p.serie, rekord: p.rekord });
+  const perfekt = {
+    wennPerfekt: nurZahlen(perfekteTage(matrix, regelKeys, perfektAb, today, true)),
+    wennNicht: nurZahlen(perfekteTage(matrix, regelKeys, perfektAb, today, false)),
+  };
   const calls = cell('sales.calls_count');
 
   // Beschriftungen kommen aus den echten Zielen, nicht aus fest getipptem Text.
@@ -148,35 +160,41 @@ async function Today() {
         )}
       </p>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <MetricCard
-          title="Calls"
-          source="CRM"
-          value={calls.value}
-          base={calls.base}
-          stretch={calls.stretch}
-          unit="count"
-          state={calls.state}
-          targetHint={calls.targetHint}
-          footLeft="Ziel aus CRM-Profil"
-          footRight={
-            // Am ersten Tag einer Phase ist noch kein Tag abgeschlossen — dann nichts statt „0/0".
-            callsWeek?.targeted
-              ? `${callsWeek.met}/${callsWeek.targeted} Tage ${phase ? `in Phase ${phase.nummer}` : 'im Block'}`
-              : undefined
-          }
-        />
-
-        <CausesCard rows={causeRows} date={today} />
-
-        {ruleRows.length > 0 && <RulesCard rows={ruleRows} date={today} since={summaryFrom} />}
-      </div>
-
-      {routineBlocks.length > 0 && (
-        <div className="mt-3">
-          <RoutineCard blocks={routineBlocks} date={today} />
+      <TodayProvider heute={{ causes: causeRows, rules: ruleRows, routines: routineBlocks }}>
+        <div className="mb-3">
+          <DayRings date={today} perfekt={perfekt} />
         </div>
-      )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <MetricCard
+            title="Calls"
+            source="CRM"
+            value={calls.value}
+            base={calls.base}
+            stretch={calls.stretch}
+            unit="count"
+            state={calls.state}
+            targetHint={calls.targetHint}
+            footLeft="Ziel aus CRM-Profil"
+            footRight={
+              // Am ersten Tag einer Phase ist noch kein Tag abgeschlossen — dann nichts statt „0/0".
+              callsWeek?.targeted
+                ? `${callsWeek.met}/${callsWeek.targeted} Tage ${phase ? `in Phase ${phase.nummer}` : 'im Block'}`
+                : undefined
+            }
+          />
+
+          <CausesCard date={today} />
+
+          {ruleRows.length > 0 && <RulesCard date={today} since={summaryFrom} />}
+        </div>
+
+        {routineBlocks.length > 0 && (
+          <div className="mt-3">
+            <RoutineCard date={today} />
+          </div>
+        )}
+      </TodayProvider>
 
       <div className="mt-3">
         <TaskInbox

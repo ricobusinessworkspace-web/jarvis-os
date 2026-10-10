@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DayMetric, MetricMatrix } from './AnalyticsService';
-import { ausblick } from './MotivationService';
-import { feierFuer, naechsteStufe, stufe } from '@/lib/motivation';
+import { ausblick, perfekteTage, tagAusMatrix } from './MotivationService';
+import { feierFuer, istPerfekt, naechsteStufe, ringe, stufe } from '@/lib/motivation';
 
 const zelle = (value: number | null, state: DayMetric['state']): DayMetric =>
   ({ value, base: 1, stretch: null, state, source: value === null ? null : 'tracker' });
@@ -79,5 +79,60 @@ describe('ausblick', () => {
     });
     const a = ausblick(m, 'training.sessions', '2026-10-09', { serieAb: '2026-10-06', regel: false });
     expect(a.wennErfuellt).toMatchObject({ serie: 2, start: '2026-10-08' });
+  });
+});
+
+/** Ein ganzer Tag: Ursachen (Calls, Training, Post), Routinen (je 6, Basis 3), eine Regel. */
+function tag(o: { calls?: number; training?: boolean; post?: boolean; morgen?: number; abend?: number; regel?: boolean; sonntag?: boolean }) {
+  const ursache = (erfuellt: boolean | undefined, base = 1): DayMetric =>
+    o.sonntag ? { value: null, base, stretch: null, state: 'offday', source: null }
+      : erfuellt === undefined ? { value: null, base, stretch: null, state: 'ungemessen', source: null }
+        : { value: erfuellt ? base : 0, base, stretch: null, state: erfuellt ? 'soll' : 'unter', source: 'tracker' };
+  const routine = (n: number | undefined): DayMetric =>
+    o.sonntag ? { value: null, base: 3, stretch: 6, state: 'offday', source: null }
+      : { value: n ?? null, base: 3, stretch: 6, state: !n ? 'ungemessen' : n >= 6 ? 'soll' : n >= 3 ? 'basis' : 'unter', source: n ? 'tracker' : null };
+  return {
+    'sales.calls_count': o.calls === undefined ? ursache(undefined, 30)
+      : { value: o.calls, base: 30, stretch: 50, state: o.calls >= 30 ? 'basis' : 'unter', source: 'crm_metrics' } as DayMetric,
+    'training.sessions': ursache(o.training),
+    'content.posts': ursache(o.post),
+    'routine.morning': routine(o.morgen),
+    'routine.evening': routine(o.abend),
+    'rule.x': { value: o.regel === false ? 0 : 1, base: 1, stretch: null, state: o.regel === false ? 'unter' : 'soll', source: 'tracker' } as DayMetric,
+  };
+}
+const PERFEKT = { calls: 31, training: true, post: true, morgen: 6, abend: 3 };
+
+describe('Ringe und perfekter Tag', () => {
+  it('Ringe zählen Ursachen mit Ziel, Schritte gegen Soll, gehaltene Regeln', () => {
+    const m: MetricMatrix = { '2026-10-09': tag({ calls: 10, training: true, morgen: 4, abend: 2, regel: false }) };
+    const r = ringe(tagAusMatrix(m, '2026-10-09', ['rule.x']));
+    expect(r.ursachen).toEqual({ wert: 1, gesamt: 3, zu: false });
+    expect(r.routinen).toEqual({ wert: 6, gesamt: 12, zu: false });
+    expect(r.regeln).toEqual({ wert: 0, gesamt: 1, zu: false });
+  });
+
+  it('perfekt nur, wenn alles erfüllt, Routinen auf Basis und keine Regel gebrochen', () => {
+    const p = (o: Parameters<typeof tag>[0]) => istPerfekt(tagAusMatrix({ d: tag(o) }, 'd', ['rule.x']));
+    expect(p(PERFEKT)).toBe(true);
+    expect(p({ ...PERFEKT, calls: 29 })).toBe(false);
+    expect(p({ ...PERFEKT, abend: 2 })).toBe(false);
+    expect(p({ ...PERFEKT, regel: false })).toBe(false);
+    expect(p({ sonntag: true })).toBe(false); // Sonntag: nichts mit Ziel → nie perfekt
+  });
+
+  it('zählt perfekte Tage; Sonntag ist Joker, heute offen bis perfekt', () => {
+    heute('2026-10-13'); // Di
+    const m: MetricMatrix = {
+      '2026-10-09': tag(PERFEKT),
+      '2026-10-10': tag(PERFEKT),
+      '2026-10-11': tag({ sonntag: true }),
+      '2026-10-12': tag(PERFEKT),
+      '2026-10-13': tag({ calls: 3 }),
+    };
+    expect(perfekteTage(m, ['rule.x'], '2026-10-09', '2026-10-13')).toEqual({ anzahl: 3, serie: 3, rekord: 3, heutePerfekt: false });
+    expect(perfekteTage(m, ['rule.x'], '2026-10-09', '2026-10-13', true)).toMatchObject({ anzahl: 4, serie: 4, rekord: 4 });
+    const bruch = { ...m, '2026-10-12': tag({ ...PERFEKT, post: false }) };
+    expect(perfekteTage(bruch, ['rule.x'], '2026-10-09', '2026-10-13', true)).toMatchObject({ anzahl: 3, serie: 1, rekord: 2 });
   });
 });

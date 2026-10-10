@@ -1,6 +1,5 @@
 'use client';
 
-import { useOptimistic, useTransition } from 'react';
 import { toggleCause } from '@/actions/today';
 import { clearCause } from '@/actions/verlauf';
 import { formatPercent } from '@/lib/metricState';
@@ -8,6 +7,7 @@ import type { MetricState } from '@/core/services/AnalyticsService';
 import { isJokerDay } from '@/lib/blocks';
 import type { Ausblick } from '@/lib/motivation';
 import { HabitRow } from './HabitRow';
+import { useHeute } from './TodayProvider';
 
 export interface RuleRow {
   metricKey: string;
@@ -32,32 +32,24 @@ export interface RuleRow {
  *
  * Eine Regel gilt an allen sieben Tagen, auch sonntags.
  */
-export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string; since: string }) {
-  const [, startTransition] = useTransition();
-
-  const [optimisticRows, applyOptimistic] = useOptimistic(
-    rows,
-    (state: RuleRow[], patch: { metricKey: string; state: MetricState; streak?: number; bestStreak?: number }) =>
-      state.map(r =>
-        r.metricKey === patch.metricKey
-          ? { ...r, state: patch.state, streak: patch.streak ?? r.streak, bestStreak: patch.bestStreak ?? r.bestStreak }
-          : r
-      )
-  );
+export function RulesCard({ date, since }: { date: string; since: string }) {
+  const { stand, anwenden } = useHeute();
+  const rows = stand.rules;
 
   // Kein Ton, keine Feier: einen Rückfall eintragen oder zurücknehmen ist keine Leistung.
-  const toggle = (row: RuleRow, broken: boolean) =>
-    startTransition(async () => {
-      const nachher = row.ausblick ? (broken ? row.ausblick.wennErfuellt : row.ausblick.wennNicht) : null;
-      applyOptimistic({
-        metricKey: row.metricKey,
-        state: broken ? 'soll' : 'unter',
-        streak: nachher?.serie,
-        bestStreak: nachher?.rekord,
-      });
-      const res = broken ? await clearCause(row.metricKey, date) : await toggleCause(row.metricKey, date, false);
-      if (!res?.success) console.error('[Regeln]', res?.error);
-    });
+  const toggle = (row: RuleRow, broken: boolean) => {
+    const nachher = row.ausblick ? (broken ? row.ausblick.wennErfuellt : row.ausblick.wennNicht) : null;
+    anwenden(
+      {
+        art: 'zeile', liste: 'rules', metricKey: row.metricKey,
+        state: broken ? 'soll' : 'unter', streak: nachher?.serie, bestStreak: nachher?.rekord,
+      },
+      async () => {
+        const res = broken ? await clearCause(row.metricKey, date) : await toggleCause(row.metricKey, date, false);
+        if (!res?.success) console.error('[Regeln]', res?.error);
+      }
+    );
+  };
 
   const sinceLabel = new Date(`${since}T12:00:00Z`).toLocaleDateString('de-DE', {
     day: 'numeric', month: 'numeric', timeZone: 'UTC',
@@ -73,7 +65,7 @@ export function RulesCard({ rows, date, since }: { rows: RuleRow[]; date: string
       </div>
 
       <div className="flex flex-col">
-        {optimisticRows.map(row => {
+        {rows.map(row => {
           const isBroken = row.state === 'unter';
           return (
             <HabitRow

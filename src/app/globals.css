@@ -551,6 +551,24 @@ body {
   100% { stroke-dashoffset: 0; opacity: 0; }
 }
 
+/* ── Gold: der perfekte Tag ───────────────────────────────── */
+/* Derselbe Ball, umgefärbt statt neu gezeichnet: Lila (Farbton ~272°) wird
+   über sepia → Sättigung → Farbdrehung zum Gold der Belohnungsfarbe. Dazu ein
+   Puls des ganzen Balls. Nur hier, nur für den perfekten Tag. */
+.orb--gold .orb-svg,
+.orb--gold .orb-glow {
+  filter: sepia(1) saturate(2.6) hue-rotate(-8deg) brightness(1.08);
+}
+
+.orb--gold {
+  animation: orb-gold-puls 1400ms ease-in-out infinite;
+}
+
+@keyframes orb-gold-puls {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
 /* ── Auftritt 1: Startsequenz über der ganzen Seite ───────── */
 
 .boot {
@@ -680,6 +698,7 @@ html[data-booted] .boot-word {
   .orb-node,
   .orb--intro .orb-nodes,
   .orb-pulse,
+  .orb--gold,
   .route-label { animation: none; }
   .orb-svg { opacity: 1; }
   .orb-glow { opacity: 0.8; }

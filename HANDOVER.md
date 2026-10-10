@@ -353,7 +353,9 @@ Pipeline sind nur Folgen.
   (10.10.): Gold-Token, Stufen 3/7/14/21/30/50/100, animierte Zeilen, Ton,
   Feier aus Server-Zahlen (`MotivationService.ausblick`, `summarize` kennt
   `streakStart`). Regel: der Browser zählt nie selbst, er wählt nur zwischen
-  den vorab gerechneten Fällen.
+  den vorab gerechneten Fällen. **Schritt 5 live**: Tagesringe + perfekter
+  Tag (`TodayProvider` als gemeinsamer optimistischer Zustand; Feier per Portal,
+  weil `backdrop-filter` an einem Vorfahren `position: fixed` einfängt).
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).

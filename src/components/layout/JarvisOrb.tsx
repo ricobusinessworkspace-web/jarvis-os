@@ -99,9 +99,14 @@ const ORB_STYLE = {
 const delays = (vars: Record<string, number>) =>
   Object.fromEntries(Object.entries(vars).map(([k, ms]) => [k, `${ms}ms`])) as CSSProperties;
 
-export function JarvisOrb({ intro = false }: { intro?: boolean }) {
+/**
+ * `gold`: der perfekte Tag — derselbe Ball, in der Belohnungsfarbe und mit
+ * einem Puls. Nur CSS (`.orb--gold`), wie alles am Orb.
+ */
+export function JarvisOrb({ intro = false, gold = false }: { intro?: boolean; gold?: boolean }) {
+  const klasse = ['orb', intro && 'orb--intro', gold && 'orb--gold'].filter(Boolean).join(' ');
   return (
-    <div className={intro ? 'orb orb--intro' : 'orb'} style={ORB_STYLE}>
+    <div className={klasse} style={ORB_STYLE}>
       <span className="orb-glow" />
 
       <svg className="orb-svg" viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} xmlns="http://www.w3.org/2000/svg">

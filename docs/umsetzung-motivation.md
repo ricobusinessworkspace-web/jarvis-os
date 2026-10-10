@@ -74,15 +74,15 @@ Handover-Delta.
 
 ## Schritt 5 — C2 + C3: Tagesringe, perfekter Tag
 
-- [ ] `TodayProvider` (gemeinsames `useOptimistic`) — Ursachen, Regeln,
+- [x] `TodayProvider` (gemeinsames `useOptimistic`) — Ursachen, Regeln,
       Routine darauf umstellen, Verhalten unverändert
-- [ ] `motivation.ts`: `ringe(...)`, `istPerfekt(...)`, `perfekteTage(matrix, ...)`
+- [x] `motivation.ts`: `ringe(...)`, `istPerfekt(...)`, `perfekteTage(matrix, ...)`
       (Anzahl, Serie, Rekord) — Tests
-- [ ] `DayRings` oben auf „Heute": drei Ringe, live, geschlossen = Gold-Rand
-- [ ] Feier „Perfekter Tag Nr. N": Orb in Gold (`JarvisOrb` Variante, nur CSS),
+- [x] `DayRings` oben auf „Heute": drei Ringe, live, geschlossen = Gold-Rand
+- [x] Feier „Perfekter Tag Nr. N": Orb in Gold (`JarvisOrb` Variante, nur CSS),
       Text, Doppelton; einmal je Tag (`localStorage`); kommt der perfekte Tag
       von außen (ChatGPT), Feier ohne Ton beim nächsten Laden
-- [ ] Browser: Ringe ändern sich beim Abhaken; Feier per Vorschau ohne echte
+- [x] Browser: Ringe ändern sich beim Abhaken; Feier per Vorschau ohne echte
       Daten prüfen (Testschalter nur im Dev: `?feier=1`)
 
 ## Schritt 6 — C5: Ziele-Seite als Zielbild
@@ -126,6 +126,14 @@ Handover-Delta.
 
 ## Fortschritt
 
+- **10.10., Schritt 5 fertig und live.** `TodayProvider` (ein `useOptimistic`
+  für Ursachen, Regeln, Routine), `DayRings` oben auf „Heute" (live, Gold-Rand
+  bei geschlossenem Ring), „Perfekte Tage N · Serie · Rekord" ab Phase 2,
+  beide Fälle vom Server (`perfekteTage(…, heuteAls)`). Feier: Orb in Gold
+  (`.orb--gold`, nur CSS) + Text + Doppelton, einmal je Tag; **per Portal an
+  `<body>`** — ein Vorfahr mit `backdrop-filter` hatte `fixed` sonst unter den
+  Bildschirm geschoben. Dev-Vorschau `?feier=1`. Browser: Post an → Ring 2/3
+  sofort, zurück, DB wie vorher.
 - **10.10., Schritt 4 fertig und live.** Dashboard liefert je Ursache/Regel den
   `ausblick` (Serie für beide Fälle); Karten schalten Serie optimistisch um,
   `useFeier` spielt Tick bzw. Doppelton und zeigt „Stufe N erreicht" /

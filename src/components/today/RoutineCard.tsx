@@ -1,6 +1,6 @@
 'use client';
 
-import { useOptimistic, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { Check, Sun, Moon, Pencil, Plus, Trash2, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { logTrackerItem } from '@/actions/dashboard';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@/actions/routines';
 import { cn } from '@/lib/utils';
 import { tick } from '@/lib/sound';
+import { useHeute } from './TodayProvider';
 
 export interface RoutineItem {
   id: string;
@@ -24,6 +25,8 @@ export interface RoutineBlock {
    *  hier gerechnet. `null`: keine Grenze hinterlegt, `targetHint` sagt warum. */
   base: number | null;
   targetHint?: string;
+  /** Sonntag: die Routine gilt nicht — zählt weder in Ring noch perfekten Tag. */
+  offDay?: boolean;
 }
 
 /**
@@ -39,31 +42,16 @@ export interface RoutineBlock {
  * welche; Soll = alle. Die Grenze kommt als `base` aus der Metrik — die Karte
  * rechnet sie nicht selbst nach, sonst stünde sie zweimal im Code.
  */
-export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: string }) {
+export function RoutineCard({ date }: { date: string }) {
   const [editing, setEditing] = useState(false);
+  // Gemeinsamer Zustand mit Ursachen und Regeln — die Ringe laufen mit.
+  const { stand, anwenden } = useHeute();
 
-  /**
-   * `useOptimistic` statt eigenem State: der gesetzte Haken bleibt genau so
-   * lange stehen, bis die neuen Server-Daten da sind, und geht dann nahtlos
-   * in sie über. Vorher habe ich den optimistischen Wert selbst gelöscht,
-   * sobald die Action zurückkam — da war die Seite aber noch nicht neu
-   * gerendert, und der Haken sprang sichtbar zurück.
-   */
-  const [optimisticBlocks, applyOptimistic] = useOptimistic(
-    blocks,
-    (state: RoutineBlock[], patch: { id: string; done: boolean }) =>
-      state.map(b => ({
-        ...b,
-        items: b.items.map(i => (i.id === patch.id ? { ...i, done: patch.done } : i)),
-      }))
-  );
-
-  const toggle = (item: RoutineItem, startTransition: React.TransitionStartFunction) => {
+  const toggle = (item: RoutineItem) => {
     if (!item.done) tick(); // nur beim Abhaken, aus dem Klick heraus
-    startTransition(async () => {
-      applyOptimistic({ id: item.id, done: !item.done });
-      await logTrackerItem(item.id, !item.done ? 'completed' : 'not_done', date);
-    });
+    anwenden({ art: 'schritt', id: item.id, done: !item.done }, () =>
+      logTrackerItem(item.id, !item.done ? 'completed' : 'not_done', date)
+    );
   };
 
   return (
@@ -85,7 +73,7 @@ export function RoutineCard({ blocks, date }: { blocks: RoutineBlock[]; date: st
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 md:gap-0">
-        {optimisticBlocks.map((block, idx) => (
+        {stand.routines.map((block, idx) => (
           <RoutineColumn
             key={block.trackerId}
             block={block}
@@ -108,7 +96,7 @@ function RoutineColumn({
 }: {
   block: RoutineBlock;
   editing: boolean;
-  onToggle: (i: RoutineItem, start: React.TransitionStartFunction) => void;
+  onToggle: (i: RoutineItem) => void;
   className: string;
 }) {
   const [, startTransition] = useTransition();
@@ -197,7 +185,7 @@ function RoutineColumn({
           <div key={item.id} className="flex items-center gap-2 border-t border-border/30 py-[6px] first:border-t-0">
             {!editing ? (
               <button
-                onClick={() => onToggle(item, startTransition)}
+                onClick={() => onToggle(item)}
                 className="flex flex-1 items-center gap-2.5 text-left text-[12.5px]"
               >
                 <span
