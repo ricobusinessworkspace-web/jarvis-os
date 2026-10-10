@@ -361,7 +361,10 @@ Pipeline sind nur Folgen.
   Umsatzziels (`core_goals`) — ohne ihn keine Restzeit. **Schritt 7 live**:
   `/api/widgets/nudge` für den Kurzbefehl „Jarvis Erinnerung" (kein Web
   Push); **offen: Rico baut Kurzbefehl + Automationen 18:00/21:30**
-  (`docs/apple-shortcuts.md` Schritt 7).
+  (`docs/apple-shortcuts.md` Schritt 7). **Schritt 8 live**: Wochenrückblick
+  dienstags auf „Heute" + als `rueckblick` im MCP-Wochenverlauf; Widget
+  „Jarvis Ringe" (`/api/widgets/motivation`, liegt mit Token in iCloud —
+  **offen: Rico platziert es**). Damit ist der Plan (Schritte 0–8) umgesetzt.
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).

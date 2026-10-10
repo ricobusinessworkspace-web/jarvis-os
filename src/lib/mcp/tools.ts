@@ -4,6 +4,7 @@ import { RoutineService } from '@/core/services/RoutineService';
 import { GoalService } from '@/core/services/GoalService';
 import { MailService, MailRegelFehler, ENTWURF_GRENZEN, type DraftView } from '@/core/services/MailService';
 import { DatenbasisService, datenqualitaet, LUECKENHAFT_UNTER } from '@/core/services/DatenbasisService';
+import { letzterRueckblick } from '@/core/services/MotivationService';
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { addDays, blockInfo, blockWeekRange, dateRange, BLOCK_START, BLOCK_WEEKS } from '@/lib/blocks';
 import { EMPTY_METRIC, FEIERABEND_HOUR } from '@/lib/metricState';
@@ -125,9 +126,15 @@ const performanceWochenverlauf: Werkzeug = {
     // Ein Datenlauf für den gesamten Zeitraum; dieselbe historische Zielberechnung wie im Dashboard.
     const definitionen = await DatenbasisService.metriken();
     const matrix = await AnalyticsService.getMatrix(zeitraeume[0].von, heute);
+    const rueckblick = await letzterRueckblick(heute);
     return {
       datenstand: datenstand(),
       phasen: phasen(),
+      /** Wie die Karte auf „Heute" am Dienstag — zum Vorlesen. */
+      rueckblick: rueckblick && {
+        ...rueckblick,
+        quoten: rueckblick.quoten.map(q => ({ ...q, quote: rund(q.quote), abdeckung: rund(q.abdeckung) })),
+      },
       wochen: zeitraeume.map(w => {
         const summaries = definitionen.map(d => ({
           d,
@@ -170,7 +177,9 @@ const performanceWochenverlauf: Werkzeug = {
         'Jede Woche nennt ihre Phase(n); was eine Phase bewertet hat, steht in phasen. ' +
         `datenqualitaet "lueckenhaft" = weniger als ${LUECKENHAFT_UNTER * 100} % der Tage mit Ziel wurden überhaupt ` +
         'eingetragen (ohne Calls und Regeln, die nie leer sind) — dann Zielquoten nicht als Leistung werten, ' +
-        'sondern als Tracking-Lücke benennen. Bedeutung jeder Kennzahl: jarvis_kontext.',
+        'sondern als Tracking-Lücke benennen. Bedeutung jeder Kennzahl: jarvis_kontext. ' +
+        'rueckblick = die zuletzt abgeschlossene Blockwoche (Quoten, neue_rekorde, beste Ursache, naechsteWoche) — ' +
+        'für „Wie war meine Woche?" vorlesen; bei neuen Rekorden gratulieren.',
     };
   },
 };

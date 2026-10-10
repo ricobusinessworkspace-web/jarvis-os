@@ -2,7 +2,7 @@
 
 > Referenzdokument, kein Handover. Der Stand des Projekts steht in `HANDOVER.md`.
 
-Zwei Widgets, beide über die App **Scriptable** (App Store, kostenlos). Scriptable
+Drei Widgets, alle über die App **Scriptable** (App Store, kostenlos). Scriptable
 führt JavaScript aus und baut daraus echte iOS-Widgets — kein eigener App-Build,
 keine Xcode-Kette, kein Apple-Developer-Account.
 
@@ -10,6 +10,7 @@ keine Xcode-Kette, kein Apple-Developer-Account.
 |---|---|---|---|
 | **Calls heute** | Tages-Calls gegen Basis und Soll | `scriptable/jarvis-calls.js` | `GET /api/widgets/calls` |
 | **Routine** | Morgen- bzw. Abendroutine | `scriptable/jarvis-routines.js` | `GET /api/widgets/routines` |
+| **Ringe + Serien** | Tagesringe, perfekter Tag, längste Serien | `scriptable/jarvis-ringe.js` | `GET /api/widgets/motivation` |
 
 **Produktion ist `https://jarvis-os-indol.vercel.app`.** Nicht
 `jarvis-os-wardogs.vercel.app` — die Adresse zeigt auf ein altes, SSO-geschütztes
@@ -230,3 +231,40 @@ teilen. Antippen holt immer frisch.
 direkt verwenden. Für Abhaken direkt im Widget braucht es App Intents (iOS 17)
 plus einen `POST`-Endpunkt — für Calls gibt es nichts abzuhaken, die kommen aus
 dem CRM.
+
+---
+
+# 3. Ringe + Serien (10.10.2026)
+
+**Bereits erledigt:** `Jarvis Ringe.js` liegt mit eingetragenem Token in Ricos
+Scriptable-iCloud-Ordner und erscheint von selbst in der App. **Rico muss es
+nur platzieren:** Homescreen lange drücken → **+** → Scriptable → Größe wählen
+→ Widget antippen → *Script* = **Jarvis Ringe**. Für den Sperrbildschirm:
+Sperrbildschirm lange drücken → Anpassen → Widgets → Scriptable → rund
+(nur Ringe) oder rechteckig (Ringe + Satz) → *Script* = **Jarvis Ringe**.
+
+Was es zeigt — alles fertig vom Server (`widgetStand()` im `MotivationService`),
+dieselbe Matrix wie „Heute":
+
+- drei konzentrische Ringe wie Apple Activity: Ursachen (erfüllt / mit Ziel),
+  Routinen (Schritte / Soll), Regeln (gehalten / alle); geschlossen = Gold
+- `titel`: „Perfekter Tag Nr. 5" oder „2 von 3 Ringen zu"
+- `zeile` / `serien`: die drei längsten laufenden Serien, ab Stufe 7 in Gold
+- klein: Ringe + Satz · mittel: Ringe, drei Ringzeilen, zwei Serien ·
+  Sperrbildschirm rund: Ringe · rechteckig: Ringe + Satz
+
+Gold gibt es nur auf dem Homescreen; den Sperrbildschirm färbt iOS selbst ein.
+Offline zeigt das Widget den letzten Stand mit „Stand hh:mm · offline".
+Ein Tipp öffnet „Heute".
+
+Antwort des Endpunkts (gekürzt):
+
+```json
+{ "ok": true, "date": "2026-10-10", "offDay": false,
+  "ringe": { "ursachen": { "wert": 1, "gesamt": 3, "zu": false, "label": "Ursachen" }, "…": "…" },
+  "perfekt": false, "perfekteTage": { "anzahl": 0, "serie": 0 },
+  "serien": [{ "label": "Trainingseinheit", "serie": 7, "stufe": 7, "gold": true }],
+  "titel": "1 von 3 Ringen zu", "zeile": "Trainingseinheit 7 · Keine Drogen 4",
+  "refreshAfterSeconds": 600 }
+```
+

@@ -1,6 +1,6 @@
 import { AnalyticsService, type DayMetric, type MetricMatrix } from './AnalyticsService';
 import {
-  erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
+  erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ringe, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
   type Ausblick, type Erinnerung, type SerienStand, type TagesStand,
 } from '@/lib/motivation';
 import { addDays, BLOCK_START, BLOCK_WEEKS, blockInfo, blockWeekRange, dateRange, daysBetween, isJokerDay } from '@/lib/blocks';
@@ -301,4 +301,132 @@ export async function erinnerung(heute: string = getBerlinDateStr(), stunde: num
       zaehlt: zielGalt(z[key]),
     })),
   });
+}
+
+// ── Wochenrückblick ──────────────────────────────────────────────────────────
+
+/** Unter dieser Abdeckung ist eine Quote keine Leistung, sondern eine Tracking-Lücke. */
+const RUECKBLICK_LUECKE = 0.5;
+
+export interface Wochenrueckblick {
+  von: string;
+  bis: string;
+  quoten: Array<{ key: string; label: string; erfuellt: number; mitZiel: number; quote: number | null; abdeckung: number | null }>;
+  neueRekorde: Array<{ key: string; label: string; rekord: number }>;
+  besteUrsache: { label: string; erfuellt: number; mitZiel: number } | null;
+  /** Eine Sache für nächste Woche — aus den Daten, nie ausgedacht. */
+  naechsteWoche: string | null;
+}
+
+/**
+ * Rückblick auf eine abgeschlossene Blockwoche (Di–Mo): Quoten je Ursache,
+ * Routine und Regel, neue Rekorde (Serie, die in dieser Woche über den alten
+ * Rekord ging), beste Ursache und eine Sache für nächste Woche. Calls und
+ * Regeln sind nie „nicht eingetragen" — ihre Abdeckung zählt nicht als Lücke.
+ */
+export function wochenrueckblick(
+  matrix: MetricMatrix,
+  metriken: Array<{ key: string; label: string; regel: boolean; lueckenlos: boolean }>,
+  von: string,
+  bis: string
+): Wochenrueckblick {
+  const quoten = metriken.map(m => {
+    const s = AnalyticsService.summarize(matrix, m.key, von, bis, { missIsFinal: m.regel });
+    return { ...m, erfuellt: s.met, mitZiel: s.targeted, quote: s.adherence, abdeckung: s.coverage, gemessen: s.measured, getrackt: s.tracked };
+  });
+
+  const neueRekorde = metriken.flatMap(m => {
+    const vorher = AnalyticsService.summarize(matrix, m.key, BLOCK_START, addDays(von, -1), { missIsFinal: m.regel }).bestStreak;
+    const nachher = AnalyticsService.summarize(matrix, m.key, BLOCK_START, bis, { missIsFinal: m.regel }).bestStreak;
+    return nachher > vorher && nachher >= 2 ? [{ key: m.key, label: m.label, rekord: nachher }] : [];
+  });
+
+  const handlungen = quoten.filter(q => !q.regel && q.mitZiel > 0 && q.quote !== null);
+  const beste = [...handlungen].sort((a, b) => (b.quote! - a.quote!) || (b.erfuellt - a.erfuellt))[0];
+
+  // Erst die Lücke, dann die Leistung: wer kaum eingetragen hat, soll eintragen.
+  const luecke = handlungen
+    .filter(q => !q.lueckenlos && q.abdeckung !== null && q.abdeckung < RUECKBLICK_LUECKE)
+    .sort((a, b) => a.abdeckung! - b.abdeckung!)[0];
+  const schwaechste = handlungen
+    .filter(q => q.quote! < 1)
+    .sort((a, b) => a.quote! - b.quote!)[0];
+  const naechsteWoche = luecke
+    ? `${luecke.label}: nur an ${luecke.gemessen} von ${luecke.getrackt} Tagen eingetragen — erst konsequent eintragen, dann zählt die Quote.`
+    : schwaechste
+      ? `${schwaechste.label}: ${schwaechste.erfuellt} von ${schwaechste.mitZiel} Tagen — nächste Woche mindestens ${Math.min(schwaechste.mitZiel, schwaechste.erfuellt + 1)}.`
+      : null;
+
+  return {
+    von,
+    bis,
+    quoten: quoten.map(({ key, label, erfuellt, mitZiel, quote, abdeckung }) => ({ key, label, erfuellt, mitZiel, quote, abdeckung })),
+    neueRekorde,
+    besteUrsache: beste ? { label: beste.label, erfuellt: beste.erfuellt, mitZiel: beste.mitZiel } : null,
+    naechsteWoche,
+  };
+}
+
+/** Die zuletzt abgeschlossene Blockwoche vor `heute` — `null` vor der ersten. */
+export function letzteWoche(heute: string): { von: string; bis: string } | null {
+  const [laufendVon] = blockWeekRange(heute);
+  const von = addDays(laufendVon, -7);
+  return von >= BLOCK_START ? { von, bis: addDays(von, 6) } : null;
+}
+
+/** Rückblick auf die letzte abgeschlossene Blockwoche — für „Heute" (dienstags) und ChatGPT. */
+export async function letzterRueckblick(heute: string = getBerlinDateStr()): Promise<Wochenrueckblick | null> {
+  const woche = letzteWoche(heute);
+  if (!woche) return null;
+  const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
+  const matrix = await AnalyticsService.getMatrix(BLOCK_START, woche.bis);
+  const label = (key: string) => definitionen.find(d => d.key === key)?.label ?? key;
+  return wochenrueckblick(matrix, [
+    ...URSACHEN_KEYS.map(key => ({ key, label: label(key), regel: false, lueckenlos: key === 'sales.calls_count' })),
+    ...ROUTINE_KEYS.map(key => ({ key, label: label(key), regel: false, lueckenlos: false })),
+    ...definitionen.filter(d => d.domain === 'rules').map(d => ({ key: d.key, label: d.label, regel: true, lueckenlos: true })),
+  ], woche.von, woche.bis);
+}
+
+// ── iPhone-Widget „Ringe + Serien" ───────────────────────────────────────────
+
+/**
+ * Alles, was das Widget zeigt — fertig gerechnet und formuliert, damit im
+ * Scriptable-Skript keine Logik steht: Ringe heute, perfekter Tag, die drei
+ * längsten laufenden Serien mit Stufe.
+ */
+export async function widgetStand(heute: string = getBerlinDateStr()) {
+  const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
+  const regelKeys = definitionen.filter(d => d.domain === 'rules').map(d => d.key);
+  const von = serieAb(heute);
+  const matrix = await AnalyticsService.getMatrix(von, heute, [...URSACHEN_KEYS, ...ROUTINE_KEYS, ...regelKeys]);
+  const label = (key: string) => definitionen.find(d => d.key === key)?.label ?? key;
+
+  const tag = tagAusMatrix(matrix, heute, regelKeys);
+  const r = ringe(tag);
+  const perfekt = istPerfekt(tag);
+  const perfekte = perfekteTage(matrix, regelKeys, PHASE_2_START > von ? PHASE_2_START : von, heute);
+
+  const serien = [...URSACHEN_KEYS, ...ROUTINE_KEYS, ...regelKeys]
+    .map(key => {
+      const s = AnalyticsService.summarize(matrix, key, von, heute, { missIsFinal: regelKeys.includes(key) });
+      return { key, label: label(key), serie: s.streak, rekord: s.bestStreak, stufe: stufe(s.streak), gold: s.streak >= GOLD_AB };
+    })
+    .filter(s => s.serie > 0)
+    .sort((a, b) => b.serie - a.serie)
+    .slice(0, 3);
+
+  const zu = [r.ursachen, r.routinen, r.regeln].filter(x => x.zu).length;
+  return {
+    ringe: {
+      ursachen: { ...r.ursachen, label: 'Ursachen' },
+      routinen: { ...r.routinen, label: 'Routinen' },
+      regeln: { ...r.regeln, label: 'Regeln' },
+    },
+    perfekt,
+    perfekteTage: { anzahl: perfekte.anzahl, serie: perfekte.serie },
+    serien,
+    titel: perfekt ? `Perfekter Tag Nr. ${perfekte.anzahl}` : `${zu} von 3 Ringen zu`,
+    zeile: serien.length ? serien.map(s => `${s.label} ${s.serie}`).join(' · ') : 'Noch keine laufende Serie',
+  };
 }

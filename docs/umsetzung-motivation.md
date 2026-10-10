@@ -111,21 +111,28 @@ Handover-Delta.
 
 ## Schritt 8 — C7 + C8: Wochenrückblick, Widget
 
-- [ ] `motivation.ts`: `wochenrueckblick(matrix, woche)` — Quoten, neue
+- [x] `motivation.ts`: `wochenrueckblick(matrix, woche)` — Quoten, neue
       Rekorde, beste Ursache, eine Sache für nächste Woche (aus den Daten)
-- [ ] Karte auf „Heute" dienstags (Wochenstart), wegklickbar (`localStorage`)
-- [ ] MCP: `performance_wochenverlauf` bekommt `rueckblick` der letzten
+- [x] Karte auf „Heute" dienstags (Wochenstart), wegklickbar (`localStorage`)
+- [x] MCP: `performance_wochenverlauf` bekommt `rueckblick` der letzten
       abgeschlossenen Woche
-- [ ] `GET /api/widgets/motivation`: Ringe, perfekter Tag, Top-Serien, Texte
-- [ ] `scriptable/jarvis-ringe.js`: Ringe + Serien, klein/mittel/Sperrbildschirm;
+- [x] `GET /api/widgets/motivation`: Ringe, perfekter Tag, Top-Serien, Texte
+- [x] `scriptable/jarvis-ringe.js`: Ringe + Serien, klein/mittel/Sperrbildschirm;
       mit Token in iCloud-Scriptable-Ordner
-- [ ] `docs/ios-widget.md` ergänzen
-- [ ] Production prüfen
+- [x] `docs/ios-widget.md` ergänzen
+- [x] Production prüfen
 
 ---
 
 ## Fortschritt
 
+- **10.10., Schritt 8 fertig und live.** Wochenrückblick (`wochenrueckblick`,
+  `letzterRueckblick`): Karte auf „Heute" dienstags, wegklickbar; Lücke geht vor
+  Leistung („erst konsequent eintragen"); ChatGPT bekommt ihn als `rueckblick`
+  in `performance_wochenverlauf`. Widget: `GET /api/widgets/motivation`
+  (`widgetStand`) + `scriptable/jarvis-ringe.js`, mit Token als
+  „Jarvis Ringe" im iCloud-Scriptable-Ordner — **Rico platziert es nur noch**.
+  Dev-Vorschauen: `/?feier=1`, `/?rueckblick=1` (in Production wirkungslos).
 - **10.10., Schritt 7 fertig und live.** `GET /api/widgets/nudge`
   (`checkWidgetAuth`) → `erinnerung()` → `erinnerungWaehlen` (rein, getestet).
   Anleitung Kurzbefehl + Automationen 18:00/21:30 in `docs/apple-shortcuts.md`

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DayMetric, MetricMatrix } from './AnalyticsService';
-import { ausblick, besteWoche, bloeckeBis, ketten, perfekteTage, tagAusMatrix } from './MotivationService';
+import { ausblick, besteWoche, bloeckeBis, ketten, letzteWoche, perfekteTage, tagAusMatrix, wochenrueckblick } from './MotivationService';
 import { feierFuer, istPerfekt, naechsteStufe, ringe, stufe } from '@/lib/motivation';
 
 const zelle = (value: number | null, state: DayMetric['state']): DayMetric =>
@@ -182,5 +182,47 @@ describe('Zielbild', () => {
     const w = besteWoche(m, '2026-09-16');
     expect(w).toMatchObject({ von: '2026-09-08', bis: '2026-09-14' });
     expect(w!.quote).toBeCloseTo(28 / 30);
+  });
+});
+
+describe('Wochenrückblick', () => {
+  const METRIKEN = [
+    { key: 'sales.calls_count', label: 'Calls', regel: false, lueckenlos: true },
+    { key: 'training.sessions', label: 'Training', regel: false, lueckenlos: false },
+    { key: 'content.posts', label: 'Post', regel: false, lueckenlos: false },
+    { key: 'rule.x', label: 'Regel', regel: true, lueckenlos: true },
+  ];
+
+  it('letzte abgeschlossene Blockwoche läuft Di–Mo', () => {
+    expect(letzteWoche('2026-10-13')).toEqual({ von: '2026-10-06', bis: '2026-10-12' });
+    expect(letzteWoche('2026-09-03')).toBeNull();
+  });
+
+  it('Quoten, neuer Rekord, beste Ursache und eine Sache für nächste Woche', () => {
+    heute('2026-09-16');
+    const m: MetricMatrix = {};
+    // Vorwoche: Training 2 Tage am Stück → alter Rekord 2.
+    m['2026-09-04'] = tag({ calls: 0, training: true, post: true });
+    m['2026-09-05'] = tag({ calls: 0, training: true, post: true });
+    // Woche 08.–14.09.: Training jeden Tag (Rekord 6), Post nur 2 von 6.
+    for (const d of ['2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-14']) {
+      m[d] = tag({ calls: 0, training: true, post: ['2026-09-08', '2026-09-09'].includes(d) ? true : false });
+    }
+    m['2026-09-13'] = tag({ sonntag: true });
+    const r = wochenrueckblick(m, METRIKEN, '2026-09-08', '2026-09-14');
+    expect(r.neueRekorde.map(x => [x.label, x.rekord])).toEqual([['Training', 6], ['Regel', 7]]); // Regel in den Testdaten jeden Tag gehalten
+    expect(r.besteUrsache).toEqual({ label: 'Training', erfuellt: 6, mitZiel: 6 });
+    expect(r.naechsteWoche).toBe('Calls: 0 von 6 Tagen — nächste Woche mindestens 1.');
+  });
+
+  it('eine Tracking-Lücke geht vor der schwächsten Quote', () => {
+    heute('2026-09-16');
+    const m: MetricMatrix = {};
+    for (const d of ['2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11', '2026-09-12', '2026-09-14']) {
+      m[d] = tag({ calls: 0, training: true, post: d === '2026-09-08' ? true : undefined });
+    }
+    m['2026-09-13'] = tag({ sonntag: true });
+    const r = wochenrueckblick(m, METRIKEN, '2026-09-08', '2026-09-14');
+    expect(r.naechsteWoche).toBe('Post: nur an 1 von 6 Tagen eingetragen — erst konsequent eintragen, dann zählt die Quote.');
   });
 });

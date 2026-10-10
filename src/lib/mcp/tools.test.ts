@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsService, type MetricMatrix } from '@/core/services/AnalyticsService';
 import { WERKZEUGE } from './tools';
 
@@ -28,6 +28,11 @@ function layer(metriken: Array<{
 }
 
 const werkzeug = (name: string) => WERKZEUGE.find(w => w.name === name)!;
+
+beforeEach(() => {
+  // Nie die geteilte Datenbank: der Rückblick im Wochenverlauf liest Definitionen.
+  vi.spyOn(AnalyticsService, 'getDefinitions').mockResolvedValue([]);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

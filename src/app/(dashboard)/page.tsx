@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
-import { ausblick, perfekteTage } from '@/core/services/MotivationService';
+import { ausblick, letzterRueckblick, perfekteTage } from '@/core/services/MotivationService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
@@ -14,6 +14,7 @@ import { RulesCard, type RuleRow } from '@/components/today/RulesCard';
 import { currentPhase, evaluationStart, PHASE_2_START } from '@/lib/phases';
 import { TodayProvider } from '@/components/today/TodayProvider';
 import { DayRings } from '@/components/today/DayRings';
+import { WochenRueckblick } from '@/components/today/WochenRueckblick';
 import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
 import { RouteLoading } from '@/components/layout/RouteLoading';
 
@@ -31,7 +32,7 @@ function lastDayOfMonth(dateStr: string): string {
   return `${y}-${String(m).padStart(2, '0')}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`;
 }
 
-async function Today() {
+async function Today({ vorschau = false }: { vorschau?: boolean }) {
   const today = getBerlinDateStr();
   const block = blockInfo(today);
 
@@ -52,6 +53,9 @@ async function Today() {
   const crmTasks = await TaskInboxService.getCrmTasks();
   const reminders = await TaskInboxService.getReminders();
   const routines = await RoutineService.getRoutineBlocks(today);
+  // Dienstags beginnt die Blockwoche neu — dann der Blick zurück.
+  // `vorschau`: nur im Dev per `?rueckblick=1`, um die Karte an anderen Tagen anzusehen.
+  const rueckblick = (!block.beforeStart && block.dayOfWeek === 1) || vorschau ? await letzterRueckblick(today) : null;
   // Welche Regeln es gibt, steht in der Datenbank (Domäne `rules`), nicht hier.
   const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
 
@@ -161,6 +165,12 @@ async function Today() {
       </p>
 
       <TodayProvider heute={{ causes: causeRows, rules: ruleRows, routines: routineBlocks }}>
+        {rueckblick && (
+          <div className="mb-3">
+            <WochenRueckblick r={rueckblick} />
+          </div>
+        )}
+
         <div className="mb-3">
           <DayRings date={today} perfekt={perfekt} />
         </div>
@@ -220,11 +230,12 @@ async function Today() {
 
 // Die Grenze liegt außen: der Ladezustand ersetzt den ganzen Inhaltsbereich
 // und steht damit an derselben Stelle wie der Ball beim Reiter-Wechsel.
-export default function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ rueckblick?: string }> }) {
+  const vorschau = process.env.NODE_ENV !== 'production' && (await searchParams).rueckblick !== undefined;
   return (
     <Suspense fallback={<RouteLoading />}>
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
-        <Today />
+        <Today vorschau={vorschau} />
       </div>
     </Suspense>
   );
