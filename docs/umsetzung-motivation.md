@@ -87,17 +87,17 @@ Handover-Delta.
 
 ## Schritt 6 — C5: Ziele-Seite als Zielbild
 
-- [ ] `MotivationService.zielbild()`: Reise (Planstart → 01.03.2027, Blöcke,
+- [x] `MotivationService.zielbild()`: Reise (Planstart → 01.03.2027, Blöcke,
       Phasen, „Du bist hier", Countdown), Umsatz (kumuliert, Ziel aus
       `core_goals`; ohne Wert „noch keine Provision erfasst"), Ketten je
       Ursache/Regel (Tageszustände + Serie/Rekord), Rekordwand
-- [ ] Rekordwand: längste Serien je Kennzahl, perfekte Tage (Anzahl, längste
+- [x] Rekordwand: längste Serien je Kennzahl, perfekte Tage (Anzahl, längste
       Serie), beste Blockwoche nur bei Abdeckung ≥ 0,7, erreichte
       Meilensteine in Gold
-- [ ] Seite: Reise → Ergebnis → Ketten → Rekordwand → Einstellungen
+- [x] Seite: Reise → Ergebnis → Ketten → Rekordwand → Einstellungen
       (`GoalsEditor` + Töne-Schalter, eingeklappt)
-- [ ] Tests für `zielbild`-Logik (Umsatz ohne Wert, beste Woche, Ketten mit Joker)
-- [ ] Browser Desktop + 375 px (Heatmap scrollt horizontal, keine Seitenbreite)
+- [x] Tests für `zielbild`-Logik (Umsatz ohne Wert, beste Woche, Ketten mit Joker)
+- [x] Browser Desktop + 375 px (Heatmap scrollt horizontal, keine Seitenbreite)
 
 ## Schritt 7 — C6: Erinnerung per Kurzbefehl
 
@@ -126,6 +126,13 @@ Handover-Delta.
 
 ## Fortschritt
 
+- **10.10., Schritt 6 fertig und live.** `/ziele` = Reise (Planstart →
+  Stichtag aus dem Umsatzziel, Blöcke, Phasen, „Du bist hier", Restzeit) →
+  Ergebnisziel („noch keine Provision erfasst" statt 0 %) → Ketten
+  (GitHub-artig, Mo–So, Sonntag mit Joker-Punkt; vor dem Start einer Regel
+  „gab es noch nicht") → Rekordwand (längste Serien mit Stufen in Gold ab 7,
+  perfekte Tage, beste Blockwoche nur ≥ 70 % eingetragen) → Einstellungen
+  eingeklappt (`GoalsEditor` + Töne-Schalter). Alles aus `zielbild()`.
 - **10.10., Schritt 5 fertig und live.** `TodayProvider` (ein `useOptimistic`
   für Ursachen, Regeln, Routine), `DayRings` oben auf „Heute" (live, Gold-Rand
   bei geschlossenem Ring), „Perfekte Tage N · Serie · Rekord" ab Phase 2,

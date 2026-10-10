@@ -356,6 +356,9 @@ Pipeline sind nur Folgen.
   den vorab gerechneten Fällen. **Schritt 5 live**: Tagesringe + perfekter
   Tag (`TodayProvider` als gemeinsamer optimistischer Zustand; Feier per Portal,
   weil `backdrop-filter` an einem Vorfahren `position: fixed` einfängt).
+  **Schritt 6 live**: `/ziele` als Zielbild (Reise, Ergebnis, Ketten,
+  Rekordwand; Editor eingeklappt). Der Stichtag der Reise ist der des
+  Umsatzziels (`core_goals`) — ohne ihn keine Restzeit.
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).
