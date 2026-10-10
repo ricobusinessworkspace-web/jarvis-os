@@ -241,6 +241,53 @@ Kontrollzentrum.
 
 ---
 
+## Schritt 7 — Kurzbefehl „Jarvis Erinnerung" (statt Web Push)
+
+Jarvis meldet sich abends, wenn noch etwas offen ist — über einen Kurzbefehl,
+nicht über Web Push (bewusst: Push bräuchte Service Worker, installierte App,
+VAPID-Schlüssel und einen Zeitplaner, der im Vercel-Hobby-Tarif nur einmal
+täglich läuft). Der Server entscheidet und formuliert alles; der Kurzbefehl
+zeigt nur an.
+
+**Endpunkt:** `GET https://jarvis-os-indol.vercel.app/api/widgets/nudge`
+mit Kopfzeile `Authorization: Bearer <WIDGET_SECRET_TOKEN>` — derselbe Token
+wie bei den Widgets (steht im Scriptable-Skript `jarvis-calls.js`).
+Antwort: `{ "zeigen": true, "titel": "Abendroutine 2/6", "text": "Basis ab 3 — noch 1 Schritt." }`
+oder `{ "zeigen": false, … }`, wenn alles erledigt ist.
+
+Was zuerst kommt: eine Stufe in Reichweite („Stufe 7 in Reichweite") → eine
+Serie in Gefahr („Training: Serie 6") → Morgenroutine unter Basis (bis 14 Uhr)
+bzw. Abendroutine (ab 19 Uhr) → Calls unter Basis (vor 18 Uhr) → eine offene
+Ursache. Sonntags kommt nichts.
+
+**Kurzbefehl bauen** (Shortcuts-App → **+**, Name `Jarvis Erinnerung`):
+
+1. **URL** → `https://jarvis-os-indol.vercel.app/api/widgets/nudge`
+2. **Inhalte von URL abrufen** → Methode `GET`, unter *Header* eine Zeile:
+   Schlüssel `Authorization`, Wert `Bearer ` + der Widget-Token.
+3. **Wörterbuchwert abrufen** → Wert für `zeigen` in *Inhalte von URL*.
+4. **Wenn** *Wörterbuchwert* **ist** `1` (Shortcuts liest `true` als 1):
+   - **Wörterbuchwert abrufen** → `titel` (aus *Inhalte von URL*)
+   - **Wörterbuchwert abrufen** → `text` (aus *Inhalte von URL*)
+   - **Mitteilung anzeigen** → Titel = *titel*, Text = *text*
+5. **Ende Wenn** — sonst nichts.
+
+**Automationen** (Automation → **+** → Tageszeit, je einmal):
+
+| Trigger | Kurzbefehl |
+|---|---|
+| **Time of Day** → 18:00 täglich | Jarvis Erinnerung |
+| **Time of Day** → 21:30 täglich | Jarvis Erinnerung |
+
+Beide auf **Sofort ausführen** und **Bei Ausführung benachrichtigen** aus —
+die Mitteilung kommt aus dem Kurzbefehl selbst.
+
+**Testen:** Kurzbefehl einmal von Hand starten. Kommt keine Mitteilung, ist
+entweder alles erledigt (gut) oder der Token falsch — dann im Browser
+`…/api/widgets/nudge?token=<Token>` öffnen: `401` heißt Token prüfen.
+
+---
+
 ## Etwas nachträglich korrigieren
 
 Zwei Wege, je nachdem wo der Fehler sitzt:

@@ -121,3 +121,81 @@ export function istPerfekt(t: TagesStand): boolean {
 /** Ein Tag ohne Ursache und Routine mit Ziel — weder perfekt noch ein Bruch der Serie. */
 export const istJokerTag = (t: TagesStand) =>
   t.ursachen.every(x => !x.zaehlt) && t.routinen.every(x => !x.zaehlt);
+
+// ── Erinnerung (Kurzbefehl) ──────────────────────────────────────────────────
+
+export interface ErinnerungsLage {
+  /** Berliner Stunde, 0–23. */
+  stunde: number;
+  /** Ursachen zum Abhaken (ohne Calls). `serie` = laufende Serie bis gestern. */
+  ursachen: Array<{ label: string; offen: boolean; zaehlt: boolean; serie: number; serieWennErledigt: number }>;
+  calls: { wert: number | null; basis: number | null; zaehlt: boolean } | null;
+  routinen: Array<{ label: string; art: 'morgen' | 'abend'; erledigt: number; gesamt: number; basis: number | null; zaehlt: boolean }>;
+}
+
+export interface Erinnerung {
+  zeigen: boolean;
+  titel: string;
+  text: string;
+}
+
+const KEINE: Erinnerung = { zeigen: false, titel: '', text: '' };
+
+/**
+ * Die eine Mitteilung, die jetzt am meisten bringt — fertig formuliert, damit
+ * im Kurzbefehl keine Logik steht. Reihenfolge: eine Stufe in Reichweite,
+ * eine Serie in Gefahr, eine Routine unter Basis zur passenden Tageszeit,
+ * Calls unter Basis vor Feierabend, sonst eine offene Ursache. Ist alles
+ * erledigt (oder Sonntag), kommt nichts — `zeigen: false`.
+ */
+export function erinnerungWaehlen(l: ErinnerungsLage): Erinnerung {
+  const offen = l.ursachen.filter(u => u.zaehlt && u.offen);
+
+  const stufeNah = offen
+    .filter(u => istMeilenstein(u.serieWennErledigt))
+    .sort((a, b) => b.serieWennErledigt - a.serieWennErledigt)[0];
+  if (stufeNah) {
+    return {
+      zeigen: true,
+      titel: `Stufe ${stufeNah.serieWennErledigt} in Reichweite`,
+      text: `${stufeNah.label} heute noch — dann sind es ${stufeNah.serieWennErledigt} Tage in Folge.`,
+    };
+  }
+
+  const gefahr = offen.filter(u => u.serie >= 2).sort((a, b) => b.serie - a.serie)[0];
+  if (gefahr) {
+    return {
+      zeigen: true,
+      titel: `${gefahr.label}: Serie ${gefahr.serie}`,
+      text: `Heute noch erledigen, dann sind es ${gefahr.serieWennErledigt}. Sonst reißt die Serie.`,
+    };
+  }
+
+  const routine = l.routinen.find(
+    r => r.zaehlt && r.basis !== null && r.erledigt < r.basis &&
+      (r.art === 'abend' ? l.stunde >= 19 : l.stunde < 14)
+  );
+  if (routine && routine.basis !== null) {
+    const fehlt = routine.basis - routine.erledigt;
+    return {
+      zeigen: true,
+      titel: `${routine.label} ${routine.erledigt}/${routine.gesamt}`,
+      text: `Basis ab ${routine.basis} — noch ${fehlt} ${fehlt === 1 ? 'Schritt' : 'Schritte'}.`,
+    };
+  }
+
+  const c = l.calls;
+  if (c && c.zaehlt && c.basis !== null && l.stunde < 18 && (c.wert ?? 0) < c.basis) {
+    const fehlt = c.basis - (c.wert ?? 0);
+    return { zeigen: true, titel: `Calls ${c.wert ?? 0}/${c.basis}`, text: `Noch ${fehlt} bis zur Basis.` };
+  }
+
+  if (offen.length) {
+    return {
+      zeigen: true,
+      titel: offen.length === 1 ? `${offen[0].label} noch offen` : `${offen.length} Ursachen noch offen`,
+      text: offen.map(u => u.label).join(', ') + ' — heute noch abhaken.',
+    };
+  }
+  return KEINE;
+}

@@ -358,7 +358,10 @@ Pipeline sind nur Folgen.
   weil `backdrop-filter` an einem Vorfahren `position: fixed` einfängt).
   **Schritt 6 live**: `/ziele` als Zielbild (Reise, Ergebnis, Ketten,
   Rekordwand; Editor eingeklappt). Der Stichtag der Reise ist der des
-  Umsatzziels (`core_goals`) — ohne ihn keine Restzeit.
+  Umsatzziels (`core_goals`) — ohne ihn keine Restzeit. **Schritt 7 live**:
+  `/api/widgets/nudge` für den Kurzbefehl „Jarvis Erinnerung" (kein Web
+  Push); **offen: Rico baut Kurzbefehl + Automationen 18:00/21:30**
+  (`docs/apple-shortcuts.md` Schritt 7).
 - **ChatGPT hakt ab** (09.10., Schritt 3, **live** in `f861141`; Production
   geprüft: alle Reiter 200, MCP ohne Token 401, 14 Werkzeuge, Schreibtest
   Post an/zurück über Production, Protokollzeilen danach gelöscht).

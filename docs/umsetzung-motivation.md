@@ -101,13 +101,13 @@ Handover-Delta.
 
 ## Schritt 7 — C6: Erinnerung per Kurzbefehl
 
-- [ ] `GET /api/widgets/nudge` (`checkWidgetAuth`) → `{ zeigen, titel, text }`
+- [x] `GET /api/widgets/nudge` (`checkWidgetAuth`) → `{ zeigen, titel, text }`
       aus `MotivationService.erinnerung()`: Serie in Gefahr > nahe Stufe >
       Routine offen > Calls unter Basis; alles erledigt → `zeigen: false`
-- [ ] Tests der Auswahl-Logik
-- [ ] `docs/apple-shortcuts.md`: Kurzbefehl „Jarvis Erinnerung" +
+- [x] Tests der Auswahl-Logik
+- [x] `docs/apple-shortcuts.md`: Kurzbefehl „Jarvis Erinnerung" +
       Automationen 18:00 / 21:30 — Rico richtet ein
-- [ ] Production: Endpunkt ohne Token 401, mit Token Antwort
+- [x] Production: Endpunkt ohne Token 401, mit Token Antwort
 
 ## Schritt 8 — C7 + C8: Wochenrückblick, Widget
 
@@ -126,6 +126,10 @@ Handover-Delta.
 
 ## Fortschritt
 
+- **10.10., Schritt 7 fertig und live.** `GET /api/widgets/nudge`
+  (`checkWidgetAuth`) → `erinnerung()` → `erinnerungWaehlen` (rein, getestet).
+  Anleitung Kurzbefehl + Automationen 18:00/21:30 in `docs/apple-shortcuts.md`
+  Schritt 7 — **Rico richtet ein**.
 - **10.10., Schritt 6 fertig und live.** `/ziele` = Reise (Planstart →
   Stichtag aus dem Umsatzziel, Blöcke, Phasen, „Du bist hier", Restzeit) →
   Ergebnisziel („noch keine Provision erfasst" statt 0 %) → Ketten

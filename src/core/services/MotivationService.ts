@@ -1,10 +1,10 @@
 import { AnalyticsService, type DayMetric, type MetricMatrix } from './AnalyticsService';
 import {
-  GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
-  type Ausblick, type SerienStand, type TagesStand,
+  erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
+  type Ausblick, type Erinnerung, type SerienStand, type TagesStand,
 } from '@/lib/motivation';
-import { addDays, BLOCK_START, BLOCK_WEEKS, blockWeekRange, dateRange, daysBetween, isJokerDay } from '@/lib/blocks';
-import { getBerlinDateStr } from '@/lib/dateUtils';
+import { addDays, BLOCK_START, BLOCK_WEEKS, blockInfo, blockWeekRange, dateRange, daysBetween, isJokerDay } from '@/lib/blocks';
+import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { PHASES, PHASE_2_START } from '@/lib/phases';
 import { GoalService } from './GoalService';
 
@@ -260,3 +260,45 @@ export async function zielbild(heute: string = getBerlinDateStr()) {
 }
 
 export type Zielbild = Awaited<ReturnType<typeof zielbild>>;
+
+// ── Erinnerung ───────────────────────────────────────────────────────────────
+
+/** Ab wann Serien für „Heute" zählen — wie auf dem Dashboard: ab Blockstart. */
+function serieAb(heute: string) {
+  const b = blockInfo(heute);
+  return b.beforeStart ? addDays(heute, -45) : b.blockStart;
+}
+
+/** Die eine Mitteilung für den Kurzbefehl „Jarvis Erinnerung" — aus der Matrix, wie das Dashboard sie sieht. */
+export async function erinnerung(heute: string = getBerlinDateStr(), stunde: number = getBerlinHour()): Promise<Erinnerung> {
+  const definitionen = await AnalyticsService.getDefinitions();
+  const von = serieAb(heute);
+  const matrix = await AnalyticsService.getMatrix(von, heute, [...URSACHEN_KEYS, ...ROUTINE_KEYS]);
+  const z = matrix[heute] ?? {};
+  const label = (key: string) => definitionen.find(d => d.key === key)?.label ?? key;
+
+  return erinnerungWaehlen({
+    stunde,
+    ursachen: URSACHEN_KEYS.filter(k => k !== 'sales.calls_count').map(key => {
+      const a = ausblick(matrix, key, heute, { serieAb: von, regel: false });
+      return {
+        label: label(key),
+        offen: !erfuellt(z[key]),
+        zaehlt: zielGalt(z[key]),
+        serie: a.serie,
+        serieWennErledigt: a.wennErfuellt.serie,
+      };
+    }),
+    calls: z['sales.calls_count']
+      ? { wert: z['sales.calls_count'].value, basis: z['sales.calls_count'].base, zaehlt: zielGalt(z['sales.calls_count']) }
+      : null,
+    routinen: ROUTINE_KEYS.map(key => ({
+      label: label(key),
+      art: key === 'routine.morning' ? 'morgen' as const : 'abend' as const,
+      erledigt: z[key]?.value ?? 0,
+      gesamt: z[key]?.stretch ?? 0,
+      basis: z[key]?.base ?? null,
+      zaehlt: zielGalt(z[key]),
+    })),
+  });
+}
