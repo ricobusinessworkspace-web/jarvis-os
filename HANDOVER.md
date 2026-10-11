@@ -1,6 +1,6 @@
 ---
 last_updated: 2026-10-14
-last_agent: Claude Opus 5.5 — Supabase-Sicherheit (RLS) geschlossen; davor Plan Schritte 0–3, NaN-Fix RulesCard
+last_agent: Claude Opus 5.5 — Supabase-Sicherheit (RLS) geschlossen; davor Wochenzyklus-Spec, Plan Schritte 0–3, NaN-Fix RulesCard
 status: In Progress
 ---
 
@@ -669,6 +669,15 @@ Pipeline sind nur Folgen.
   denselben Origin. Bei „Seite leer, Server aber ok" zuerst dort nachsehen.
 
 ## Offene Entscheidungen
+
+- **Wochenzyklus (11.10., wartet auf Ricos OK)** — `docs/wochenzyklus-spec.md`
+  ist verbindlich; Inventur, Vorschlag und Migrationsvorschlag in
+  `docs/wochenzyklus-analyse.md`. Kernpunkte: Woche Mo–So statt Blockwoche
+  Di–Mo, Wochenfortschritt primär, Heatmaps mit roten Tagen raus (auch die
+  Ketten auf `/ziele` vom 10.10.), harter Schnitt Sonntag 23:59 für Nachträge,
+  `core_goal_drivers` + `target_numeric` als Migration. **Nichts umgesetzt.**
+- **Erinnerung per Kurzbefehl ist auf Eis** (Rico, 11.10.) — gebaut und live
+  (`/api/widgets/nudge`), Rico will später daran erinnert werden.
 
 - **`core:seed` ist veraltet — nicht ausführen.** Er ersetzt *alle* Quellen
   durch seine Liste, kennt aber die CRM-Quellen (`crm_metrics`, seit 12.09.)
