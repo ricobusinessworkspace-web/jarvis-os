@@ -119,6 +119,17 @@ export function blockWeekRange(dateStr: string = getBerlinDateStr()): [string, s
   return [start, addDays(start, 6)];
 }
 
+/**
+ * Die Kalenderwoche Mo–So, in der `dateStr` liegt — die Einheit des
+ * Wochenzyklus (`docs/wochenzyklus-spec.md`). Unabhängig von den Blockwochen
+ * (Di–Mo), die nur noch den Plan gliedern.
+ */
+export function kalenderWoche(dateStr: string = getBerlinDateStr()): { von: string; bis: string; tage: string[] } {
+  const von = addDays(dateStr, -(isoWeekday(dateStr) - 1));
+  const bis = addDays(von, 6);
+  return { von, bis, tage: dateRange(von, bis) };
+}
+
 /** Nur die getrackten Tage (Mo–Sa) eines Zeitraums — der Nenner für Adherence und Coverage. */
 export function trackedDays(from: string, to: string): string[] {
   return dateRange(from, to).filter(d => !isOffDay(d));

@@ -41,6 +41,7 @@ describe('AnalyticsService.summarize', () => {
   });
 
   it('gibt keine Quote, wenn im Zeitraum kein Ziel galt — statt 0 %', () => {
+    heute('2026-10-20'); // der Zeitraum liegt ganz in der Vergangenheit — sonst ist der 14. „heute" und offen
     const m = matrixAus('body.weight', {
       '2026-10-12': zelle(80.1, 'erfasst', null),
       '2026-10-13': zelle(null, 'ungemessen', null),

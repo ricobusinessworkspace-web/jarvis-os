@@ -348,6 +348,13 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **iPhone-Widgets neu** (14.10.): alte drei (Calls, Routine, Ringe) samt
+  Endpunkten `/api/widgets/calls|routines|motivation`, `components/widgets/*`
+  und toten `RoutineService`-Methoden abgebaut. Neu: **Jarvis Heute** (Kacheln,
+  groß + Woche) und **Jarvis Calls** (heute + Woche + Split), beide über
+  `GET /api/widgets/heute` → `heuteUndWoche()` im neuen `WochenService`
+  (Woche Mo–So, `kalenderWoche` in `blocks.ts`, Wochenziel = Tagesziel ×
+  Arbeitstage). `/routines` leitet auf `/` um. Doku: `docs/ios-widget.md`.
 - **Motivationssystem (Schritte 4–8)**: Arbeitsplan mit Häkchen in
   `docs/umsetzung-motivation.md` (Häkchen + „Fortschritt"). **Schritt 4 live**
   (10.10.): Gold-Token, Stufen 3/7/14/21/30/50/100, animierte Zeilen, Ton,
@@ -669,6 +676,14 @@ Pipeline sind nur Folgen.
   denselben Origin. Bei „Seite leer, Server aber ok" zuerst dort nachsehen.
 
 ## Offene Entscheidungen
+
+- **Neues Design (14.10., in Arbeit)** — Prototyp
+  https://claude.ai/artifact/MfjmDe1hpyKL5wTJpGX4vR : vier Reiter (Heute,
+  Vertrieb, Ziele, Mails), Apple-minimal, Tag als Kacheln, laufende Woche Mo–So
+  im Blocksystem, keine Vorwochen, keine Ringe. Verlauf und Health fallen weg.
+  **Regel (Rico, 14.10.): bearbeitbar nur bis 0 Uhr** — danach bleibt Offenes
+  „nicht gemessen" (gilt auch für ChatGPT: dann nur noch heute). Noch nicht in
+  Jarvis eingebaut — erst wenn Rico das Design abnimmt.
 
 - **Wochenzyklus (11.10., wartet auf Ricos OK)** — `docs/wochenzyklus-spec.md`
   ist verbindlich; Inventur, Vorschlag und Migrationsvorschlag in

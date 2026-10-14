@@ -11,7 +11,7 @@ import { revalidatePath } from 'next/cache';
  * Mehrere Pfade zu markieren ist billig — nur die gerade offene Seite rendert
  * sofort neu, der Rest wird beim nächsten Besuch geholt.
  */
-const TRACKING_PATHS = ['/', '/verlauf', '/health', '/vertrieb', '/routines'];
+const TRACKING_PATHS = ['/', '/verlauf', '/health', '/vertrieb'];
 
 export function revalidateTracking() {
   for (const path of TRACKING_PATHS) revalidatePath(path);

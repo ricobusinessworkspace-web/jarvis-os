@@ -1,6 +1,6 @@
 import { AnalyticsService, type DayMetric, type MetricMatrix } from './AnalyticsService';
 import {
-  erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ringe, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
+  erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
   type Ausblick, type Erinnerung, type SerienStand, type TagesStand,
 } from '@/lib/motivation';
 import { addDays, BLOCK_START, BLOCK_WEEKS, blockInfo, blockWeekRange, dateRange, daysBetween, isJokerDay } from '@/lib/blocks';
@@ -386,47 +386,4 @@ export async function letzterRueckblick(heute: string = getBerlinDateStr()): Pro
     ...ROUTINE_KEYS.map(key => ({ key, label: label(key), regel: false, lueckenlos: false })),
     ...definitionen.filter(d => d.domain === 'rules').map(d => ({ key: d.key, label: d.label, regel: true, lueckenlos: true })),
   ], woche.von, woche.bis);
-}
-
-// ── iPhone-Widget „Ringe + Serien" ───────────────────────────────────────────
-
-/**
- * Alles, was das Widget zeigt — fertig gerechnet und formuliert, damit im
- * Scriptable-Skript keine Logik steht: Ringe heute, perfekter Tag, die drei
- * längsten laufenden Serien mit Stufe.
- */
-export async function widgetStand(heute: string = getBerlinDateStr()) {
-  const definitionen = (await AnalyticsService.getDefinitions()).filter(d => d.isActive);
-  const regelKeys = definitionen.filter(d => d.domain === 'rules').map(d => d.key);
-  const von = serieAb(heute);
-  const matrix = await AnalyticsService.getMatrix(von, heute, [...URSACHEN_KEYS, ...ROUTINE_KEYS, ...regelKeys]);
-  const label = (key: string) => definitionen.find(d => d.key === key)?.label ?? key;
-
-  const tag = tagAusMatrix(matrix, heute, regelKeys);
-  const r = ringe(tag);
-  const perfekt = istPerfekt(tag);
-  const perfekte = perfekteTage(matrix, regelKeys, PHASE_2_START > von ? PHASE_2_START : von, heute);
-
-  const serien = [...URSACHEN_KEYS, ...ROUTINE_KEYS, ...regelKeys]
-    .map(key => {
-      const s = AnalyticsService.summarize(matrix, key, von, heute, { missIsFinal: regelKeys.includes(key) });
-      return { key, label: label(key), serie: s.streak, rekord: s.bestStreak, stufe: stufe(s.streak), gold: s.streak >= GOLD_AB };
-    })
-    .filter(s => s.serie > 0)
-    .sort((a, b) => b.serie - a.serie)
-    .slice(0, 3);
-
-  const zu = [r.ursachen, r.routinen, r.regeln].filter(x => x.zu).length;
-  return {
-    ringe: {
-      ursachen: { ...r.ursachen, label: 'Ursachen' },
-      routinen: { ...r.routinen, label: 'Routinen' },
-      regeln: { ...r.regeln, label: 'Regeln' },
-    },
-    perfekt,
-    perfekteTage: { anzahl: perfekte.anzahl, serie: perfekte.serie },
-    serien,
-    titel: perfekt ? `Perfekter Tag Nr. ${perfekte.anzahl}` : `${zu} von 3 Ringen zu`,
-    zeile: serien.length ? serien.map(s => `${s.label} ${s.serie}`).join(' · ') : 'Noch keine laufende Serie',
-  };
 }

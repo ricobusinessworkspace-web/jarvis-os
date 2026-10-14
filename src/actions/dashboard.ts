@@ -127,45 +127,6 @@ export async function saveDashboardLayout(layout: string[]) {
 }
 
 // ─── LOGS & TRACKING ───
-export async function savePersonalLog(data: any) {
-  try {
-    const { date, ...rest } = data;
-    
-    // Auto calculate sleep hours if bed and wake time are present
-    let sleepHours = rest.sleepHours;
-    let bedTime = rest.bedTime;
-    let wakeTime = rest.wakeTime;
-
-    const existing = await prisma.personalLog.findUnique({ where: { date } });
-    
-    if (bedTime === undefined) bedTime = existing?.bedTime;
-    if (wakeTime === undefined) wakeTime = existing?.wakeTime;
-
-    if (bedTime && wakeTime) {
-      const bed = new Date(`1970-01-01T${bedTime}:00`);
-      const wake = new Date(`1970-01-01T${wakeTime}:00`);
-      if (!isNaN(bed.getTime()) && !isNaN(wake.getTime())) {
-        if (wake < bed) wake.setDate(wake.getDate() + 1);
-        sleepHours = Number(((wake.getTime() - bed.getTime()) / (1000 * 60 * 60)).toFixed(1));
-      }
-    } else {
-      sleepHours = 0;
-    }
-
-    const updated = await prisma.personalLog.upsert({
-      where: { date },
-      update: { ...rest, sleepHours },
-      create: { date, ...rest, sleepHours }
-    });
-
-    revalidateTracking();
-    return { success: true, data: updated };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-}
-
-/** Ein Routine-Schritt für einen Tag — dünne Hülle um `TrackingService.setzeSchritt`. */
 export async function logTrackerItem(itemId: string, status: string, dateStr: string) {
   try {
     await TrackingService.setzeSchritt(itemId, dateStr, status as HakenStatus);
