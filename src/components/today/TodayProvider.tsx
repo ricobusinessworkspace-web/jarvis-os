@@ -2,20 +2,58 @@
 
 import { createContext, useContext, useOptimistic, useTransition } from 'react';
 import type { MetricState } from '@/core/services/AnalyticsService';
-import type { TagesStand } from '@/lib/motivation';
-import type { CauseRow } from './CausesCard';
-import type { RuleRow } from './RulesCard';
-import type { RoutineBlock } from './RoutineCard';
+import type { Ausblick, TagesStand } from '@/lib/motivation';
 
 /**
- * Ein gemeinsamer Zustand für „Heute": Ursachen, Regeln und Routine teilen
- * sich **ein** `useOptimistic`. Nur so laufen Ringe und „perfekter Tag" live
- * mit, egal in welcher Karte ein Haken fällt.
- *
- * Der Haken sitzt sofort und bleibt sitzen, bis die neuen Server-Daten da
- * sind — `useOptimistic` löst ihn genau dann ab (siehe Handover: eigener
+ * Ein gemeinsamer Zustand für „Heute": Kacheln, Regeln und Woche teilen sich
+ * **ein** `useOptimistic`. Der Haken sitzt sofort und bleibt sitzen, bis die
+ * neuen Server-Daten da sind — `useOptimistic` löst ihn genau dann ab (eigener
  * State hatte den Wert zu früh verworfen, die Anzeige sprang zurück).
  */
+
+export interface CauseRow {
+  metricKey: string;
+  label: string;
+  state: MetricState;
+  /** Calls kommen aus dem CRM und werden nicht abgehakt. */
+  toggleable: boolean;
+  /** Nur Calls: Wert und Ziele für die breite Kachel. */
+  value?: number | null;
+  base?: number | null;
+  stretch?: number | null;
+  streak: number;
+  bestStreak: number;
+  /** Serie und Rekord für beide Fälle des heutigen Hakens — vom Server gerechnet. */
+  ausblick?: Ausblick;
+}
+
+export interface RuleRow {
+  metricKey: string;
+  label: string;
+  state: MetricState;
+  streak: number;
+  bestStreak: number;
+  ausblick?: Ausblick;
+}
+
+export interface RoutineItem {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+export interface RoutineBlock {
+  trackerId: string;
+  name: string;
+  kind: 'morning' | 'evening';
+  items: RoutineItem[];
+  /** Ab so vielen Schritten gilt die Basis — aus der Metrik, nicht hier gerechnet. */
+  base: number | null;
+  targetHint?: string;
+  /** Sonntag: die Routine gilt nicht. */
+  offDay?: boolean;
+}
+
 export interface Heute {
   causes: CauseRow[];
   rules: RuleRow[];
@@ -28,7 +66,6 @@ export type HeutePatch =
       liste: 'causes' | 'rules';
       metricKey: string;
       state: MetricState;
-      /** Die vom Server vorab gerechnete Serie für den neuen Zustand. */
       streak?: number;
       bestStreak?: number;
     }
@@ -53,12 +90,11 @@ function anwendenAuf(stand: Heute, p: HeutePatch): Heute {
     : { ...stand, rules: stand.rules.map(zeile) };
 }
 
-const erfuellt = (s: MetricState) => s === 'soll' || s === 'basis';
+export const erfuellt = (s: MetricState) => s === 'soll' || s === 'basis';
 
 /**
- * Der Tag in der Form, die Ringe und „perfekter Tag" brauchen — dieselbe wie
- * auf dem Server (`tagAusMatrix`). Offene Ursachen zählen mit, Off-Day und
- * „erfasst" nicht.
+ * Der Tag in der Form, die „perfekter Tag" braucht — dieselbe wie auf dem
+ * Server (`tagAusMatrix`). Off-Day und „erfasst" zählen nicht.
  */
 export function tagesStand(h: Heute): TagesStand {
   return {

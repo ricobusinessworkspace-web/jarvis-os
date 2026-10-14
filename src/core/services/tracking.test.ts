@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * `TrackingService` gegen eine Datenbank im Speicher — nie gegen die geteilte
@@ -58,9 +58,14 @@ vi.mock('../db', () => {
 
 import { TrackingService, TrackingFehler } from './TrackingService';
 
+/** Welcher Tag heute ist — nur er lässt sich bearbeiten. */
+const heute = (tag: string) => vi.setSystemTime(new Date(`${tag}T10:00:00.000Z`));
+
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  heute('2026-10-09');
   db.quellen = [
     { metricKey: 'training.sessions', kind: 'tracker', priority: 10, isActive: true, config: { tracker: 'Ursachen', item: 'Trainingseinheit' } },
     { metricKey: 'training.sessions', kind: 'personal_log', priority: 90, isActive: true, config: { field: 'workout_completed' } },
@@ -80,6 +85,8 @@ beforeEach(() => {
   db.schreibvorgaenge = 0;
 });
 
+afterEach(() => vi.useRealTimers());
+
 describe('TrackingService — Ursachen und Regeln', () => {
   it('schreibt in den Haken aus core_metric_sources und meldet vorher/nachher', async () => {
     expect(await TrackingService.setzeUrsache('training.sessions', '2026-10-09', true))
@@ -95,7 +102,7 @@ describe('TrackingService — Ursachen und Regeln', () => {
     expect(zweite).toEqual({ vorher: 'completed', nachher: 'completed', geaendert: false });
     expect(db.schreibvorgaenge).toBe(1);
 
-    expect(await TrackingService.loescheUrsache('training.sessions', '2026-10-08'))
+    expect(await TrackingService.loescheUrsache('rule.x', '2026-10-09'))
       .toEqual({ vorher: null, nachher: null, geaendert: false });
     expect(db.schreibvorgaenge).toBe(1);
   });
@@ -118,11 +125,30 @@ describe('TrackingService — Ursachen und Regeln', () => {
   });
 });
 
+describe('TrackingService — nur heute', () => {
+  it('gestern und morgen sind zu — nichts wird geschrieben', async () => {
+    await expect(TrackingService.setzeUrsache('training.sessions', '2026-10-08', true)).rejects.toThrow('vorbei');
+    await expect(TrackingService.loescheUrsache('rule.x', '2026-10-08')).rejects.toThrow('vorbei');
+    await expect(TrackingService.setzeSchritt('bett', '2026-10-10', 'completed')).rejects.toThrow('noch nicht begonnen');
+    await expect(TrackingService.loescheSchritt('bett', '2026-10-08')).rejects.toThrow('vorbei');
+    expect(db.schreibvorgaenge).toBe(0);
+  });
+
+  it('um 0 Uhr Berliner Zeit wechselt der Tag', async () => {
+    vi.setSystemTime(new Date('2026-10-09T22:30:00.000Z')); // Berlin: 10.10., 00:30
+    await expect(TrackingService.setzeUrsache('training.sessions', '2026-10-09', true)).rejects.toThrow('vorbei');
+    expect(await TrackingService.setzeUrsache('training.sessions', '2026-10-10', true)).toMatchObject({ geaendert: true });
+  });
+});
+
 describe('TrackingService — Routine-Schritte', () => {
   it('hakt nur Schritte ab, die an dem Tag galten', async () => {
+    heute('2026-10-07');
     await expect(TrackingService.setzeSchritt('alt', '2026-10-07', 'completed')).rejects.toThrow('galt am 2026-10-07 nicht');
     await expect(TrackingService.setzeSchritt('neu', '2026-10-07', 'completed')).rejects.toThrow('galt am 2026-10-07 nicht');
+    heute('2026-10-06');
     expect(await TrackingService.setzeSchritt('alt', '2026-10-06', 'completed')).toMatchObject({ geaendert: true });
+    heute('2026-10-08');
     expect(await TrackingService.setzeSchritt('neu', '2026-10-08', 'completed')).toMatchObject({ geaendert: true });
   });
 

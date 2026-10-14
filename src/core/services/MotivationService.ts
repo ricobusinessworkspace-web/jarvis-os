@@ -3,7 +3,7 @@ import {
   erinnerungWaehlen, GOLD_AB, istJokerTag, istPerfekt, MEILENSTEINE, ROUTINE_KEYS, stufe, URSACHEN_KEYS,
   type Ausblick, type Erinnerung, type SerienStand, type TagesStand,
 } from '@/lib/motivation';
-import { addDays, BLOCK_START, BLOCK_WEEKS, blockInfo, blockWeekRange, dateRange, daysBetween, isJokerDay } from '@/lib/blocks';
+import { addDays, BLOCK_START, BLOCK_WEEKS, blockInfo, blockWeekRange, dateRange, daysBetween } from '@/lib/blocks';
 import { getBerlinDateStr, getBerlinHour } from '@/lib/dateUtils';
 import { PHASES, PHASE_2_START } from '@/lib/phases';
 import { GoalService } from './GoalService';
@@ -109,45 +109,6 @@ export function perfekteTage(
 
 // ── Zielbild (Ziele-Seite) ───────────────────────────────────────────────────
 
-/** Zustand eines Tages in einer Kette — für die Heatmap. */
-export type KettenZustand = 'erfuellt' | 'verfehlt' | 'offen' | 'leer' | 'frei' | 'vor';
-
-export interface Kette {
-  key: string;
-  label: string;
-  regel: boolean;
-  tage: Array<{ datum: string; zustand: KettenZustand; joker: boolean }>;
-  serie: number;
-  rekord: number;
-}
-
-const KETTEN_ZUSTAND = (c: DayMetric | undefined, tag: string, heute: string): KettenZustand => {
-  if (!c || (c.base === null && !c.targetHint)) return 'vor'; // ohne Ziel: gab es noch nicht — auch sonntags
-  if (c.state === 'offday') return 'frei';
-  if (erfuellt(c)) return 'erfuellt';
-  if (tag === heute) return 'offen';
-  return c.state === 'unter' ? 'verfehlt' : 'leer';
-};
-
-/** Eine Kette je Ursache und Regel, Tag für Tag ab Planbeginn — mit Serie und Rekord wie überall. */
-export function ketten(
-  matrix: MetricMatrix, metriken: Array<{ key: string; label: string; regel: boolean }>, heute: string
-): Kette[] {
-  return metriken.map(m => {
-    const s = AnalyticsService.summarize(matrix, m.key, BLOCK_START, heute, { missIsFinal: m.regel });
-    return {
-      ...m,
-      tage: dateRange(BLOCK_START, heute).map(datum => ({
-        datum,
-        zustand: KETTEN_ZUSTAND(matrix[datum]?.[m.key], datum, heute),
-        joker: isJokerDay(datum),
-      })),
-      serie: s.streak,
-      rekord: s.bestStreak,
-    };
-  });
-}
-
 /** Ab dieser Abdeckung zählt eine Woche für die Rekordwand. */
 export const BESTE_WOCHE_ABDECKUNG = 0.7;
 
@@ -194,7 +155,8 @@ export function bloeckeBis(ende: string) {
 
 /**
  * Alles für die Ziele-Seite: die Reise (Planbeginn bis Stichtag des
- * Umsatzziels), das Ergebnisziel, die Ketten und die Rekordwand. Kein Wert
+ * Umsatzziels), das Ergebnisziel und die Rekorde. (Die Ketten-Heatmap ist seit
+ * 14.10. weg — Vorwochen spielen keine Rolle mehr.) Kein Wert
  * wird erfunden: ohne Stichtag keine Restzeit, ohne Abschlusswert kein Prozent.
  */
 export async function zielbild(heute: string = getBerlinDateStr()) {
@@ -230,19 +192,15 @@ export async function zielbild(heute: string = getBerlinDateStr()) {
     bis: umsatzZiel.until,
   };
 
-  const kettenListe = ketten(matrix, [
-    ...URSACHEN_KEYS.map(key => ({ key, label: label(key), regel: false })),
-    ...regeln.map(r => ({ key: r.key, label: r.label, regel: true })),
-  ], heute);
-
-  // Rekordwand: längste Serien (Ursachen, Routinen, Regeln), erreichte Stufen.
+  // Rekorde: längste Serien je Ursache, Regel und Routine — dieselbe `summarize` wie überall.
   const serien = [
-    ...kettenListe.map(k => ({ key: k.key, label: k.label, rekord: k.rekord, serie: k.serie })),
-    ...ROUTINE_KEYS.map(key => {
-      const s = AnalyticsService.summarize(matrix, key, BLOCK_START, heute);
-      return { key, label: label(key), rekord: s.bestStreak, serie: s.streak };
-    }),
-  ].map(x => ({
+    ...URSACHEN_KEYS.map(key => ({ key, regel: false })),
+    ...regeln.map(r => ({ key: r.key, regel: true })),
+    ...ROUTINE_KEYS.map(key => ({ key, regel: false })),
+  ].map(({ key, regel }) => {
+    const s = AnalyticsService.summarize(matrix, key, BLOCK_START, heute, { missIsFinal: regel });
+    return { key, label: label(key), rekord: s.bestStreak, serie: s.streak };
+  }).map(x => ({
     ...x,
     stufe: stufe(x.rekord),
     gold: x.rekord >= GOLD_AB,
@@ -254,7 +212,6 @@ export async function zielbild(heute: string = getBerlinDateStr()) {
   return {
     reise,
     umsatz,
-    ketten: kettenListe,
     rekorde: { serien, perfekt, besteWoche: besteWoche(matrix, heute) },
   };
 }

@@ -4,9 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { feierFuer, type SerienStand } from '@/lib/motivation';
 import { merkeGefeiert, schonGefeiert } from '@/lib/gefeiert';
 import { fanfare, tick } from '@/lib/sound';
-import type { Feier } from './HabitRow';
 
 const DAUER_MS = 3200;
+
+/** Was gerade gefeiert wird — aus den Zahlen des Servers (`feierFuer`). */
+export interface Feier {
+  art: 'rekord' | 'stufe';
+  text: string;
+}
 
 /**
  * Ton und Feier beim Antippen — nur aus dem Klick heraus (iOS spielt Ton nur
@@ -31,9 +36,9 @@ export function useFeier() {
       let feier: Feier | null = null;
       if (stufeNeu) {
         merkeGefeiert(`${key}:${f.stufe}:${nachher.start}`);
-        feier = { art: 'stufe', text: `Stufe ${f.stufe} erreicht — ${f.stufe} Tage ${name}` };
+        feier = { art: 'stufe', text: `Stufe ${f.stufe} · ${f.stufe} Tage` };
       } else if (f.rekord) {
-        feier = { art: 'rekord', text: `Neuer Rekord — ${nachher.rekord} Tage` };
+        feier = { art: 'rekord', text: `Neuer Rekord · ${nachher.rekord} Tage` };
       }
 
       if (!feier) {

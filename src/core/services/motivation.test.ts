@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DayMetric, MetricMatrix } from './AnalyticsService';
-import { ausblick, besteWoche, bloeckeBis, ketten, letzteWoche, perfekteTage, tagAusMatrix, wochenrueckblick } from './MotivationService';
+import { ausblick, besteWoche, bloeckeBis, letzteWoche, perfekteTage, tagAusMatrix, wochenrueckblick } from './MotivationService';
 import { feierFuer, istPerfekt, naechsteStufe, ringe, stufe } from '@/lib/motivation';
 
 const zelle = (value: number | null, state: DayMetric['state']): DayMetric =>
@@ -137,12 +137,6 @@ describe('Ringe und perfekter Tag', () => {
   });
 });
 
-/** Ein Sonntag vor dem Start einer Regel (Off-Day ohne Ziel) ist „gab es noch nicht", nicht „frei". */
-const KETTE_VOR_SONNTAG = (m: MetricMatrix) => {
-  const mitSonntag = { ...m, '2026-09-06': { 'rule.x': { value: null, base: null, stretch: null, state: 'offday' as const, source: null } } };
-  return ketten(mitSonntag, [{ key: 'rule.x', label: 'R', regel: true }], '2026-09-07')[0].tage.find(t => t.datum === '2026-09-06')!.zustand;
-};
-
 describe('Zielbild', () => {
   it('Blöcke bis zum Stichtag, der letzte abgeschnitten', () => {
     expect(bloeckeBis('2027-03-01')).toEqual([
@@ -150,23 +144,6 @@ describe('Zielbild', () => {
       { nummer: 2, von: '2026-11-24', bis: '2027-02-15' },
       { nummer: 3, von: '2027-02-16', bis: '2027-03-01' },
     ]);
-  });
-
-  it('Kette: vor dem Start „vor", Sonntag als Joker markiert, heute offen', () => {
-    heute('2026-09-07'); // Mo
-    const m: MetricMatrix = {
-      '2026-09-01': { 'rule.x': { value: null, base: null, stretch: null, state: 'ungemessen', source: null } },
-      '2026-09-05': { 'rule.x': zelle(1, 'soll') },
-      '2026-09-06': { 'rule.x': zelle(0, 'unter') }, // So: Rückfall, Joker
-      '2026-09-07': { 'rule.x': zelle(1, 'soll') },
-    };
-    const [k] = ketten(m, [{ key: 'rule.x', label: 'Regel', regel: true }], '2026-09-07');
-    const z = Object.fromEntries(k.tage.map(t => [t.datum, [t.zustand, t.joker]]));
-    expect(z['2026-09-01']).toEqual(['vor', false]);
-    expect(KETTE_VOR_SONNTAG(m)).toBe('vor');
-    expect(z['2026-09-06']).toEqual(['verfehlt', true]);
-    expect(z['2026-09-07']).toEqual(['erfuellt', false]);
-    expect(k.serie).toBe(2); // Sa + Mo, der Sonntag reißt nichts
   });
 
   it('beste Woche nur bei ausreichender Abdeckung', () => {

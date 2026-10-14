@@ -9,11 +9,12 @@
   /* ── 1. PRIMITIVES ── */
   --primitive-black:        #000000;
   --primitive-black-soft:   #0a0a0c;
-  --primitive-gray-900:     #141416;
-  --primitive-gray-800:     #1c1c1e;
-  --primitive-gray-700:     #222225;
-  --primitive-gray-600:     #3a3a3e;
-  --primitive-gray-400:     #86868b;
+  /* Apple-Systemfarben (dunkel): Grundfläche, gruppierte Flächen, Trennlinien */
+  --primitive-gray-900:     #1c1c1e;
+  --primitive-gray-800:     #2c2c2e;
+  --primitive-gray-700:     #3a3a3c;
+  --primitive-gray-600:     #48484a;
+  --primitive-gray-400:     #8e8e93;
   --primitive-gray-100:     #f5f5f7;
 
   --primitive-blue-400:     #0a84ff;
@@ -32,6 +33,7 @@
   --color-surface-base:     var(--primitive-gray-900);
   --color-surface-hover:    var(--primitive-gray-800);
   --color-border-base:      rgba(255, 255, 255, 0.06);
+  --color-separator-base:   rgba(84, 84, 88, 0.45);
   --color-border-active:    rgba(255, 255, 255, 0.12);
   --color-text-primary:     var(--primitive-gray-100);
   --color-text-secondary:   var(--primitive-gray-400);
@@ -92,7 +94,11 @@
   --color-info: var(--color-intent-info);
   --color-gold: var(--color-reward);
   --color-gold-glow: var(--color-reward-glow);
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --color-separator: var(--color-separator-base);
+  --color-tertiary: var(--primitive-gray-600);
+  /* Auf Apple-Geräten SF, sonst Inter. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter), system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--font-inter), system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
 }
 
@@ -635,7 +641,7 @@ html[data-booted] .boot-word {
    `top: 3.5rem` lässt die Kopfzeile frei (h-14). */
 .nav-orb {
   position: absolute;
-  top: 3.5rem;
+  top: 0;
   right: 0;
   bottom: 0;
   left: 0;

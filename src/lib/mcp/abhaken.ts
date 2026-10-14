@@ -14,7 +14,7 @@ import { datenstand, datum, nurErlaubt, rund, zeichenkette, ZUSTAND_TEXT } from 
  * Routine-Schritte. Nichts zu Mail, Zielen oder Körperwerten.
  *
  * Für alle gilt:
- * - **Nur heute und gestern** (Berlin). Älteres gehört in den Verlauf.
+ * - **Nur heute** (Berlin). Um 0 Uhr ist der Tag zu; Offenes bleibt „nicht gemessen".
  * - **Derselbe Schreibweg wie das Dashboard** (`TrackingService`), also dieselben Regeln.
  * - **Antwort = vorher/nachher aus der Matrix**, mit Serie und Rekord — vorlesbar.
  * - **Idempotent:** steht schon da, was geschrieben werden soll → `unveraendert`, kein Schreibvorgang.
@@ -30,22 +30,25 @@ const FREMDTEXT =
 
 const DATUM_SCHEMA = {
   type: 'string',
-  description: '„heute" (Standard), „gestern" oder JJJJ-MM-TT — nur heute oder gestern.',
+  description: 'Weglassen oder „heute". Nur der heutige Tag lässt sich ändern — vergangene Tage stehen fest.',
 };
 
 // ── Datum ────────────────────────────────────────────────────────────────────
 
-/** Heute oder gestern (Berlin); alles andere wird klar abgelehnt. */
+/**
+ * Nur heute (Berlin). Gestern ist vorbei: um 0 Uhr ist der Tag zu, Offenes
+ * bleibt „nicht gemessen" (Rico, 14.10.). Dieselbe Grenze zieht der
+ * `TrackingService` für alle Schreibwege — hier steht sie nur, damit ChatGPT
+ * eine Antwort bekommt, die Rico vorlesen kann.
+ */
 export function schreibTag(wert: unknown): string {
   const heute = getBerlinDateStr();
-  const gestern = addDays(heute, -1);
   if (wert === undefined || wert === null || wert === 'heute') return heute;
-  if (wert === 'gestern') return gestern;
-  const d = datum(wert, 'datum');
-  if (d === heute || d === gestern) return d;
+  const d = wert === 'gestern' ? addDays(heute, -1) : datum(wert, 'datum');
+  if (d === heute) return heute;
   if (d > heute) throw new WerkzeugFehler(`Künftige Tage lassen sich nicht abhaken — heute ist ${heute}.`);
   throw new WerkzeugFehler(
-    `Über ChatGPT geht nur heute (${heute}) und gestern (${gestern}). Älter als gestern bitte im Verlauf in Jarvis nachtragen.`
+    `Nur heute (${heute}) lässt sich ändern. Vergangene Tage stehen fest — was offen blieb, bleibt „nicht gemessen".`
   );
 }
 
@@ -202,7 +205,7 @@ const ursacheEintragen: Werkzeug = {
   name: 'ursache_eintragen',
   title: 'Ursache abhaken',
   description:
-    'Trägt eine Ursache für heute oder gestern ein: erledigt, nicht erledigt oder zurücksetzen (= nicht gemessen). ' +
+    'Trägt eine Ursache für heute ein: erledigt, nicht erledigt oder zurücksetzen (= nicht gemessen). ' +
     'Ursachen sind die täglichen Handlungen, die von Hand abgehakt werden, z. B. „Training" und „Post". Calls kommen ' +
     'automatisch aus dem CRM und lassen sich nicht abhaken; Regeln gehen über regel_rueckfall. Antwortet mit neuer ' +
     'Serie und Rekord — bei neuer_rekord ausdrücklich gratulieren. ' + FREMDTEXT,
@@ -277,7 +280,7 @@ const regelRueckfall: Werkzeug = {
   name: 'regel_rueckfall',
   title: 'Regel-Rückfall',
   description:
-    'Trägt für heute oder gestern einen Rückfall bei einer Tagesregel ein oder nimmt ihn zurück. Regeln gelten als ' +
+    'Trägt für heute einen Rückfall bei einer Tagesregel ein oder nimmt ihn zurück. Regeln gelten als ' +
     'gehalten, solange kein Rückfall eingetragen ist — „gehalten" muss also nie eingetragen werden. Am Sonntag ' +
     'reißt ein Rückfall keine Serie (Joker), zählt aber in die Quote. Antwortet mit Serie und Rekord. ' + FREMDTEXT,
   inputSchema: {
@@ -353,7 +356,7 @@ const routineSchritt: Werkzeug = {
   name: 'routine_schritt',
   title: 'Routine-Schritt abhaken',
   description:
-    'Hakt einen Schritt der Morgen- oder Abendroutine für heute oder gestern ab oder nimmt den Haken zurück. ' +
+    'Hakt einen Schritt der Morgen- oder Abendroutine für heute ab oder nimmt den Haken zurück. ' +
     'Der Schritt wird per Name gesucht (z. B. „Bett machen"); nur Schritte, die an dem Tag zur Routine gehörten. ' +
     'Passt der Name auf mehrere Schritte, kommt eine Rückfrage — dann Rico fragen, nicht raten. Antwortet mit ' +
     'Routine-Stand und Serie. ' + FREMDTEXT,
@@ -410,7 +413,7 @@ const routineKomplett: Werkzeug = {
   name: 'routine_komplett',
   title: 'Routine komplett abhaken',
   description:
-    'Hakt alle Schritte der Morgen- oder Abendroutine für heute oder gestern ab — für „Morgenroutine ist durch". ' +
+    'Hakt alle Schritte der Morgen- oder Abendroutine für heute ab — für „Morgenroutine ist durch". ' +
     'Nur Schritte, die an dem Tag zur Routine gehörten; schon abgehakte bleiben unverändert. Antwortet mit ' +
     'Routine-Stand, Serie und Rekord. ' + FREMDTEXT,
   inputSchema: {

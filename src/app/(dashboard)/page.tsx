@@ -1,241 +1,153 @@
 import { Suspense } from 'react';
 import { AnalyticsService } from '@/core/services/AnalyticsService';
-import { ausblick, letzterRueckblick, perfekteTage } from '@/core/services/MotivationService';
 import { TaskInboxService } from '@/core/services/TaskInboxService';
 import { RoutineService } from '@/core/services/RoutineService';
+import { ausblick, perfekteTage } from '@/core/services/MotivationService';
+import { heuteUndWoche } from '@/core/services/WochenService';
 import { getBerlinDateStr } from '@/lib/dateUtils';
-import { blockInfo, BLOCK_WEEKS } from '@/lib/blocks';
-import { MetricCard } from '@/components/today/MetricCard';
-import { CausesCard, type CauseRow } from '@/components/today/CausesCard';
-import { TaskInbox } from '@/components/today/TaskInbox';
-import { ActivityGrid } from '@/components/today/ActivityGrid';
-import { RoutineCard } from '@/components/today/RoutineCard';
-import { RulesCard, type RuleRow } from '@/components/today/RulesCard';
-import { currentPhase, evaluationStart, PHASE_2_START } from '@/lib/phases';
-import { TodayProvider } from '@/components/today/TodayProvider';
-import { DayRings } from '@/components/today/DayRings';
-import { WochenRueckblick } from '@/components/today/WochenRueckblick';
-import { EMPTY_METRIC, targetSub } from '@/lib/metricState';
+import { blockInfo, isJokerDay, addDays } from '@/lib/blocks';
+import { PHASE_2_START } from '@/lib/phases';
+import { EMPTY_METRIC } from '@/lib/metricState';
 import { RouteLoading } from '@/components/layout/RouteLoading';
+import { TodayProvider, type CauseRow, type RuleRow } from '@/components/today/TodayProvider';
+import { CallsKachel, RegelnListe, Tageskacheln } from '@/components/today/Kacheln';
+import { WocheKarte } from '@/components/today/WocheKarte';
+import { PerfektFeier } from '@/components/today/PerfektFeier';
 
 export const dynamic = 'force-dynamic';
 
-/** `sub` wird aus den echten Soll-Werten gebildet — siehe `targetSub`. */
+/**
+ * „Heute" — der Tag ist der Hauptteil, die Woche darunter, Vorwochen gibt es
+ * nicht (Rico, 14.10.). Bearbeitbar ist nur heute; um 0 Uhr ist der Tag zu.
+ *
+ * Alle Serien und Rekorde rechnet der Server mit `summarize` — für beide
+ * Fälle des heutigen Hakens (`ausblick`). Die Kacheln wählen nur aus.
+ */
 const URSACHEN = [
   { key: 'sales.calls_count', label: 'Calls' },
   { key: 'training.sessions', label: 'Training' },
   { key: 'content.posts', label: 'Post' },
 ];
 
-function lastDayOfMonth(dateStr: string): string {
-  const [y, m] = dateStr.split('-').map(Number);
-  return `${y}-${String(m).padStart(2, '0')}-${new Date(Date.UTC(y, m, 0)).getUTCDate()}`;
-}
-
-async function Today({ vorschau = false }: { vorschau?: boolean }) {
+async function Today() {
   const today = getBerlinDateStr();
   const block = blockInfo(today);
+  // Serien laufen ab Blockstart über den Phasenschnitt — wie bisher.
+  const from = block.beforeStart ? addDays(today, -45) : block.blockStart;
 
-  const monthStart = `${today.slice(0, 7)}-01`;
-  const monthEnd = lastDayOfMonth(today);
-  // Quoten zählen ab Beginn der laufenden Phase: der Systemwechsel soll nicht
-  // in die neue Quote hineinrechnen. Serien laufen über den Schnitt weiter.
-  const phase = currentPhase(today);
-  const blockFrom = block.beforeStart ? monthStart : block.blockStart;
-  const summaryFrom = evaluationStart(blockFrom, today);
-  // Geladen wird ab Blockstart: Serien laufen über den Phasenschnitt hinweg.
-  const from = blockFrom < monthStart ? blockFrom : monthStart;
-
-  // Nacheinander, nicht parallel: der Supabase-Pooler gibt pro Instanz genau
-  // eine Verbindung (connection_limit=1). Ein Promise.all lässt die Abfragen
-  // um diese eine Verbindung konkurrieren und in den Pool-Timeout laufen.
-  const matrix = await AnalyticsService.getMatrix(from, monthEnd);
+  // Nacheinander, nicht parallel: der Pooler gibt pro Instanz eine Verbindung.
+  const matrix = await AnalyticsService.getMatrix(from, today);
+  const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
+  const routines = await RoutineService.getRoutineBlocks(today);
+  const woche = await heuteUndWoche(today);
   const crmTasks = await TaskInboxService.getCrmTasks();
   const reminders = await TaskInboxService.getReminders();
-  const routines = await RoutineService.getRoutineBlocks(today);
-  // Dienstags beginnt die Blockwoche neu — dann der Blick zurück.
-  // `vorschau`: nur im Dev per `?rueckblick=1`, um die Karte an anderen Tagen anzusehen.
-  const rueckblick = (!block.beforeStart && block.dayOfWeek === 1) || vorschau ? await letzterRueckblick(today) : null;
-  // Welche Regeln es gibt, steht in der Datenbank (Domäne `rules`), nicht hier.
-  const rules = (await AnalyticsService.getDefinitions()).filter(d => d.domain === 'rules' && d.isActive);
 
   const ruleKeys = new Set(rules.map(r => r.key));
-  const summaries = Object.fromEntries(
-    [...URSACHEN.map(m => m.key), ...ruleKeys].map(key => [
-      key,
-      AnalyticsService.summarize(matrix, key, summaryFrom, today, {
-        streakFrom: from,
-        missIsFinal: ruleKeys.has(key), // ein Rückfall steht sofort fest
-      }),
-    ])
-  );
-
   const cell = (key: string) => matrix[today]?.[key] ?? EMPTY_METRIC;
+  const serie = (key: string) => ausblick(matrix, key, today, { serieAb: from, regel: ruleKeys.has(key) });
 
-  // Die Basis der Routine kommt aus der Metrik (`maxSkip` in der Intention).
+  const causeRows: CauseRow[] = URSACHEN.map(m => {
+    const c = cell(m.key);
+    const a = serie(m.key);
+    return {
+      metricKey: m.key,
+      label: m.label,
+      state: c.state,
+      toggleable: m.key !== 'sales.calls_count',
+      value: c.value,
+      base: c.base,
+      stretch: c.stretch,
+      streak: a.serie,
+      bestStreak: a.rekord,
+      ausblick: a,
+    };
+  });
+
+  const ruleRows: RuleRow[] = rules.map(r => {
+    const a = serie(r.key);
+    return { metricKey: r.key, label: r.label, state: cell(r.key).state, streak: a.serie, bestStreak: a.rekord, ausblick: a };
+  });
+
   const routineBlocks = routines.map(b => {
     const m = cell(`routine.${b.kind}`);
     return { ...b, base: m.base, targetHint: m.targetHint, offDay: m.state === 'offday' };
   });
 
-  // Perfekte Tage zählen ab Phase 2 — erst seitdem gibt es die Regeln, die
-  // dazugehören. Beide Fälle für heute, der Browser wählt nur aus.
+  // Perfekte Tage zählen ab Phase 2 — beide Fälle, der Browser wählt nur aus.
   const perfektAb = PHASE_2_START > from ? PHASE_2_START : from;
   const regelKeys = [...ruleKeys];
-  const nurZahlen = (p: ReturnType<typeof perfekteTage>) => ({ anzahl: p.anzahl, serie: p.serie, rekord: p.rekord });
-  const perfekt = {
-    wennPerfekt: nurZahlen(perfekteTage(matrix, regelKeys, perfektAb, today, true)),
-    wennNicht: nurZahlen(perfekteTage(matrix, regelKeys, perfektAb, today, false)),
+  const zahlen = (heutePerfekt: boolean) => {
+    const p = perfekteTage(matrix, regelKeys, perfektAb, today, heutePerfekt);
+    return { anzahl: p.anzahl, serie: p.serie, rekord: p.rekord };
   };
-  const calls = cell('sales.calls_count');
 
-  // Beschriftungen kommen aus den echten Zielen, nicht aus fest getipptem Text.
-  const gridMetrics = [
-    ...URSACHEN.map(m => ({ ...m, sub: targetSub(cell(m.key)) })),
-    // Regeln gibt es erst seit Phase 2 — davor ist eine leere Zelle kein
-    // „nicht gemessen", sondern „gab es noch nicht".
-    ...rules.map(r => ({ key: r.key, label: r.label, sub: 'jeden Tag', since: phase?.von })),
+  const datum = new Date(`${today}T12:00:00Z`).toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
+  });
+
+  const aufgaben = [
+    ...reminders.items.map(r => ({ id: `r${r.id}`, titel: r.title, meta: `Erinnerung${r.listName ? ` · ${r.listName}` : ''}${r.overdue ? ' · überfällig' : ''}`, rot: r.overdue })),
+    ...crmTasks.map(t => ({ id: `c${t.id}`, titel: t.text, meta: `CRM · ${t.leadName}`, rot: false })),
   ];
 
-  // Serie für beide Fälle des heutigen Hakens — der Browser wählt beim
-  // Antippen nur aus, er zählt nicht selbst.
-  const ausblickFuer = (key: string) => ausblick(matrix, key, today, { serieAb: from, regel: ruleKeys.has(key) });
-
-  const ruleRows: RuleRow[] = rules.map(r => {
-    const s = summaries[r.key];
-    return {
-      ausblick: ausblickFuer(r.key),
-      metricKey: r.key,
-      label: r.label,
-      state: cell(r.key).state,
-      streak: s?.streak ?? 0,
-      bestStreak: s?.bestStreak ?? 0,
-      adherence: s?.adherence ?? null,
-      // Regeln kennen nur 1 und 0 — jeder gemessene, nicht erfüllte Tag ist ein Rückfall.
-      broken: s ? s.measured - s.met : 0,
-    };
-  });
-
-  const causeRows: CauseRow[] = URSACHEN.map(m => {
-    const c = cell(m.key);
-    const s = summaries[m.key];
-    return {
-      ausblick: ausblickFuer(m.key),
-      metricKey: m.key,
-      label: m.label === 'Post' ? 'Personal Brand Post' : m.label === 'Training' ? 'Trainingseinheit' : m.label,
-      state: c.state,
-      source: c.source,
-      streak: s?.streak ?? 0,
-      bestStreak: s?.bestStreak ?? 0,
-      adherence: s?.adherence ?? null,
-      coverage: s?.coverage ?? null,
-      // Calls kommen aus dem CRM und werden nicht von Hand abgehakt.
-      toggleable: m.key !== 'sales.calls_count',
-    };
-  });
-
-  const dateLabel = new Date(`${today}T12:00:00Z`).toLocaleDateString('de-DE', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  });
-
-  const callsWeek = summaries['sales.calls_count'];
-
   return (
-    <>
-      <h1 className="text-[28px] font-semibold tracking-tight">{dateLabel}</h1>
-      <p className="mb-6 mt-1 text-[13px] text-muted">
-        {block.beforeStart ? (
-          <>Block 1 startet am {block.blockStart}</>
-        ) : (
-          <>
-            Block <span className="text-foreground">{block.blockNumber}</span> · Woche{' '}
-            <span className="text-foreground">{block.weekOfBlock}</span> von {BLOCK_WEEKS} · noch{' '}
-            <span className="text-foreground">{block.daysRemaining} Tage</span>
-            {block.isOffDay && ' · Off-Day'}
-            {phase && (
-              <>
-                {' · '}Phase <span className="text-foreground">{phase.nummer}</span>
-              </>
-            )}
-          </>
-        )}
-      </p>
+    <TodayProvider heute={{ causes: causeRows, rules: ruleRows, routines: routineBlocks }}>
+      <h1 className="mt-2 font-display text-[34px] font-bold tracking-[-0.025em]">Heute</h1>
+      <PerfektFeier
+        date={today}
+        untertitel={`${datum} · bearbeitbar bis 0 Uhr`}
+        perfekt={{ wennPerfekt: zahlen(true), wennNicht: zahlen(false) }}
+      />
 
-      <TodayProvider heute={{ causes: causeRows, rules: ruleRows, routines: routineBlocks }}>
-        {rueckblick && (
-          <div className="mb-3">
-            <WochenRueckblick r={rueckblick} />
-          </div>
-        )}
-
-        <div className="mb-3">
-          <DayRings date={today} perfekt={perfekt} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <MetricCard
-            title="Calls"
-            source="CRM"
-            value={calls.value}
-            base={calls.base}
-            stretch={calls.stretch}
-            unit="count"
-            state={calls.state}
-            targetHint={calls.targetHint}
-            footLeft="Ziel aus CRM-Profil"
-            footRight={
-              // Am ersten Tag einer Phase ist noch kein Tag abgeschlossen — dann nichts statt „0/0".
-              callsWeek?.targeted
-                ? `${callsWeek.met}/${callsWeek.targeted} Tage ${phase ? `in Phase ${phase.nummer}` : 'im Block'}`
-                : undefined
-            }
-          />
-
-          <CausesCard date={today} />
-
-          {ruleRows.length > 0 && <RulesCard date={today} since={summaryFrom} />}
-        </div>
-
-        {routineBlocks.length > 0 && (
-          <div className="mt-3">
-            <RoutineCard date={today} />
-          </div>
-        )}
-      </TodayProvider>
-
-      <div className="mt-3">
-        <TaskInbox
-          crmTasks={crmTasks}
-          reminders={reminders.items}
-          remindersConnected={reminders.connected}
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <CallsKachel woche={`${woche.woche.calls.ist} / ${woche.woche.calls.basis ?? '–'}`} />
+        <Tageskacheln date={today} />
       </div>
 
-      <div className="mt-3">
-        <ActivityGrid
-          matrix={matrix}
-          metrics={gridMetrics}
-          summaries={summaries}
-          from={monthStart}
-          to={monthEnd}
-          today={today}
-        />
-      </div>
-    </>
+      {ruleRows.length > 0 && (
+        <section>
+          <h2 className="mb-2.5 mt-8 flex items-baseline justify-between text-[20px] font-semibold tracking-tight">
+            Regeln <span className="text-[13px] font-normal text-muted">antippen bei Rückfall</span>
+          </h2>
+          <RegelnListe date={today} joker={isJokerDay(today)} />
+        </section>
+      )}
+
+      <WocheKarte
+        zeilen={woche.woche.zeilen}
+        heuteIndex={woche.woche.tage.indexOf(today)}
+        tageUebrig={woche.woche.tageUebrig}
+        von={woche.woche.von}
+        bis={woche.woche.bis}
+        rueckfaelleHeuteServer={ruleRows.filter(r => r.state === 'unter').length}
+      />
+
+      {aufgaben.length > 0 && (
+        <section>
+          <h2 className="mb-2.5 mt-8 flex items-baseline justify-between text-[20px] font-semibold tracking-tight">
+            Aufgaben <span className="text-[13px] font-normal text-muted">{Math.min(5, aufgaben.length)} von {aufgaben.length}</span>
+          </h2>
+          <div className="overflow-hidden rounded-[14px] bg-surface">
+            {aufgaben.slice(0, 5).map((a, i) => (
+              <div key={a.id} className={`relative px-4 py-3 ${i > 0 ? 'before:absolute before:left-4 before:right-0 before:top-0 before:h-px before:bg-separator' : ''}`}>
+                <div className="text-[15px]">{a.titel}</div>
+                <div className={`text-[13px] ${a.rot ? 'text-error' : 'text-muted'}`}>{a.meta}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </TodayProvider>
   );
 }
 
-// Die Grenze liegt außen: der Ladezustand ersetzt den ganzen Inhaltsbereich
-// und steht damit an derselben Stelle wie der Ball beim Reiter-Wechsel.
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ rueckblick?: string }> }) {
-  const vorschau = process.env.NODE_ENV !== 'production' && (await searchParams).rueckblick !== undefined;
+// Die Grenze liegt außen: der Ladezustand ersetzt den ganzen Inhaltsbereich.
+export default function DashboardPage() {
   return (
     <Suspense fallback={<RouteLoading />}>
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 md:px-8">
-        <Today vorschau={vorschau} />
+      <div className="mx-auto w-full max-w-[760px] px-5 pb-16 pt-4">
+        <Today />
       </div>
     </Suspense>
   );

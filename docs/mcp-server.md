@@ -3,7 +3,7 @@
 Damit ChatGPT (auch per Sprache) und Claude mit Jarvis arbeiten können:
 Tagesüberblick, Aufgaben, Routinen, Ziele und Mail-Warteschlange lesen,
 Mail-Entwürfe speichern, **Ursachen, Regel-Rückfälle und Routine-Schritte
-abhaken** (nur heute und gestern). **Senden und Freigeben geht nur in Jarvis
+abhaken** (nur heute — um 0 Uhr ist der Tag zu). **Senden und Freigeben geht nur in Jarvis
 selbst**, Ziele und Körperwerte ebenso.
 
 Der Lightning-CRM-Connector bleibt davon getrennt und unverändert. Leads,
@@ -136,8 +136,8 @@ Jarvis — die Lesewerkzeuge funktionieren dann trotzdem.
 | `routine_schritt` | schreibt | `TrackingService.setzeSchritt` / `loescheSchritt` — per Name, nur Schritte, die an dem Tag galten; mehrdeutig → Rückfrage |
 | `routine_komplett` | schreibt | `TrackingService.setzeSchritt` für alle Schritte der Routine |
 
-**Regeln für alle Abhak-Werkzeuge:** nur heute und gestern (Berlin), sonst
-„bitte im Verlauf"; Antwort mit vorher/nachher, Serie, Rekord und
+**Regeln für alle Abhak-Werkzeuge:** nur heute (Berlin) — vergangene Tage
+stehen fest, Offenes bleibt „nicht gemessen" (seit 14.10.); Antwort mit vorher/nachher, Serie, Rekord und
 `neuer_rekord` (nur bei echter Handlung, ab 2 Tagen); idempotent
 (`unveraendert` ohne Schreibvorgang); jede echte Änderung landet in
 `mcp_write_log` (Werkzeug, Argumente, vorher/nachher, Client) und der Tag
@@ -166,8 +166,8 @@ gesendet` erst erzwingen (heute prüft es nur Pflichtfelder).
   durch." → `ursache_eintragen` (Training), `ursache_eintragen` (Post),
   `routine_komplett` (Morgen); ChatGPT nennt die neuen Serien. Danach zeigt
   das Dashboard es beim nächsten Laden, der Verlauf den Hinweis „über ChatGPT".
-- „Ich hatte gestern einen Rückfall beim Scrolling." → `regel_rueckfall` mit `datum: gestern`.
-- „Trag Training für Montag letzte Woche ein." → Ablehnung: nur heute/gestern, bitte im Verlauf.
+- „Ich hatte heute einen Rückfall beim Scrolling." → `regel_rueckfall`.
+- „Trag Training für gestern ein." → Ablehnung: nur heute, vergangene Tage stehen fest.
 
 ## Fehlerbilder
 

@@ -56,25 +56,24 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('Datumsfenster — nur heute und gestern', () => {
+describe('Datumsfenster — nur heute', () => {
   beforeEach(() => {
     vi.spyOn(TrackingService, 'setzeUrsache').mockResolvedValue({ vorher: null, nachher: 'completed', geaendert: true });
   });
 
-  it('ohne Datum gilt heute, „gestern" und das ISO-Datum von gestern gehen', async () => {
+  it('ohne Datum, mit „heute" oder dem ISO-Datum von heute geht es', async () => {
     heute('2026-10-09');
     await werkzeug('ursache_eintragen').run({ ursache: 'Training' });
-    await werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: 'gestern' });
-    await werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: '2026-10-08' });
-    expect(vi.mocked(TrackingService.setzeUrsache).mock.calls.map(c => c[1])).toEqual(['2026-10-09', '2026-10-08', '2026-10-08']);
+    await werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: 'heute' });
+    await werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: '2026-10-09' });
+    expect(vi.mocked(TrackingService.setzeUrsache).mock.calls.map(c => c[1])).toEqual(['2026-10-09', '2026-10-09', '2026-10-09']);
   });
 
-  it('vorgestern und Zukunft werden klar abgelehnt — nichts geschrieben', async () => {
+  it('gestern, vorgestern und Zukunft werden klar abgelehnt — nichts geschrieben', async () => {
     heute('2026-10-09');
-    await expect(werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: '2026-10-07' }))
-      .rejects.toThrow('im Verlauf in Jarvis');
-    await expect(werkzeug('regel_rueckfall').run({ regel: 'Scrolling', datum: '2026-10-10' }))
-      .rejects.toThrow('Künftige Tage');
+    await expect(werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: 'gestern' })).rejects.toThrow('stehen fest');
+    await expect(werkzeug('ursache_eintragen').run({ ursache: 'Training', datum: '2026-10-07' })).rejects.toThrow('stehen fest');
+    await expect(werkzeug('regel_rueckfall').run({ regel: 'Scrolling', datum: '2026-10-10' })).rejects.toThrow('Künftige Tage');
     expect(TrackingService.setzeUrsache).not.toHaveBeenCalled();
     expect(protokoll).not.toHaveBeenCalled();
   });
@@ -82,8 +81,8 @@ describe('Datumsfenster — nur heute und gestern', () => {
   it('der Tageswechsel zählt nach Berliner Zeit', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-09T22:30:00.000Z')); // Berlin: 10.10., 00:30
-    await werkzeug('ursache_eintragen').run({ ursache: 'Post', datum: '2026-10-09' }); // gestern in Berlin
-    await expect(werkzeug('ursache_eintragen').run({ ursache: 'Post', datum: '2026-10-08' })).rejects.toThrow('nur heute');
+    await werkzeug('ursache_eintragen').run({ ursache: 'Post', datum: '2026-10-10' });
+    await expect(werkzeug('ursache_eintragen').run({ ursache: 'Post', datum: '2026-10-09' })).rejects.toThrow('Nur heute');
   });
 });
 
@@ -187,8 +186,8 @@ describe('regel_rueckfall', () => {
   it('zurücknehmen löscht den Rückfall', async () => {
     heute('2026-10-10');
     const loeschen = vi.spyOn(TrackingService, 'loescheUrsache').mockResolvedValue({ vorher: 'not_done', nachher: null, geaendert: true });
-    await werkzeug('regel_rueckfall').run({ regel: 'scrolling', aktion: 'zuruecknehmen', datum: 'gestern' });
-    expect(loeschen).toHaveBeenCalledWith('rule.scrolling', '2026-10-09');
+    await werkzeug('regel_rueckfall').run({ regel: 'scrolling', aktion: 'zuruecknehmen' });
+    expect(loeschen).toHaveBeenCalledWith('rule.scrolling', '2026-10-10');
   });
 });
 

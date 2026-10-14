@@ -348,6 +348,28 @@ Pipeline sind nur Folgen.
   drei nehmen nichts an, wenn die Sammelabfrage leer zurückkommt (Ausfall).
 - **Quote nur über Tage mit Ziel** (`targeted`). Ohne Ziel ist die Quote
   `null`, nie 0 %.
+- **Neues Design live** (14.10., Ricos Abnahme des Prototyps
+  https://claude.ai/artifact/MfjmDe1hpyKL5wTJpGX4vR): **vier Reiter** — Heute,
+  Vertrieb, Ziele, Mails — Apple-minimal (Systemschrift, Apple-Grautöne,
+  `AppShell`: Umschalter oben am Mac, Tab-Leiste unten am iPhone; Sidebar,
+  TopBar, Uhr weg). **Verlauf und Health abgebaut** (Seiten leiten auf `/`
+  um). „Heute": Calls-Kachel (CRM, mit Wochenstand), Kacheln Training/Post
+  (antippen = erledigt, nochmal = zurück auf offen via `clearCause`),
+  Morgen/Abend (aufklappbare Schritte), Regeln als iOS-Liste, „Diese Woche"
+  Mo–So im Blocksystem (`WocheKarte`, heutige Spalte live), Aufgaben (5).
+  Keine Ringe, keine Monats-Heatmap, kein Wochenrückblick auf dem Dashboard —
+  Vorwochen spielen dort keine Rolle. Serien/Gold/Ton/perfekter Tag bleiben
+  (`Kacheln.tsx`, `PerfektFeier.tsx`, `useFeier`). Vertrieb: Woche primär
+  (Ist/Basis, Tage übrig, pro Tag nötig), Split, Ergebnis (Termine „keine
+  Daten", Abschlüsse „keine erfasst" statt 0), Calls je Tag. Ziele: Umsatz +
+  „zahlt darauf ein" (fest: Calls der Woche, bis Migration
+  `core_goal_drivers`), Plan, weitere Ziele, Rekorde, Einstellungen als
+  aufklappbare Liste (GoalsEditor, neuer `RoutinenEditor`, Töne).
+  Blockfarben zentral in `src/lib/zellen.ts`.
+- **Nur heute bearbeitbar** (Rico, 14.10.): `nurHeute()` im `TrackingService`
+  lehnt jeden Haken für einen anderen Berliner Tag ab — Dashboard und ChatGPT
+  gleich (MCP: „gestern" entfällt). Offenes bleibt „nicht gemessen". Jarvis-
+  Kopie der Spec ergänzt; **CRM-Kopie muss nachziehen.**
 - **iPhone-Widgets neu** (14.10.): alte drei (Calls, Routine, Ringe) samt
   Endpunkten `/api/widgets/calls|routines|motivation`, `components/widgets/*`
   und toten `RoutineService`-Methoden abgebaut. Neu: **Jarvis Heute** (Kacheln,
@@ -677,20 +699,6 @@ Pipeline sind nur Folgen.
 
 ## Offene Entscheidungen
 
-- **Neues Design (14.10., in Arbeit)** — Prototyp
-  https://claude.ai/artifact/MfjmDe1hpyKL5wTJpGX4vR : vier Reiter (Heute,
-  Vertrieb, Ziele, Mails), Apple-minimal, Tag als Kacheln, laufende Woche Mo–So
-  im Blocksystem, keine Vorwochen, keine Ringe. Verlauf und Health fallen weg.
-  **Regel (Rico, 14.10.): bearbeitbar nur bis 0 Uhr** — danach bleibt Offenes
-  „nicht gemessen" (gilt auch für ChatGPT: dann nur noch heute). Noch nicht in
-  Jarvis eingebaut — erst wenn Rico das Design abnimmt.
-
-- **Wochenzyklus (11.10., wartet auf Ricos OK)** — `docs/wochenzyklus-spec.md`
-  ist verbindlich; Inventur, Vorschlag und Migrationsvorschlag in
-  `docs/wochenzyklus-analyse.md`. Kernpunkte: Woche Mo–So statt Blockwoche
-  Di–Mo, Wochenfortschritt primär, Heatmaps mit roten Tagen raus (auch die
-  Ketten auf `/ziele` vom 10.10.), harter Schnitt Sonntag 23:59 für Nachträge,
-  `core_goal_drivers` + `target_numeric` als Migration. **Nichts umgesetzt.**
 - **Erinnerung per Kurzbefehl ist auf Eis** (Rico, 11.10.) — gebaut und live
   (`/api/widgets/nudge`), Rico will später daran erinnert werden.
 

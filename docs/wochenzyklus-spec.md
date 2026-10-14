@@ -10,6 +10,12 @@ Die Einheit der Steuerung ist die **laufende Woche**, nicht der Monat.
 Mo 00:00 – So 23:59. Sonntag 23:59 ist ein harter Schnitt: danach keine
 Nachträge mehr für diese Woche.
 
+> **Jarvis, ab 14.10.2026 strenger (Rico):** Bearbeitbar ist nur **der
+> laufende Tag** — um 0 Uhr ist er zu, Offenes bleibt „nicht gemessen".
+> Mentaler Reset: jeden Morgen frisch, ohne die letzten Tage zu korrigieren.
+> Gilt in Jarvis für Dashboard und ChatGPT (`TrackingService.nurHeute`).
+> **Die CRM-Kopie dieser Spec muss das noch nachziehen.**
+
 ## Warum
 
 Historische Fehlwochen als rote Flächen anzuzeigen erzeugt Vermeidung statt

@@ -53,6 +53,8 @@ export interface WochenZeile {
   key: string;
   name: string;
   zellen: Zelle[];
+  /** Wert je Tag Mo–So; `null` = nicht gemessen oder noch nicht da. */
+  werte: Array<number | null>;
   /** Ist der Woche: Summe (Calls) bzw. erfüllte Tage. */
   ist: number;
   /** Basis-Wochenziel; `null` ohne Ziel. */
@@ -75,6 +77,7 @@ export async function heuteUndWoche(heute: string = getBerlinDateStr()) {
     return tagesziel === null ? null : tagesziel * arbeitstage;
   };
   const zellen = (key: string, sonntags = false) => woche.tage.map(t => zelle(c(key, t), t, heute, sonntags));
+  const werte = (key: string) => woche.tage.map(t => (t <= heute ? c(key, t)?.value ?? null : null));
   const erfuellteTage = (key: string) => woche.tage.filter(t => t <= heute && erfuellt(c(key, t))).length;
 
   // Regeln als eine Zeile: ein Rückfall an dem Tag färbt den Tag.
@@ -111,10 +114,10 @@ export async function heuteUndWoche(heute: string = getBerlinDateStr()) {
   const callsBasis = wochenziel(CALLS, 'base');
 
   const zeilen: WochenZeile[] = [
-    { key: CALLS, name: 'Calls', zellen: zellen(CALLS), ist: callsIst, ziel: callsBasis },
-    ...URSACHEN.map(u => ({ key: u.key, name: u.name, zellen: zellen(u.key), ist: erfuellteTage(u.key), ziel: arbeitstage })),
-    ...ROUTINEN.map(r => ({ key: r.key, name: r.name, zellen: zellen(r.key), ist: erfuellteTage(r.key), ziel: arbeitstage })),
-    { key: 'regeln', name: 'Regeln', zellen: regelZellen, ist: rueckfaelleWoche, ziel: null },
+    { key: CALLS, name: 'Calls', zellen: zellen(CALLS), werte: werte(CALLS), ist: callsIst, ziel: callsBasis },
+    ...URSACHEN.map(u => ({ key: u.key, name: u.name, zellen: zellen(u.key), werte: werte(u.key), ist: erfuellteTage(u.key), ziel: arbeitstage })),
+    ...ROUTINEN.map(r => ({ key: r.key, name: r.name, zellen: zellen(r.key), werte: werte(r.key), ist: erfuellteTage(r.key), ziel: arbeitstage })),
+    { key: 'regeln', name: 'Regeln', zellen: regelZellen, werte: regelZellen.map(z => (z === 'unter' ? 0 : z === 'soll' ? 1 : null)), ist: rueckfaelleWoche, ziel: null },
   ];
 
   return {

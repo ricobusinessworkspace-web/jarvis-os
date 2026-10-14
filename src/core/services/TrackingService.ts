@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { AnalyticsService } from './AnalyticsService';
+import { getBerlinDateStr } from '@/lib/dateUtils';
 
 /**
  * Der eine Schreibweg für Haken: Ursachen, Regeln und Routine-Schritte.
@@ -11,6 +12,11 @@ import { AnalyticsService } from './AnalyticsService';
  * Jede Funktion meldet, was vorher stand und was jetzt steht. Steht schon da,
  * was geschrieben werden soll, wird **nichts** geschrieben (`geaendert: false`)
  * — ein wiederholter Aufruf ist harmlos.
+ *
+ * **Nur heute ist bearbeitbar** (Rico, 14.10.: mentaler Reset um 0 Uhr).
+ * Ein vergangener Tag steht, wie er bis Mitternacht eingetragen war; was offen
+ * blieb, bleibt „nicht gemessen". Das gilt für Dashboard und ChatGPT gleich —
+ * deshalb hier und nirgends sonst.
  *
  * Gespeichert wird in `jarvis_tracker_logs`:
  * - `completed` — erledigt bzw. (bei Regeln) ausdrücklich gehalten
@@ -47,6 +53,13 @@ export interface Schritt {
 /** Galt der Schritt an diesem Tag? Dasselbe Fenster, aus dem die Matrix die Schrittzahl bildet. */
 export function giltAm(s: Pick<Schritt, 'activeFrom' | 'archivedOn'>, datum: string): boolean {
   return (s.activeFrom === null || s.activeFrom <= datum) && (s.archivedOn === null || s.archivedOn > datum);
+}
+
+/** Vergangene und künftige Tage sind zu — nur der heutige Berliner Tag lässt sich ändern. */
+export function nurHeute(datum: string) {
+  const heute = getBerlinDateStr();
+  if (datum < heute) throw new TrackingFehler(`Der ${datum} ist vorbei — vergangene Tage lassen sich nicht mehr ändern. Offenes bleibt „nicht gemessen".`);
+  if (datum > heute) throw new TrackingFehler(`Der ${datum} hat noch nicht begonnen — abhaken geht nur heute.`);
 }
 
 export class TrackingService {
@@ -96,6 +109,7 @@ export class TrackingService {
    * Rückfall — und etwas anderes als keine Zeile.
    */
   static async setzeUrsache(metricKey: string, datum: string, done: boolean): Promise<Aenderung> {
+    nurHeute(datum);
     const haken = await this.hakenImFenster(metricKey, datum);
     return this.schreibe(haken.id, datum, done ? 'completed' : 'not_done');
   }
@@ -105,6 +119,7 @@ export class TrackingService {
    * gemessen", eine Regel wieder auf gehalten (Rückfall zurückgenommen).
    */
   static async loescheUrsache(metricKey: string, datum: string): Promise<Aenderung> {
+    nurHeute(datum);
     const haken = await this.hakenImFenster(metricKey, datum);
     return this.schreibe(haken.id, datum, null);
   }
@@ -150,6 +165,7 @@ export class TrackingService {
    * gezählt und stünde unsichtbar in der Datenbank.
    */
   static async setzeSchritt(itemId: string, datum: string, status: HakenStatus): Promise<Aenderung> {
+    nurHeute(datum);
     if (!HAKEN_STATUS.includes(status)) throw new TrackingFehler(`Unbekannter Status ${status}.`);
     const item = await prisma.trackerItem.findUnique({
       where: { id: itemId },
@@ -164,6 +180,7 @@ export class TrackingService {
 
   /** Nimmt den Haken eines Routine-Schritts ganz weg — der Schritt steht wieder offen. */
   static async loescheSchritt(itemId: string, datum: string): Promise<Aenderung> {
+    nurHeute(datum);
     return this.schreibe(itemId, datum, null);
   }
 

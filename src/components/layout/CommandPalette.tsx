@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from '@/components/ui/command';
-import { Sun, CalendarDays, PhoneCall, HeartPulse, Target, CornerDownLeft, Volume2, VolumeX } from 'lucide-react';
+import { Sun, PhoneCall, Target, Mail, CornerDownLeft, Volume2, VolumeX } from 'lucide-react';
 import { useToene } from '@/hooks/useToene';
 import { tick } from '@/lib/sound';
 
@@ -17,20 +17,11 @@ import { tick } from '@/lib/sound';
  * ist dauerhaft sichtbar, aber jede Zeile führt wirklich irgendwohin.
  */
 
-/** Ohne Zeitzonen-Umweg: der Server rendert nur die Hülle, die Tage rechnet der Browser. */
-function shiftDay(offset: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 const PAGES = [
-  { label: 'Heute', href: '/', icon: Sun, hint: 'Dashboard' },
-  { label: 'Verlauf', href: '/verlauf', icon: CalendarDays, hint: 'Tage nachtragen' },
-  { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall, hint: 'Calls, Pipeline' },
-  { label: 'Health', href: '/health', icon: HeartPulse, hint: 'Training, Routinen, Regeln' },
-  // Finanzen kaltgestellt (07.10.), siehe Sidebar.
-  { label: 'Ziele', href: '/ziele', icon: Target, hint: 'Basis, Soll, Umsatz' },
+  { label: 'Heute', href: '/', icon: Sun, hint: 'Tag und Woche' },
+  { label: 'Vertrieb', href: '/vertrieb', icon: PhoneCall, hint: 'Calls diese Woche' },
+  { label: 'Ziele', href: '/ziele', icon: Target, hint: 'Umsatz, Rekorde, Einstellungen' },
+  { label: 'Mails', href: '/mail', icon: Mail, hint: 'Warteschlange aus dem CRM' },
 ];
 
 export function CommandPalette() {
@@ -77,17 +68,6 @@ export function CommandPalette() {
               <span className="ml-auto text-[11px] text-muted">{hint}</span>
             </CommandItem>
           ))}
-        </CommandGroup>
-
-        <CommandGroup heading="Nachtragen">
-          <CommandItem value="gestern nachtragen" onSelect={() => go(`/verlauf?d=${shiftDay(-1)}`)}>
-            <CalendarDays className="mr-2.5 h-4 w-4 shrink-0 text-muted" />
-            <span>Gestern nachtragen</span>
-          </CommandItem>
-          <CommandItem value="vorgestern nachtragen" onSelect={() => go(`/verlauf?d=${shiftDay(-2)}`)}>
-            <CalendarDays className="mr-2.5 h-4 w-4 shrink-0 text-muted" />
-            <span>Vorgestern nachtragen</span>
-          </CommandItem>
         </CommandGroup>
 
         <CommandGroup heading="Einstellungen">
