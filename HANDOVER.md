@@ -1,6 +1,6 @@
 ---
-last_updated: 2026-10-09
-last_agent: Claude Opus 5.5 — Plan Schritte 0–3 (Sonntags-Joker, ChatGPT liest/hakt ab); parallel: NaN-Fix RulesCard
+last_updated: 2026-10-14
+last_agent: Claude Opus 5.5 — Supabase-Sicherheit (RLS) geschlossen; davor Plan Schritte 0–3, NaN-Fix RulesCard
 status: In Progress
 ---
 
@@ -428,6 +428,13 @@ Pipeline sind nur Folgen.
   gezählten Haken kommen je Tag aus demselben Fenster.
 
 ## Gelöste Probleme (nicht wiederholen)
+
+- **Problem:** Supabase-Sicherheitswarnungen (Mails). **Lösung (14.10., live):**
+  `docs/security-lockdown.sql` ausgeführt, `get_advisors` danach sauber bis auf
+  `pg_net` (CRM-Zeitschaltuhr, bewusst) und den Passwort-Schalter im Dashboard.
+  „RLS enabled, no policy" ist gewollt.
+  **Warum wichtig:** Jarvis liest per Prisma als `postgres` (BYPASSRLS).
+  **Neue Tabellen immer mit RLS anlegen**, danach `get_advisors` prüfen.
 
 - **Problem:** Konsolenfehler „Received NaN for the `children` attribute",
   scheinbar auf allen Reitern (auch `/mail`), im HTML kein NaN.
